@@ -1,0 +1,9 @@
+# Local Claude Code instructions and permissions
+CLAUDE.local.md
+.claude/settings.local.json
+
+# Local environment values
+.env
+.env.*
+!.env.example
+!.env.*.example
