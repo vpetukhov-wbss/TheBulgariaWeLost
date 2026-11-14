@@ -1,6 +1,6 @@
 ---
 name: angular-api-integration
-description: "Implement and review typed Angular HttpClient integrations with ASP.NET Core or other backend."
+description: "Implement and review typed Angular HttpClient integrations with the NestJS API."
 ---
 
 # angular-api-integration
