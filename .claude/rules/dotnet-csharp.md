@@ -7,7 +7,7 @@ paths:
   - "**/global.json"
 ---
 # C#/.NET focused rules
-- Follow the repository's pinned target framework and C# version. Check the existing backend template before selecting the initial SDK.
+- Follow the repository's pinned target framework and C# version. Check the media service requirements before selecting its initial SDK.
 - Prefer nullable enabled, analyzers, explicit access modifiers where idiomatic, file-scoped namespaces; one public application/domain type per file.
 - Use `sealed` only with intent; records for immutable value semantics; `required`/constructors to protect construction invariants.
 - Avoid premature Span<T>, pooling, reflection, allocations micro-optimizations. Measure hotspots first.
