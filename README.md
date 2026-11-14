@@ -20,7 +20,7 @@
 
 ## Основа за разработка
 
-Основата на API е [Brocoders NestJS Boilerplate](https://github.com/brocoders/nestjs-boilerplate) в документния му режим. Уеб интерфейсът стъпва на Angular и Nebular. Съвместимите версии се фиксират след преглед на конкретния Angular темплейт.
+Основата на API е [Brocoders NestJS Boilerplate](https://github.com/brocoders/nestjs-boilerplate) в документния му режим. Уеб интерфейсът стъпва на Angular и стандартната светла тема `default` на Akveo Nebular. Съвместимите версии се фиксират след преглед на конкретния Angular темплейт.
 
 ## Работа с Claude Code
 

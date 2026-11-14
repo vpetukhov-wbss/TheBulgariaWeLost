@@ -18,7 +18,7 @@
 ## Използване на съществуващите проекти
 
 - API в `apps/api/` стъпва върху документирания commit на Brocoders и режима MongoDB/Mongoose. Приложи проектните роли, сесии и правила за достъп според [админ API договора](docs/admin/api.md).
-- Уеб приложението в `apps/web/` ползва темплейта на собственика и Nebular. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е в `services/media/`. Провери нейния `global.json` и `TargetFramework`.
+- Уеб приложението в `apps/web/` ползва темплейта на собственика и стандартната светла тема `default` на Akveo Nebular. При стартиране задавай `NbThemeModule.forRoot({ name: 'default' })` и зареждай стиловете за същата тема през настройката на темплейта. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е в `services/media/`. Провери нейния `global.json` и `TargetFramework`.
 - Пренеси само нужните за архива компоненти с потвърдени права за публично разпространение. Използвай отделна конфигурация за локалните и production среди.
 
 ## Инженерни сетъпи
