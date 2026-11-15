@@ -1,0 +1,107 @@
+<nb-card>
+  <nb-card-header
+    ><h1>{{ page.title }}</h1></nb-card-header
+  >
+  <nb-card-body>
+    @if (success(); as message) {
+      <nb-alert status="success" role="status">{{ message }}</nb-alert>
+      <a nbButton status="primary" routerLink="/login">Към входа</a>
+    } @else if (usesLink && !hash) {
+      <nb-alert status="warning" role="alert">Линкът е непълен.</nb-alert>
+      <a nbButton status="basic" routerLink="/login">Към входа</a>
+    } @else {
+      @if (error(); as message) {
+        <nb-alert status="danger" role="alert">{{ message }}</nb-alert>
+      }
+      <form [formGroup]="form" (ngSubmit)="submit()" [nbSpinner]="busy()" nbSpinnerStatus="primary">
+        @if (action === 'register') {
+          <div class="names">
+            <label
+              >Име
+              <input
+                nbInput
+                fullWidth
+                formControlName="firstName"
+                autocomplete="given-name"
+                required
+            /></label>
+            <label
+              >Фамилия
+              <input
+                nbInput
+                fullWidth
+                formControlName="lastName"
+                autocomplete="family-name"
+                required
+            /></label>
+          </div>
+        }
+        @if (form.controls.email.enabled) {
+          <label
+            >Имейл
+            <input
+              nbInput
+              fullWidth
+              type="email"
+              formControlName="email"
+              autocomplete="email"
+              required
+            />
+          </label>
+          @if (form.controls.email.touched && form.controls.email.invalid) {
+            <p class="caption status-danger" role="alert">Въведи валиден имейл.</p>
+          }
+        }
+        @if (form.controls.password.enabled) {
+          <label
+            >Парола
+            <input
+              nbInput
+              fullWidth
+              type="password"
+              formControlName="password"
+              [autocomplete]="action === 'login' ? 'current-password' : 'new-password'"
+              required
+            />
+          </label>
+          @if (form.controls.password.touched && form.controls.password.invalid) {
+            <p class="caption status-danger" role="alert">
+              {{
+                action === 'login'
+                  ? 'Въведи паролата си.'
+                  : 'Паролата трябва да съдържа поне 6 символа.'
+              }}
+            </p>
+          }
+        }
+        @if (action === 'reset') {
+          <label
+            >Потвърди паролата
+            <input
+              nbInput
+              fullWidth
+              type="password"
+              formControlName="confirmation"
+              autocomplete="new-password"
+              required
+            />
+          </label>
+        }
+        <button nbButton status="primary" type="submit" [disabled]="busy()">
+          {{ page.submit }}
+        </button>
+      </form>
+      <nav aria-label="Достъп до профила">
+        @if (action === 'login') {
+          <a routerLink="/forgot-password">Забравена парола</a>
+          <a routerLink="/register">Създай профил</a>
+        } @else {
+          <a routerLink="/login">Към входа</a>
+          @if (action === 'reset') {
+            <a routerLink="/forgot-password">Поискай нов линк</a>
+          }
+        }
+      </nav>
+    }
+  </nb-card-body>
+</nb-card>

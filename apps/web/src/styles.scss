@@ -1,0 +1,11 @@
+body {
+  margin: 0;
+}
+
+@media (max-width: 42rem) {
+  .nb-theme-default nb-layout .layout nb-layout-header > nav {
+    height: auto;
+    min-height: 4.75rem;
+    padding-block: 0.75rem;
+  }
+}
