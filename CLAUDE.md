@@ -6,7 +6,7 @@
 
 - [README.md](README.md) описва обхвата на първата версия и избраната инфраструктура.
 - [docs/monetization.md](docs/monetization.md) описва рекламните кампании, спонсорствата и връзките към социалните канали.
-- Стекът е NestJS и Mongoose за API, Angular и Nebular за уеб интерфейса, .NET и SFTP за файловата услуга. Репото е в етап на проектиране. [Архитектура](docs/architecture.md)
+- Стекът е NestJS и Mongoose за API, Angular и Nebular за уеб интерфейса, .NET и SFTP за файловата услуга. Основата на API е в `apps/api`. Редакционният и административният каталог от екрани е описан в документацията. [Архитектура](docs/architecture.md)
 
 ## Архитектура
 
@@ -26,6 +26,12 @@
 - Правилата за NestJS, Angular и .NET в `.claude/rules/` се прилагат според засегнатите файлове. Проектната архитектура, базата и правилата за публикуване и права се определят от настоящия документ и правилата на архива.
 - Използвай Angular конвенциите на workspace-а, типизиран API клиент и проверка на правата на сървъра. При промяна на договора провери API и Angular клиента поотделно и тествай засегнатия поток между тях.
 - Правилата, уменията и агентите са адаптирани от [dotnet](https://github.com/vpetukhov-wbss/ai-engineering-setups/tree/f5c3583f91383240edf3710fc7f1168b7b11dfa7/setups/dotnet) и [angular](https://github.com/vpetukhov-wbss/ai-engineering-setups/tree/f5c3583f91383240edf3710fc7f1168b7b11dfa7/setups/angular) в AI Engineering Setups. [MIT известие](docs/licenses/ai-engineering-setups-MIT.txt)
+
+## Команди за NestJS
+
+- Изпълнявай от `apps/api`. Инсталация и локален старт с `npm ci`, `cp .env.example .env`, `docker compose up -d --wait` и `npm run start:dev`.
+- Проверки с `npm run format:check`, `npm run lint`, `npm run typecheck` и `npm run build`. За HTTP интеграция използвай `npm run test:e2e` по указанията в [README на API](apps/api/README.md).
+- За нов или променян NestJS endpoint използвай `/nestjs-feature`. Правилата в `.claude/rules/nestjs-api.md` са ограничени до API пакета.
 
 ## Работа и проверка
 
