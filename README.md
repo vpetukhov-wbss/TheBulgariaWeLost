@@ -22,6 +22,8 @@
 
 Основата на API е [Brocoders NestJS Boilerplate](https://github.com/brocoders/nestjs-boilerplate) в документния му режим. Уеб интерфейсът стъпва на Angular и стандартната светла тема `default` на Akveo Nebular. Чистият Angular workspace е в [`apps/web/`](apps/web/README.md).
 
+Настройката на MongoDB replica set, Mailpit и проверките е в [NestJS workspace `apps/api/`](apps/api/README.md).
+
 ## Работа с Claude Code
 
 Стартирайте `claude` от корена на клонираното репо. Проектните инструкции са в [CLAUDE.md](CLAUDE.md). Командата `/memory` показва заредените инструкции. За конкретна задача използвайте `/design-domain-model`, `/implement-feature` или `/review-change`.

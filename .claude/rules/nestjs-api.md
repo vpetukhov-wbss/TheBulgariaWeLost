@@ -1,11 +1,14 @@
 ---
 paths:
   - "apps/api/**/*.ts"
+  - "apps/api/**/*.json"
+  - "apps/api/compose.yaml"
 ---
 # NestJS API
 
-- Следвай структурата на Brocoders в документен режим. Разделяй публичния и административния API чрез DTO, guards и проверки върху конкретния ресурс.
-- Прилагай текущи роли, валидност на сесията и MFA според админ договора. Централизирай проверките за достъп и версионирането на маршрутите.
-- При промяна на агрегат запиши съответните ревизия, одит и outbox в същата MongoDB транзакция. Изпълнявай операциите в една сесия последователно.
-- Поддържай OpenAPI и договорените кодове и структури за грешки. Валидирай DTO и приемай само предвидените полета.
-- Съхранявай метаданните и правата върху файловете. Изпращай файловите задачи към .NET чрез [вътрешния договор](../../docs/architecture.md#файлов-поток).
+- Organize features as modules. Keep controllers focused on HTTP and DTOs. Keep Mongoose schemas in the owning module and return explicit response DTOs.
+- Preserve `/api/v1/auth/*` for the Angular client and `/api/admin/v1/*` for the back office. Maintain Swagger metadata and follow [the admin API contract](../../docs/admin/api.md) for new administrative routes.
+- Use the current account and session for authorization. Access tokens carry role hints for UI navigation. Check current access policy, resources and administrator MFA in NestJS.
+- Reuse conditional updates and session versions for token rotation and revocation. Keep sensitive responses private. Exclude passwords, tokens, SMTP/DB credentials and link hashes from logs and responses.
+- Use one MongoDB transaction for a business state change and its required audit/outbox entries. Execute operations sequentially on the same session. Build indexes for actual queries and run integrations on a replica set.
+- Keep file bytes, SFTP credentials and media processing with the [.NET service](../../docs/architecture.md#файлов-поток). NestJS owns metadata, rights and the job contract.
