@@ -1,0 +1,34 @@
+<nb-layout>
+  <nb-layout-header>
+    <div class="header">
+      <a class="brand" routerLink="/">
+        <nb-icon icon="archive-outline" aria-hidden="true"></nb-icon>
+        <span>България, която изгубихме</span>
+      </a>
+      <div class="header-actions">
+        <a
+          *nbIsGranted="['view', 'back-office']"
+          nbButton
+          ghost
+          status="primary"
+          routerLink="/admin"
+        >
+          Работен панел
+        </a>
+        <ng-template [nbIsGranted]="['view', 'account']">
+          <a nbButton ghost status="primary" routerLink="/account">Профил</a>
+          <button nbButton ghost [disabled]="signingOut()" (click)="logout()">Изход</button>
+        </ng-template>
+        <a *nbIsGranted="['sign-in', 'session']" nbButton status="primary" routerLink="/login"
+          >Вход</a
+        >
+      </div>
+    </div>
+  </nb-layout-header>
+
+  <nb-layout-column>
+    <main>
+      <router-outlet />
+    </main>
+  </nb-layout-column>
+</nb-layout>

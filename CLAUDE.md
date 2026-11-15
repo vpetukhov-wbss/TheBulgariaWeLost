@@ -18,13 +18,13 @@
 ## Използване на съществуващите проекти
 
 - API в `apps/api/` стъпва върху документирания commit на Brocoders и режима MongoDB/Mongoose. Приложи проектните роли, сесии и правила за достъп според [админ API договора](docs/admin/api.md).
-- Уеб приложението в `apps/web/` ползва темплейта на собственика и стандартната светла тема `default` на Akveo Nebular. При стартиране задавай `NbThemeModule.forRoot({ name: 'default' })` и зареждай стиловете за същата тема през настройката на темплейта. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е в `services/media/`. Провери нейния `global.json` и `TargetFramework`.
+- Уеб приложението е [чист Angular workspace в `apps/web/`](apps/web/README.md) със стандартната светла тема `default` на Akveo Nebular. При стартиране задавай `NbThemeModule.forRoot({ name: 'default' })` и зареждай стиловете за същата тема през Angular workspace конфигурацията. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е в `services/media/`. Провери нейния `global.json` и `TargetFramework`.
 - Пренеси само нужните за архива компоненти с потвърдени права за публично разпространение. Използвай отделна конфигурация за локалните и production среди.
 
 ## Инженерни сетъпи
 
 - Правилата за NestJS, Angular и .NET в `.claude/rules/` се прилагат според засегнатите файлове. Проектната архитектура, базата и правилата за публикуване и права се определят от настоящия документ и правилата на архива.
-- Използвай съвместимите с темплейта Angular конвенции, типизиран API клиент и проверка на правата на сървъра. При промяна на договора провери API и Angular клиента поотделно и тествай засегнатия поток между тях.
+- Използвай Angular конвенциите на workspace-а, типизиран API клиент и проверка на правата на сървъра. При промяна на договора провери API и Angular клиента поотделно и тествай засегнатия поток между тях.
 - Правилата, уменията и агентите са адаптирани от [dotnet](https://github.com/vpetukhov-wbss/ai-engineering-setups/tree/f5c3583f91383240edf3710fc7f1168b7b11dfa7/setups/dotnet) и [angular](https://github.com/vpetukhov-wbss/ai-engineering-setups/tree/f5c3583f91383240edf3710fc7f1168b7b11dfa7/setups/angular) в AI Engineering Setups. [MIT известие](docs/licenses/ai-engineering-setups-MIT.txt)
 
 ## Работа и проверка
