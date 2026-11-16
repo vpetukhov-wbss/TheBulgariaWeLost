@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../Media.ControlPlane/Media.ControlPlane.csproj" />
+    <ProjectReference Include="../Media.Storage/Media.Storage.csproj" />
+  </ItemGroup>
+</Project>
