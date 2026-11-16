@@ -58,7 +58,7 @@
 <ng-template #pageContent let-view>
   @switch (view.id) {
     @case (homeScreen) {
-      <app-archive-home-page (search)="searchArchive($event)" />
+      <app-archive-home-page (searchRequested)="searchArchive($event)" />
     }
     @case (adminScreen) {
       <app-admin-dashboard-page />

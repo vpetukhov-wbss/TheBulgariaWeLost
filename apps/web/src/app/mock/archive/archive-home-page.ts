@@ -12,7 +12,7 @@ import { ArchiveSearchForm } from './archive-search-form';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ArchiveHomePage {
-  readonly search = output<string>();
+  readonly searchRequested = output<string>();
   protected readonly topic = screenPath('19:2052');
   protected readonly category = screenPath('19:2128');
   protected readonly materials: readonly FeaturedMaterial[] = [

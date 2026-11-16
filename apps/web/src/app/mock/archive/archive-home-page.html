@@ -2,7 +2,7 @@
   <div class="preview-archive-intro">
     <h1>България, която изгубихме</h1>
     <p>Дигитален архив на снимки, документи и лични истории от България.</p>
-    <app-archive-search-form (search)="search.emit($event)" />
+    <app-archive-search-form (querySubmitted)="searchRequested.emit($event)" />
     <nav class="preview-archive-links" aria-label="Избрани теми">
       <a [routerLink]="topic">Българските железници</a>
       <a [routerLink]="category">Категория „Транспорт“</a>

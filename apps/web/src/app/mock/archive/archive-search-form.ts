@@ -22,10 +22,10 @@ import { NbButtonModule, NbInputModule } from '@nebular/theme';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ArchiveSearchForm {
-  readonly search = output<string>();
+  readonly querySubmitted = output<string>();
 
   protected submit(event: Event, query: string): void {
     event.preventDefault();
-    this.search.emit(query);
+    this.querySubmitted.emit(query);
   }
 }
