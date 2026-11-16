@@ -4,76 +4,20 @@
       <nav class="mock-review-bar" aria-label="Преглед на макетите">
         <a routerLink="/demo">Всички екрани</a>
         @if (equivalent(); as id) {
-          <a [routerLink]="['/demo', id]">{{
+          <a [routerLink]="screenPath(id)">{{
             view.w < 500 ? 'Десктоп изглед' : 'Мобилен изглед'
           }}</a>
         }
+        @if (!view.menus && view.w >= 500) {
+          <a routerLink="/editor">Редактор</a>
+          <a routerLink="/admin">Администрация</a>
+        }
         <span>Мок данни</span>
       </nav>
-      @if (view.menus; as menus) {
-        <div class="mock-admin-grid">
-          <aside class="mock-sidebar" [class.mock-sidebar-open]="menuOpen()">
-            <a
-              class="mock-brand"
-              [routerLink]="['/demo', view.role === 'editor' ? '6:141' : '4:82']"
-            >
-              <span class="mock-monogram" aria-hidden="true">Б</span>
-              <strong>България, която изгубихме</strong>
-            </a>
-            <span class="mock-sidebar-caption">ДИГИТАЛЕН АРХИВ</span>
-            <nav aria-label="Управление на архива" id="management-menu">
-              @for (entry of menus; track entry[0]) {
-                @if (entry[2]) {
-                  <a
-                    [routerLink]="['/demo', entry[1] || view.id]"
-                    [class.mock-menu-current]="entry[3]"
-                    [attr.aria-current]="entry[3] ? 'page' : null"
-                  >
-                    <nb-icon [icon]="icon(entry[2])" aria-hidden="true" />
-                    {{ entry[0] }}
-                  </a>
-                } @else {
-                  <span class="mock-sidebar-caption">{{ entry[0] }}</span>
-                }
-              }
-            </nav>
-            <div class="mock-sidebar-session">
-              <span class="mock-avatar" aria-hidden="true">{{
-                view.role === 'editor' ? 'ЕР' : 'АД'
-              }}</span>
-              <div>
-                <strong>{{ view.role === 'editor' ? 'Елена Радева' : 'Архивен екип' }}</strong>
-                <small>{{ view.role === 'editor' ? 'Редактор' : 'Администратор' }}</small>
-              </div>
-            </div>
-          </aside>
-          <div class="mock-admin-main">
-            <header class="mock-admin-bar">
-              <button
-                class="mock-menu-trigger"
-                nbButton
-                type="button"
-                size="small"
-                appearance="outline"
-                aria-controls="management-menu"
-                [attr.aria-expanded]="menuOpen()"
-                (click)="menuOpen.set(!menuOpen())"
-              >
-                Меню
-              </button>
-              <span class="mock-admin-crumb"
-                >Архив <span aria-hidden="true">›</span> <strong>{{ view.crumb }}</strong></span
-              >
-              <span class="mock-session-label">
-                <nb-icon icon="shield-outline" aria-hidden="true" />
-                {{ view.role === 'editor' ? 'Редакторска сесия' : 'Защитена сесия' }}
-              </span>
-            </header>
-            <main class="mock-admin-content">
-              <ng-container *ngTemplateOutlet="pageContent; context: { $implicit: view }" />
-            </main>
-          </div>
-        </div>
+      @if (view.menus) {
+        <app-management-layout [view]="view">
+          <ng-container *ngTemplateOutlet="pageContent; context: { $implicit: view }" />
+        </app-management-layout>
       } @else {
         <header class="mock-public-bar">
           <nav class="mock-content" aria-label="Основна навигация">
@@ -112,16 +56,26 @@
 }
 
 <ng-template #pageContent let-view>
-  @if (!heading()) {
-    <h1 class="mock-only-screen-reader">{{ view.name }}</h1>
+  @switch (view.id) {
+    @case (homeScreen) {
+      <app-archive-home-page (search)="searchArchive($event)" />
+    }
+    @case (adminScreen) {
+      <app-admin-dashboard-page />
+    }
+    @default {
+      @if (!heading()) {
+        <h1 class="mock-only-screen-reader">{{ view.name }}</h1>
+      }
+      @if (file()) {
+        <p class="mock-feedback" role="status">Избран файл {{ file() }}</p>
+      }
+      @if (feedback() && !view.dialog) {
+        <p class="mock-feedback" role="status">{{ feedback() }}</p>
+      }
+      <ng-container *ngTemplateOutlet="render; context: { $implicit: view.body }" />
+    }
   }
-  @if (file()) {
-    <p class="mock-feedback" role="status">Избран файл {{ file() }}</p>
-  }
-  @if (feedback() && !view.dialog) {
-    <p class="mock-feedback" role="status">{{ feedback() }}</p>
-  }
-  <ng-container *ngTemplateOutlet="render; context: { $implicit: view.body }" />
 </ng-template>
 
 <ng-template #render let-node>
@@ -150,7 +104,7 @@
           <a
             class="mock-stretched-link"
             [attr.aria-label]="nodeText(node)"
-            [routerLink]="['/demo', node.to]"
+            [routerLink]="screenPath(node.to)"
           ></a>
         }
         @for (child of node.ch; track $index) {
@@ -168,7 +122,7 @@
           class="mock-text"
           [style.--font-size]="node.s + 'px'"
           [style.font-weight]="node.fw"
-          [routerLink]="['/demo', node.to]"
+          [routerLink]="screenPath(node.to)"
           [style.color]="color(node.c)"
           >{{ node.t }}</a
         >
@@ -345,73 +299,13 @@
       </div>
     }
     @case ('table') {
-      @let rows = matchingRows(node);
-      @let first = node.pg ? page() * pageSize : 0;
-      <div class="mock-table-card">
-        <div class="mock-table-scroll" tabindex="0" role="region" aria-label="Таблица с мок данни">
-          <table>
-            <thead>
-              <tr>
-                @for (column of node.cols; track $index) {
-                  <th scope="col">{{ column }}</th>
-                }
-              </tr>
-            </thead>
-            <tbody>
-              @for (row of rows.slice(first, node.pg ? first + pageSize : rows.length); track row) {
-                <tr>
-                  @for (cell of row.cells; track $index; let index = $index) {
-                    <td>
-                      @if (index === 0 && row.to) {
-                        <a [routerLink]="['/demo', row.to]">
-                          @for (value of cell; track $index) {
-                            <ng-container
-                              *ngTemplateOutlet="render; context: { $implicit: value }"
-                            />
-                          }
-                        </a>
-                      } @else {
-                        @for (value of cell; track $index) {
-                          <ng-container *ngTemplateOutlet="render; context: { $implicit: value }" />
-                        }
-                      }
-                    </td>
-                  }
-                </tr>
-              } @empty {
-                <tr>
-                  <td [attr.colspan]="node.cols.length">Няма записи по тези критерии.</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-        @if (node.pg) {
-          <div class="mock-pagination">
-            <span>{{ rows.length }} записа</span>
-            <button
-              nbButton
-              type="button"
-              size="tiny"
-              appearance="ghost"
-              [disabled]="first === 0"
-              (click)="page.update(decreasePage)"
-            >
-              ← Предишна
-            </button>
-            <button
-              nbButton
-              type="button"
-              size="tiny"
-              appearance="ghost"
-              [disabled]="first + pageSize >= rows.length"
-              (click)="page.update(increasePage)"
-            >
-              Следваща →
-            </button>
-          </div>
-        }
-      </div>
+      <app-preview-data-table
+        [columns]="node.cols"
+        [rows]="matchingRows(node)"
+        [paginated]="node.pg ?? false"
+        [(page)]="page"
+        [cellTemplate]="render"
+      />
     }
   }
 </ng-template>

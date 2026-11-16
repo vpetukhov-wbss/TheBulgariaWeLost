@@ -11,7 +11,7 @@ npm ci
 npm start
 ```
 
-Angular слуша на `http://localhost:4200`. Локалният proxy насочва `/api/**` към NestJS на `http://localhost:3000`. За мейлите на Brocoders задай `FRONTEND_DOMAIN=http://localhost:4200`. При публикуване обслужвай Angular и API от един origin, насочи `/api/` към NestJS и настрой SPA fallback към `index.html` за браузърните маршрути.
+Angular показва архива с мок данни на `http://localhost:4200`. За работа със сесиите и NestJS използвай `npm run start:api`. Локалният proxy насочва `/api/**` към NestJS на `http://localhost:3000`. За мейлите на Brocoders задай `FRONTEND_DOMAIN=http://localhost:4200`. При публикуване обслужвай Angular и API от един origin, насочи `/api/` към NestJS и настрой SPA fallback към `index.html` за браузърните маршрути.
 
 ```sh
 npm run format:check
@@ -23,11 +23,23 @@ npm run build
 
 ## Преглед на екраните с мок данни
 
-Стартирай от `apps/web/` с `npm run start:mock`. Началната страница е на `http://localhost:4200/`, а каталогът за преглед на всички 190 [Figma изгледа](https://www.figma.com/design/3MmvkZFAq9ghZyQ3YU4w5O) е на `http://localhost:4200/demo`. Каталогът предлага директен вход към публичния сайт, мобилните изгледи, редакторския и административния панел.
+Стартирай от `apps/web/` с `npm start` или `npm run start:mock`. В горната лента на началната страница са връзките за редактора, администрацията и каталога за всички 190 [Figma изгледа](https://www.figma.com/design/3MmvkZFAq9ghZyQ3YU4w5O).
+
+| Маршрут | Екран |
+| --- | --- |
+| `/` | Начало на архива |
+| `/archive` | Търсене и материали |
+| `/account` | Авторски профил |
+| `/editor` | Редакторска зона |
+| `/admin` | Административно табло |
+| `/admin/users` | Потребители |
+| `/admin/audit` | Одит |
+| `/admin/storage` | Файлови хранилища |
+| `/demo` | Каталог на всички изгледи и състояния |
 
 Потребителските и административните потоци използват локални примерни записи и връзки между екраните. Входът, потвържденията, изборът на файлове, бановете и смяната на хранилище са симулации. Прегледът работи самостоятелно без API и база данни. За статичен преглед изпълни `npm run build:mock` и обслужвай `dist/bulgaria-web-mock/browser` със SPA fallback. Обичайният `npm run build` е за уеб приложението със сесии и NestJS интеграция.
 
-Екраните и мок данните са в `src/app/mock/fixtures/`. [Източници на изображенията](src/mock-assets/README.md)
+Началната страница, картите и формата за търсене са в `src/app/mock/archive/`. Административното табло, показателите и навигацията са в `src/app/mock/management/`, а таблицата е в `src/app/mock/shared/`. Примерните данни и вариантите на екраните са в `src/app/mock/fixtures/`. [Източници на изображенията](src/mock-assets/README.md)
 
 ## Сесии и роли
 

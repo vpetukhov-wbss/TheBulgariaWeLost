@@ -1,16 +1,21 @@
 import { Routes } from '@angular/router';
+import { screenPaths } from './screen-links';
+
+const screenPage = () => import('./mock-screen').then((module) => module.MockScreen);
 
 export const mockRoutes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'demo/19:1791' },
+  ...Object.entries(screenPaths).map(([screen, path]) => ({
+    path: path.slice(1),
+    pathMatch: 'full' as const,
+    data: { screen },
+    loadComponent: screenPage,
+  })),
   {
     path: 'demo',
     pathMatch: 'full',
     title: 'Екрани с мок данни · България, която изгубихме',
     loadComponent: () => import('./mock-catalog').then((module) => module.MockCatalog),
   },
-  {
-    path: 'demo/:screen',
-    loadComponent: () => import('./mock-screen').then((module) => module.MockScreen),
-  },
+  { path: 'demo/:screen', loadComponent: screenPage },
   { path: '**', redirectTo: 'demo' },
 ];

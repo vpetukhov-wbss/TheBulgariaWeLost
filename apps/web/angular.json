@@ -91,7 +91,8 @@
                 "@fontsource/open-sans/cyrillic-700.css",
                 "@nebular/theme/styles/prebuilt/default.css",
                 "src/styles.scss",
-                "src/app/mock/mock.scss"
+                "src/app/mock/mock.scss",
+                "src/app/mock/component-pages.scss"
               ]
             }
           },
@@ -110,7 +111,7 @@
               "buildTarget": "bulgaria-web:build:mock"
             }
           },
-          "defaultConfiguration": "development",
+          "defaultConfiguration": "mock",
           "options": {
             "proxyConfig": "proxy.conf.json"
           }

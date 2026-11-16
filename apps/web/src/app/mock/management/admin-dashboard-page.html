@@ -1,0 +1,47 @@
+<div class="preview-dashboard">
+  <header class="preview-heading-row">
+    <div>
+      <h1>Обзор на архива</h1>
+      <p>Материали, сигнали и състояние на системата на едно място.</p>
+    </div>
+    <a class="mock-button" nbButton [routerLink]="newMaterial" status="primary" size="small">
+      + Нов материал
+    </a>
+  </header>
+  <section class="preview-dashboard-summary">
+    <div>
+      <small>10 ноември 2026 · Архивът днес</small>
+      <h2>Преглед на работата по архива</h2>
+      <p>Вижте кое чака преглед и къде е нужно административно действие.</p>
+    </div>
+    <a class="mock-button" nbButton routerLink="/admin/materials" appearance="outline" size="small">
+      Към материалите
+    </a>
+  </section>
+  <div class="preview-metric-grid">
+    @for (metric of metrics; track metric.path) {
+      <app-admin-metric-card [item]="metric" />
+    }
+  </div>
+  <div class="preview-dashboard-panels">
+    @for (panel of panels; track panel.title) {
+      <section class="preview-dashboard-panel">
+        <h2>{{ panel.title }}</h2>
+        <p>{{ panel.description }}</p>
+        <ul>
+          @for (entry of panel.entries; track entry.title) {
+            <li>
+              <a [routerLink]="entry.path">
+                <span
+                  ><strong>{{ entry.title }}</strong
+                  ><small>{{ entry.detail }}</small></span
+                >
+                <span class="mock-badge" [attr.data-tone]="entry.tone">{{ entry.status }}</span>
+              </a>
+            </li>
+          }
+        </ul>
+      </section>
+    }
+  </div>
+</div>

@@ -1,0 +1,61 @@
+@let screen = view();
+<div class="mock-admin-grid">
+  <aside class="mock-sidebar" [class.mock-sidebar-open]="menuOpen()">
+    <a class="mock-brand" [routerLink]="screen.role === 'editor' ? '/editor' : '/admin'">
+      <span class="mock-monogram" aria-hidden="true">Б</span>
+      <strong>България, която изгубихме</strong>
+    </a>
+    <span class="mock-sidebar-caption">ДИГИТАЛЕН АРХИВ</span>
+    <nav aria-label="Управление на архива" id="management-menu">
+      @for (entry of screen.menus ?? []; track entry[0]) {
+        @if (entry[2]) {
+          <a
+            [routerLink]="screenPath(entry[1] ?? screen.id)"
+            [class.mock-menu-current]="entry[3]"
+            [attr.aria-current]="entry[3] ? 'page' : null"
+          >
+            <nb-icon [icon]="icon(entry[2])" aria-hidden="true" />
+            {{ entry[0] }}
+          </a>
+        } @else {
+          <span class="mock-sidebar-caption">{{ entry[0] }}</span>
+        }
+      }
+    </nav>
+    <div class="mock-sidebar-session">
+      <span class="mock-avatar" aria-hidden="true">{{
+        screen.role === 'editor' ? 'ЕР' : 'АД'
+      }}</span>
+      <div>
+        <strong>{{ screen.role === 'editor' ? 'Елена Радева' : 'Архивен екип' }}</strong>
+        <small>{{ screen.role === 'editor' ? 'Редактор' : 'Администратор' }}</small>
+      </div>
+    </div>
+  </aside>
+  <div class="mock-admin-main">
+    <header class="mock-admin-bar">
+      <button
+        class="mock-menu-trigger"
+        nbButton
+        type="button"
+        size="small"
+        appearance="outline"
+        aria-controls="management-menu"
+        [attr.aria-expanded]="menuOpen()"
+        (click)="menuOpen.set(!menuOpen())"
+      >
+        Меню
+      </button>
+      <span class="mock-admin-crumb"
+        >Архив <span aria-hidden="true">›</span> <strong>{{ screen.crumb }}</strong></span
+      >
+      <span class="mock-session-label">
+        <nb-icon icon="shield-outline" aria-hidden="true" />
+        {{ screen.role === 'editor' ? 'Редакторска сесия' : 'Защитена сесия' }}
+      </span>
+    </header>
+    <main class="mock-admin-content">
+      <ng-content />
+    </main>
+  </div>
+</div>

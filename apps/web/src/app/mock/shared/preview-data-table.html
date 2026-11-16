@@ -1,0 +1,65 @@
+<div class="mock-table-card">
+  <div class="mock-table-scroll" tabindex="0" role="region" aria-label="Таблица с мок данни">
+    <table>
+      <thead>
+        <tr>
+          @for (column of columns(); track $index) {
+            <th scope="col">{{ column }}</th>
+          }
+        </tr>
+      </thead>
+      <tbody>
+        @for (row of visibleRows(); track row) {
+          <tr>
+            @for (cell of row.cells; track $index; let index = $index) {
+              <td>
+                @if (index === 0 && row.to) {
+                  <a [routerLink]="screenPath(row.to)">
+                    <ng-container *ngTemplateOutlet="values; context: { $implicit: cell }" />
+                  </a>
+                } @else {
+                  <ng-container *ngTemplateOutlet="values; context: { $implicit: cell }" />
+                }
+              </td>
+            }
+          </tr>
+        } @empty {
+          <tr>
+            <td [attr.colspan]="columns().length">Няма записи по тези критерии.</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  @if (paginated()) {
+    <div class="mock-pagination">
+      <span>{{ rows().length }} записа</span>
+      <button
+        nbButton
+        type="button"
+        size="tiny"
+        appearance="ghost"
+        [disabled]="first() === 0"
+        (click)="changePage(-1)"
+      >
+        ← Предишна
+      </button>
+      <button
+        nbButton
+        type="button"
+        size="tiny"
+        appearance="ghost"
+        [disabled]="first() + pageSize >= rows().length"
+        (click)="changePage(1)"
+      >
+        Следваща →
+      </button>
+    </div>
+  }
+</div>
+
+<ng-template #values let-items>
+  @for (value of items; track $index) {
+    <ng-container *ngTemplateOutlet="cellTemplate(); context: { $implicit: value }" />
+  }
+</ng-template>
