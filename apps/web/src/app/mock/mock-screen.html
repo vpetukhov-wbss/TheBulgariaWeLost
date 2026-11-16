@@ -1,0 +1,417 @@
+@if (current(); as view) {
+  <div class="mock-frame" [class.mock-mobile]="view.w < 500" [class.mock-admin]="view.menus">
+    <div [attr.inert]="view.dialog ? '' : null">
+      <nav class="mock-review-bar" aria-label="Преглед на макетите">
+        <a routerLink="/demo">Всички екрани</a>
+        @if (equivalent(); as id) {
+          <a [routerLink]="['/demo', id]">{{
+            view.w < 500 ? 'Десктоп изглед' : 'Мобилен изглед'
+          }}</a>
+        }
+        <span>Мок данни</span>
+      </nav>
+      @if (view.menus; as menus) {
+        <div class="mock-admin-grid">
+          <aside class="mock-sidebar" [class.mock-sidebar-open]="menuOpen()">
+            <a
+              class="mock-brand"
+              [routerLink]="['/demo', view.role === 'editor' ? '6:141' : '4:82']"
+            >
+              <span class="mock-monogram" aria-hidden="true">Б</span>
+              <strong>България, която изгубихме</strong>
+            </a>
+            <span class="mock-sidebar-caption">ДИГИТАЛЕН АРХИВ</span>
+            <nav aria-label="Управление на архива" id="management-menu">
+              @for (entry of menus; track entry[0]) {
+                @if (entry[2]) {
+                  <a
+                    [routerLink]="['/demo', entry[1] || view.id]"
+                    [class.mock-menu-current]="entry[3]"
+                    [attr.aria-current]="entry[3] ? 'page' : null"
+                  >
+                    <nb-icon [icon]="icon(entry[2])" aria-hidden="true" />
+                    {{ entry[0] }}
+                  </a>
+                } @else {
+                  <span class="mock-sidebar-caption">{{ entry[0] }}</span>
+                }
+              }
+            </nav>
+            <div class="mock-sidebar-session">
+              <span class="mock-avatar" aria-hidden="true">{{
+                view.role === 'editor' ? 'ЕР' : 'АД'
+              }}</span>
+              <div>
+                <strong>{{ view.role === 'editor' ? 'Елена Радева' : 'Архивен екип' }}</strong>
+                <small>{{ view.role === 'editor' ? 'Редактор' : 'Администратор' }}</small>
+              </div>
+            </div>
+          </aside>
+          <div class="mock-admin-main">
+            <header class="mock-admin-bar">
+              <button
+                class="mock-menu-trigger"
+                nbButton
+                type="button"
+                size="small"
+                appearance="outline"
+                aria-controls="management-menu"
+                [attr.aria-expanded]="menuOpen()"
+                (click)="menuOpen.set(!menuOpen())"
+              >
+                Меню
+              </button>
+              <span class="mock-admin-crumb"
+                >Архив <span aria-hidden="true">›</span> <strong>{{ view.crumb }}</strong></span
+              >
+              <span class="mock-session-label">
+                <nb-icon icon="shield-outline" aria-hidden="true" />
+                {{ view.role === 'editor' ? 'Редакторска сесия' : 'Защитена сесия' }}
+              </span>
+            </header>
+            <main class="mock-admin-content">
+              <ng-container *ngTemplateOutlet="pageContent; context: { $implicit: view }" />
+            </main>
+          </div>
+        </div>
+      } @else {
+        <header class="mock-public-bar">
+          <nav class="mock-content" aria-label="Основна навигация">
+            @if (view.header) {
+              <ng-container *ngTemplateOutlet="render; context: { $implicit: view.header }" />
+            }
+          </nav>
+        </header>
+        <main class="mock-content mock-public-content">
+          <ng-container *ngTemplateOutlet="pageContent; context: { $implicit: view }" />
+        </main>
+      }
+    </div>
+    @if (view.dialog) {
+      <div class="mock-dialog-backdrop">
+        <section
+          role="dialog"
+          aria-modal="true"
+          [attr.aria-label]="view.name"
+          tabindex="0"
+          (keydown.escape)="closeDialog()"
+        >
+          <ng-container *ngTemplateOutlet="render; context: { $implicit: view.dialog }" />
+          @if (feedback()) {
+            <p class="mock-feedback" role="status">{{ feedback() }}</p>
+          }
+        </section>
+      </div>
+    }
+  </div>
+} @else {
+  <main class="mock-catalog">
+    <h1>Екранът липсва</h1>
+    <a routerLink="/demo">Към всички екрани</a>
+  </main>
+}
+
+<ng-template #pageContent let-view>
+  @if (!heading()) {
+    <h1 class="mock-only-screen-reader">{{ view.name }}</h1>
+  }
+  @if (file()) {
+    <p class="mock-feedback" role="status">Избран файл {{ file() }}</p>
+  }
+  @if (feedback() && !view.dialog) {
+    <p class="mock-feedback" role="status">{{ feedback() }}</p>
+  }
+  <ng-container *ngTemplateOutlet="render; context: { $implicit: view.body }" />
+</ng-template>
+
+<ng-template #render let-node>
+  @switch (node.k) {
+    @case ('group') {
+      <div
+        class="mock-group"
+        [class.mock-row]="node.d === 'row'"
+        [class.mock-panel]="node.r"
+        [class.mock-linked-group]="node.to"
+        [style.--node-width]="node.w ? node.w + '%' : null"
+        [style.--gap]="(node.g || 0) + 'px'"
+        [style.min-height.px]="node.h"
+        [style.padding-top.px]="node.p?.[0]"
+        [style.padding-right.px]="node.p?.[1]"
+        [style.padding-bottom.px]="node.p?.[2]"
+        [style.padding-left.px]="node.p?.[3]"
+        [style.background]="color(node.b)"
+        [style.border-color]="color(node.e)"
+        [style.border-width.px]="node.e === undefined ? null : 1"
+        [style.border-radius.px]="node.r"
+        [style.align-items]="node.a"
+        [style.justify-content]="node.j"
+      >
+        @if (node.to) {
+          <a
+            class="mock-stretched-link"
+            [attr.aria-label]="nodeText(node)"
+            [routerLink]="['/demo', node.to]"
+          ></a>
+        }
+        @for (child of node.ch; track $index) {
+          <ng-container *ngTemplateOutlet="render; context: { $implicit: child }" />
+        }
+      </div>
+    }
+    @case ('text') {
+      @if (node === heading()) {
+        <h1 class="mock-text" [style.--font-size]="node.s + 'px'" [style.color]="color(node.c)">
+          {{ node.t }}
+        </h1>
+      } @else if (node.to) {
+        <a
+          class="mock-text"
+          [style.--font-size]="node.s + 'px'"
+          [style.font-weight]="node.fw"
+          [routerLink]="['/demo', node.to]"
+          [style.color]="color(node.c)"
+          >{{ node.t }}</a
+        >
+      } @else if (node.href) {
+        <a class="mock-text" [style.--font-size]="node.s + 'px'" [href]="node.href">{{ node.t }}</a>
+      } @else if (node.s >= 20 && node.fw >= 600) {
+        <h2 class="mock-text" [style.--font-size]="node.s + 'px'" [style.color]="color(node.c)">
+          {{ node.t }}
+        </h2>
+      } @else {
+        <span
+          class="mock-text"
+          [style.--font-size]="node.s + 'px'"
+          [style.font-weight]="node.fw"
+          [style.color]="color(node.c)"
+          [style.text-align]="node.j"
+          >{{ node.t }}</span
+        >
+      }
+    }
+    @case ('line') {
+      <hr class="mock-rule" />
+    }
+    @case ('icon') {
+      <nb-icon [icon]="icon(node.t)" [style.font-size.px]="node.s" aria-hidden="true" />
+    }
+    @case ('badge') {
+      <span class="mock-badge" [style.background]="color(node.b)" [style.color]="color(node.c)">{{
+        node.t
+      }}</span>
+    }
+    @case ('button') {
+      @if (isFileButton(node)) {
+        <label class="mock-file-button">
+          <span>{{ node.t }}</span>
+          <input type="file" (change)="chooseFile($event, node)" />
+        </label>
+      } @else {
+        <button
+          class="mock-button"
+          nbButton
+          type="button"
+          size="small"
+          [disabled]="node.b === 5"
+          [status]="node.b === 7 || node.b === 8 ? 'primary' : node.b === 14 ? 'danger' : 'basic'"
+          [appearance]="node.b === 0 ? 'outline' : 'filled'"
+          [style.--button-bg]="color(node.b)"
+          [style.--button-fg]="color(node.c)"
+          (click)="action(node)"
+        >
+          {{ node.t }}
+        </button>
+      }
+    }
+    @case ('check') {
+      <nb-checkbox [checked]="checked(node)" (checkedChange)="setChecked(node, $event)">{{
+        node.t
+      }}</nb-checkbox>
+    }
+    @case ('filter') {
+      <nb-select
+        class="mock-select"
+        size="small"
+        [style.--node-width]="node.w ? node.w + '%' : null"
+        [attr.aria-label]="node.t"
+        [placeholder]="node.t"
+        [selected]="filterValue(node)"
+        (selectedChange)="setFilter(node, $event)"
+      >
+        @for (option of dropdownOptions(node); track option) {
+          <nb-option [value]="option">{{ option || 'Всички' }}</nb-option>
+        }
+      </nb-select>
+    }
+    @case ('search') {
+      <div class="mock-input" [style.--node-width]="node.w ? node.w + '%' : null">
+        <div class="mock-archive-button-wrap">
+          <input
+            nbInput
+            fullWidth
+            fieldSize="small"
+            [attr.aria-label]="placeholder(node)"
+            type="search"
+            [placeholder]="placeholder(node)"
+            [ngModel]="value(node)"
+            (ngModelChange)="setValue(node, $event)"
+            (keydown.enter)="enterSearch($event, node)"
+          />
+          @if (node.t?.endsWith(' Търси')) {
+            <button
+              class="mock-button"
+              nbButton
+              type="button"
+              size="small"
+              status="primary"
+              (click)="searchArchive()"
+            >
+              Търси
+            </button>
+          }
+        </div>
+      </div>
+    }
+    @case ('field') {
+      <label class="mock-input" [style.--node-width]="node.w ? node.w + '%' : null">
+        @if (node.label && node.label !== 'null') {
+          <span>{{ node.label }}</span>
+        }
+        @if (node.i === 'down') {
+          <nb-select
+            size="small"
+            fullWidth
+            [attr.aria-label]="label(node)"
+            [selected]="value(node)"
+            (selectedChange)="setValue(node, $event)"
+          >
+            @for (option of dropdownOptions(node); track option) {
+              <nb-option [value]="option">{{ option }}</nb-option>
+            }
+          </nb-select>
+        } @else if (node.h >= 65) {
+          <textarea
+            nbInput
+            fullWidth
+            [attr.aria-label]="label(node)"
+            [style.min-height.px]="node.h"
+            [readOnly]="node.ro || false"
+            [placeholder]="placeholder(node)"
+            [ngModel]="value(node)"
+            (ngModelChange)="setValue(node, $event)"
+          ></textarea>
+        } @else {
+          <input
+            nbInput
+            fullWidth
+            [attr.aria-label]="label(node)"
+            [style.min-height.px]="node.h"
+            [type]="inputType(node)"
+            [readOnly]="node.ro || false"
+            [placeholder]="placeholder(node)"
+            [ngModel]="value(node)"
+            (ngModelChange)="setValue(node, $event)"
+            (keydown.enter)="enterSearch($event, node)"
+          />
+        }
+        @if (node.hint) {
+          <small>{{ node.hint }}</small>
+        }
+      </label>
+    }
+    @case ('picture') {
+      @if (pictures[node.t]; as picture) {
+        <img
+          class="mock-picture"
+          [style.--node-width]="node.w ? node.w + '%' : null"
+          [style.height.px]="node.h"
+          [style.border-radius.px]="node.r"
+          [style.object-fit]="picture.fit || 'cover'"
+          [src]="'/mock-assets/' + picture.file"
+          [alt]="picture.alt"
+        />
+      }
+    }
+    @case ('preview') {
+      <div
+        class="mock-preview"
+        [style.--node-width]="node.w ? node.w + '%' : null"
+        [style.height.px]="node.h"
+        [style.background]="color(node.b)"
+        [style.border-radius.px]="node.r"
+      >
+        <nb-icon [icon]="icon(node.i)" aria-hidden="true" />
+        <span>{{ node.t }}</span>
+      </div>
+    }
+    @case ('table') {
+      @let rows = matchingRows(node);
+      @let first = node.pg ? page() * pageSize : 0;
+      <div class="mock-table-card">
+        <div class="mock-table-scroll" tabindex="0" role="region" aria-label="Таблица с мок данни">
+          <table>
+            <thead>
+              <tr>
+                @for (column of node.cols; track $index) {
+                  <th scope="col">{{ column }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of rows.slice(first, node.pg ? first + pageSize : rows.length); track row) {
+                <tr>
+                  @for (cell of row.cells; track $index; let index = $index) {
+                    <td>
+                      @if (index === 0 && row.to) {
+                        <a [routerLink]="['/demo', row.to]">
+                          @for (value of cell; track $index) {
+                            <ng-container
+                              *ngTemplateOutlet="render; context: { $implicit: value }"
+                            />
+                          }
+                        </a>
+                      } @else {
+                        @for (value of cell; track $index) {
+                          <ng-container *ngTemplateOutlet="render; context: { $implicit: value }" />
+                        }
+                      }
+                    </td>
+                  }
+                </tr>
+              } @empty {
+                <tr>
+                  <td [attr.colspan]="node.cols.length">Няма записи по тези критерии.</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (node.pg) {
+          <div class="mock-pagination">
+            <span>{{ rows.length }} записа</span>
+            <button
+              nbButton
+              type="button"
+              size="tiny"
+              appearance="ghost"
+              [disabled]="first === 0"
+              (click)="page.update(decreasePage)"
+            >
+              ← Предишна
+            </button>
+            <button
+              nbButton
+              type="button"
+              size="tiny"
+              appearance="ghost"
+              [disabled]="first + pageSize >= rows.length"
+              (click)="page.update(increasePage)"
+            >
+              Следваща →
+            </button>
+          </div>
+        }
+      </div>
+    }
+  }
+</ng-template>

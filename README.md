@@ -20,11 +20,11 @@
 
 ## Основа за разработка
 
-Основата на API е [Brocoders NestJS Boilerplate](https://github.com/brocoders/nestjs-boilerplate) в документния му режим. Уеб интерфейсът стъпва на Angular и стандартната светла тема `default` на Akveo Nebular. Чистият Angular workspace е в [`apps/web/`](apps/web/README.md).
+Основата на API е [Brocoders NestJS Boilerplate](https://github.com/brocoders/nestjs-boilerplate) в документния му режим. Уеб интерфейсът стъпва на Angular и стандартната светла тема `default` на Akveo Nebular. Чистият Angular workspace е в [`apps/web/`](apps/web/README.md). Мок режимът показва [190 екрана за преглед](apps/web/README.md#преглед-на-екраните-с-мок-данни).
 
 Настройката на MongoDB replica set, Mailpit и проверките е в [NestJS workspace `apps/api/`](apps/api/README.md).
 
-Настройката на SFTP профилите, проверките и вътрешния договор е в [.NET Media API `services/media/`](services/media/README.md).
+Настройката на SFTP профилите, проверките и вътрешния договор е в [.NET Media API `apps/media/`](apps/media/README.md).
 
 ## Работа с Claude Code
 

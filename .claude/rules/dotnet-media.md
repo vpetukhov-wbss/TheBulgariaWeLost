@@ -1,8 +1,8 @@
 ---
 paths:
-  - "services/media/**/*.cs"
-  - "services/media/**/*.csproj"
-  - "services/media/**/*.json"
+  - "apps/media/**/*.cs"
+  - "apps/media/**/*.csproj"
+  - "apps/media/**/*.json"
 ---
 # .NET Media API
 
