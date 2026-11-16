@@ -1,8 +1,8 @@
 import {
   Controller,
+  ForbiddenException,
   Get,
   Req,
-  Res,
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
@@ -14,8 +14,6 @@ import {
   ApiProperty,
   ApiTags,
 } from '@nestjs/swagger';
-import type { Response } from 'express';
-import { randomUUID } from 'node:crypto';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
 import type { RequestWithUser } from '../utils/types/request-with-user.type';
@@ -45,24 +43,14 @@ export class BackOfficeController {
   @ApiForbiddenResponse({
     description: 'Insufficient permissions or MFA required.',
   })
-  me(
-    @Req() request: RequestWithUser<SignedInAccount>,
-    @Res() response: Response,
-  ): void {
+  me(@Req() request: RequestWithUser<SignedInAccount>): BackOfficePrincipalDto {
     const { profile } = request.user;
     if (profile.role !== Role.Editor) {
       const requiresMfa = profile.role === Role.Administrator;
-      response
-        .status(403)
-        .type('application/problem+json')
-        .json({
-          type: 'about:blank',
-          title: requiresMfa ? 'MFA required' : 'Access denied',
-          status: 403,
-          code: requiresMfa ? 'mfa_required' : 'forbidden',
-          traceId: randomUUID(),
-        });
-      return;
+      throw new ForbiddenException({
+        message: requiresMfa ? 'MFA required.' : 'Access denied.',
+        code: requiresMfa ? 'mfa_required' : 'forbidden',
+      });
     }
 
     const principal: BackOfficePrincipalDto = {
@@ -71,6 +59,6 @@ export class BackOfficeController {
       role: profile.role,
       permissions: ['BackOffice.Access', 'Editorial.Manage'],
     };
-    response.json(principal);
+    return principal;
   }
 }

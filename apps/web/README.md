@@ -21,6 +21,18 @@ npm run build
 
 Готовият браузърен build се намира в `dist/bulgaria-web/browser`.
 
+## Типизиран API клиент
+
+Клиентът в `src/app/api/generated/` се генерира от единния [`contracts/openapi/v1.yaml`](../../contracts/openapi/v1.yaml). Вътрешните service-to-service операции са изключени от browser клиента. Не редактирай генерираните файлове на ръка.
+
+```sh
+npm run contract:validate
+npm run api:generate
+npm run api:check
+```
+
+Angular добавя `X-Correlation-ID` към API заявките чрез централен interceptor. Сървърите връщат същата стойност в response header и като `traceId` в Problem Details при грешка.
+
 ## Преглед на екраните с мок данни
 
 Стартирай от `apps/web/` с `npm start` или `npm run start:mock`. В горната лента на началната страница са връзките за редактора, администрацията и каталога за всички 190 [Figma изгледа](https://www.figma.com/design/3MmvkZFAq9ghZyQ3YU4w5O).

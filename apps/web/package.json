@@ -9,6 +9,9 @@
     "watch": "ng build --watch --configuration development",
     "format:check": "prettier --check src",
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
+    "api:generate": "ng-openapi-gen",
+    "api:check": "npm run api:generate && node scripts/check-generated.mjs",
+    "contract:validate": "node scripts/check-openapi-compatibility.mjs ../../contracts/openapi/v1.yaml",
     "start:mock": "ng serve --configuration mock",
     "build:mock": "ng build --configuration mock"
   },
@@ -37,8 +40,10 @@
     "@angular/build": "21.2.30",
     "@angular/cli": "21.2.30",
     "@angular/compiler-cli": "21.2.26",
+    "ng-openapi-gen": "1.1.0",
     "prettier": "^3.8.1",
-    "typescript": "5.9.3"
+    "typescript": "5.9.3",
+    "yaml": "2.9.1"
   },
   "engines": {
     "node": "^22.12.0 || ^24.0.0"

@@ -1,0 +1,100 @@
+name: API contract
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/api-contract.yml'
+      - 'contracts/openapi/**'
+      - 'apps/api/**'
+      - 'apps/media/**'
+      - 'apps/web/**'
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/api-contract.yml'
+      - 'contracts/openapi/**'
+      - 'apps/api/**'
+      - 'apps/media/**'
+      - 'apps/web/**'
+
+permissions:
+  contents: read
+
+jobs:
+  contract-and-angular:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+      - name: Install Angular dependencies
+        working-directory: apps/web
+        run: npm ci
+      - name: Validate contract and generated client
+        working-directory: apps/web
+        run: |
+          npm run contract:validate
+          npm run api:check
+          npm run typecheck
+          npm run build
+      - name: Reject breaking OpenAPI changes
+        if: github.event_name == 'pull_request'
+        working-directory: apps/web
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          base_contract="$(mktemp)"
+          if git show "origin/${BASE_REF}:contracts/openapi/v1.yaml" > "$base_contract" 2>/dev/null; then
+            node scripts/check-openapi-compatibility.mjs "$base_contract" ../../contracts/openapi/v1.yaml
+          else
+            echo 'No base contract exists yet; validating the first version only.'
+          fi
+
+  nestjs-contract-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: apps/api/package-lock.json
+      - name: Install and build NestJS
+        working-directory: apps/api
+        run: |
+          npm ci
+          npm run format:check
+          npm run lint
+          npm run typecheck
+          npm run build
+      - name: Start MongoDB and Mailpit
+        working-directory: apps/api
+        run: docker compose up -d --wait
+      - name: Run API example requests
+        working-directory: apps/api
+        run: npm run test:e2e
+      - name: Stop fixtures
+        if: always()
+        working-directory: apps/api
+        run: docker compose down -v
+
+  dotnet-media-contract-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+          cache: true
+          cache-dependency-path: apps/media/**/packages.lock.json
+      - name: Build and run media contract examples
+        working-directory: apps/media
+        run: |
+          dotnet restore Media.slnx --locked-mode
+          dotnet build Media.slnx --no-restore --configuration Release
+          dotnet test Media.slnx --no-build --configuration Release
