@@ -14,7 +14,7 @@ NestJS пази ролите, сесиите, решенията за достъ
 
 ## Стартиране
 
-Изпълни от `services/media` с .NET SDK 10.0.404 или по-нов patch в същия feature band.
+Изпълни от `apps/media` с .NET SDK 10.0.404 или по-нов patch в същия feature band.
 
 ```sh
 dotnet restore --locked-mode

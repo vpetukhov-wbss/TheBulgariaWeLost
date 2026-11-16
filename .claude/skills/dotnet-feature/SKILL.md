@@ -8,7 +8,7 @@ description: "Implement a high-quality .NET/C# feature slice with minimal comple
 2. Convert acceptance criteria to behavior-focused tests before or alongside changes.
 3. Design only needed request/response types, domain changes, validator, use-case handler and transport mapping; separate public models into files.
 4. Keep core invariants together, `CancellationToken` end-to-end, no sync I/O, stable error semantics and explicit authorization/tenancy.
-5. For the Media API, use the module boundaries and HTTP contract in `services/media/README.md`. Use the SFTP storage interface for bytes and the typed NestJS client for current access, leases and authoritative metadata.
+5. For the Media API, use the module boundaries and HTTP contract in `apps/media/README.md`. Use the SFTP storage interface for bytes and the typed NestJS client for current access, leases and authoritative metadata.
 6. Consider concurrency, duplicate requests, transaction scope and side effects; choose Outbox only for the actual dual-write problem.
 7. Implement the smallest cohesive diff; add error cases and meaningful observability without logging sensitive input.
 8. Run targeted tests, full relevant build/tests, format verification; disclose any check impossible to execute.

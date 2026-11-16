@@ -68,6 +68,31 @@
               "optimization": false,
               "extractLicenses": false,
               "sourceMap": true
+            },
+            "mock": {
+              "browser": "src/main.mock.ts",
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "assets": [
+                {
+                  "glob": "*.jpg",
+                  "input": "src/mock-assets",
+                  "output": "mock-assets"
+                }
+              ],
+              "outputPath": "dist/bulgaria-web-mock",
+              "styles": [
+                "@fontsource/open-sans/latin-400.css",
+                "@fontsource/open-sans/cyrillic-400.css",
+                "@fontsource/open-sans/latin-600.css",
+                "@fontsource/open-sans/cyrillic-600.css",
+                "@fontsource/open-sans/latin-700.css",
+                "@fontsource/open-sans/cyrillic-700.css",
+                "@nebular/theme/styles/prebuilt/default.css",
+                "src/styles.scss",
+                "src/app/mock/mock.scss"
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -80,6 +105,9 @@
             },
             "development": {
               "buildTarget": "bulgaria-web:build:development"
+            },
+            "mock": {
+              "buildTarget": "bulgaria-web:build:mock"
             }
           },
           "defaultConfiguration": "development",

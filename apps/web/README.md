@@ -21,6 +21,14 @@ npm run build
 
 Готовият браузърен build се намира в `dist/bulgaria-web/browser`.
 
+## Преглед на екраните с мок данни
+
+Стартирай от `apps/web/` с `npm run start:mock`. Началната страница е на `http://localhost:4200/`, а каталогът за преглед на всички 190 [Figma изгледа](https://www.figma.com/design/3MmvkZFAq9ghZyQ3YU4w5O) е на `http://localhost:4200/demo`. Каталогът предлага директен вход към публичния сайт, мобилните изгледи, редакторския и административния панел.
+
+Потребителските и административните потоци използват локални примерни записи и връзки между екраните. Входът, потвържденията, изборът на файлове, бановете и смяната на хранилище са симулации. Прегледът работи самостоятелно без API и база данни. За статичен преглед изпълни `npm run build:mock` и обслужвай `dist/bulgaria-web-mock/browser` със SPA fallback. Обичайният `npm run build` е за уеб приложението със сесии и NestJS интеграция.
+
+Екраните и мок данните са в `src/app/mock/fixtures/`. [Източници на изображенията](src/mock-assets/README.md)
+
 ## Сесии и роли
 
 - `NbAuthService` използва `NbPasswordAuthStrategy` с маршрутите на Brocoders под `/api/v1/auth/`. Вградените JWT модел и interceptor поставят access token само в подходящите API заявки. Адаптерът подава refresh token като `Authorization: Bearer` към `POST /api/v1/auth/refresh`. Паралелните заявки споделят един refresh, тъй като Brocoders ротира токена.
