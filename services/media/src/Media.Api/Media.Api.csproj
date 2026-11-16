@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>the-bulgaria-we-lost-media</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.15" />
+    <ProjectReference Include="../Media.Transfers/Media.Transfers.csproj" />
+    <ProjectReference Include="../Media.Processing/Media.Processing.csproj" />
+    <ProjectReference Include="../Media.Storage/Media.Storage.csproj" />
+    <ProjectReference Include="../Media.ControlPlane/Media.ControlPlane.csproj" />
+  </ItemGroup>
+</Project>

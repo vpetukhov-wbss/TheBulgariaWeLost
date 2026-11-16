@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Media.Api/Media.Api.csproj" />
+    <Project Path="src/Media.ControlPlane/Media.ControlPlane.csproj" />
+    <Project Path="src/Media.Processing/Media.Processing.csproj" />
+    <Project Path="src/Media.Storage/Media.Storage.csproj" />
+    <Project Path="src/Media.Transfers/Media.Transfers.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Media.IntegrationTests/Media.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

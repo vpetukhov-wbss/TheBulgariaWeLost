@@ -1,0 +1,6 @@
+**/bin/
+**/obj/
+TestResults/
+.quarantine/
+*.user
+/src/Media.Api/appsettings.Development.json

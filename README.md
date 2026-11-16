@@ -24,6 +24,8 @@
 
 Настройката на MongoDB replica set, Mailpit и проверките е в [NestJS workspace `apps/api/`](apps/api/README.md).
 
+Настройката на SFTP профилите, проверките и вътрешния договор е в [.NET Media API `services/media/`](services/media/README.md).
+
 ## Работа с Claude Code
 
 Стартирайте `claude` от корена на клонираното репо. Проектните инструкции са в [CLAUDE.md](CLAUDE.md). Командата `/memory` показва заредените инструкции. За конкретна задача използвайте `/design-domain-model`, `/implement-feature` или `/review-change`.

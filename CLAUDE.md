@@ -18,7 +18,7 @@
 ## Използване на съществуващите проекти
 
 - API в `apps/api/` стъпва върху документирания commit на Brocoders и режима MongoDB/Mongoose. Приложи проектните роли, сесии и правила за достъп според [админ API договора](docs/admin/api.md).
-- Уеб приложението е [чист Angular workspace в `apps/web/`](apps/web/README.md) със стандартната светла тема `default` на Akveo Nebular. При стартиране задавай `NbThemeModule.forRoot({ name: 'default' })` и зареждай стиловете за същата тема през Angular workspace конфигурацията. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е в `services/media/`. Провери нейния `global.json` и `TargetFramework`.
+- Уеб приложението е [чист Angular workspace в `apps/web/`](apps/web/README.md) със стандартната светла тема `default` на Akveo Nebular. При стартиране задавай `NbThemeModule.forRoot({ name: 'default' })` и зареждай стиловете за същата тема през Angular workspace конфигурацията. Провери peer dependencies, `package.json` и lockfile при интеграция. Файловата услуга е [модулен монолит в `services/media/`](services/media/README.md) с .NET 10 и C# 14.
 - Пренеси само нужните за архива компоненти с потвърдени права за публично разпространение. Използвай отделна конфигурация за локалните и production среди.
 
 ## Инженерни сетъпи
@@ -32,6 +32,12 @@
 - Изпълнявай от `apps/api`. Инсталация и локален старт с `npm ci`, `cp .env.example .env`, `docker compose up -d --wait` и `npm run start:dev`.
 - Проверки с `npm run format:check`, `npm run lint`, `npm run typecheck` и `npm run build`. За HTTP интеграция използвай `npm run test:e2e` по указанията в [README на API](apps/api/README.md).
 - За нов или променян NestJS endpoint използвай `/nestjs-feature`. Правилата в `.claude/rules/nestjs-api.md` са ограничени до API пакета.
+
+## Команди за .NET Media API
+
+- Изпълнявай от `services/media`. Възстанови зависимостите с `dotnet restore --locked-mode`. Настрой локалните SFTP профили и служебните токени по [README](services/media/README.md), след което стартирай с `dotnet run --project src/Media.Api`.
+- Провери с `dotnet build --no-restore`, `dotnet test --no-build` и `dotnet format --no-restore --verify-no-changes`.
+- За .NET промени използвай `/dotnet-feature`. Запази решенията за права и lease в NestJS и файловите операции в модулите на Media API.
 
 ## Работа и проверка
 
