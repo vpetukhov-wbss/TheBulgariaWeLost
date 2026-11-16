@@ -13,6 +13,8 @@ import {
 } from '@nebular/theme';
 import {
   MockNode,
+  adminScreen,
+  homeScreen,
   MockScreenData,
   MockTableRow,
   color,
@@ -22,6 +24,12 @@ import {
   pictures,
   screensById,
 } from './mock-data';
+
+import { ArchiveHomePage } from './archive/archive-home-page';
+import { AdminDashboardPage } from './management/admin-dashboard-page';
+import { ManagementLayout } from './management/management-layout';
+import { screenPath } from './screen-links';
+import { PreviewDataTable } from './shared/preview-data-table';
 
 const mobileArchive = '21:385';
 const desktopArchive = '19:1884';
@@ -72,6 +80,10 @@ function walk(node: MockNode): MockNode[] {
 @Component({
   imports: [
     NgTemplateOutlet,
+    ArchiveHomePage,
+    AdminDashboardPage,
+    ManagementLayout,
+    PreviewDataTable,
     FormsModule,
     RouterLink,
     NbButtonModule,
@@ -95,15 +107,14 @@ export class MockScreen {
   protected readonly feedback = signal('');
   protected readonly page = signal(0);
   protected readonly file = signal('');
-  protected readonly menuOpen = signal(false);
   protected readonly filters = signal<ReadonlyMap<MockNode, string>>(new Map());
   protected readonly color = color;
   protected readonly icon = icon;
   protected readonly nodeText = nodeText;
   protected readonly pictures = pictures;
-  protected readonly pageSize = 4;
-  protected readonly decreasePage = (page: number) => page - 1;
-  protected readonly increasePage = (page: number) => page + 1;
+  protected readonly homeScreen = homeScreen;
+  protected readonly adminScreen = adminScreen;
+  protected readonly screenPath = screenPath;
 
   protected readonly nodes = computed(() => {
     const screen = this.current();
@@ -128,7 +139,7 @@ export class MockScreen {
 
   constructor() {
     this.route.paramMap.pipe(takeUntilDestroyed()).subscribe((params) => {
-      const screen = screensById.get(params.get('screen') ?? '');
+      const screen = screensById.get(params.get('screen') ?? this.route.snapshot.data['screen']);
       this.current.set(screen);
       this.query.set(
         this.route.snapshot.queryParamMap.get('q') ??
@@ -138,7 +149,6 @@ export class MockScreen {
       this.page.set(0);
       this.filters.set(new Map());
       this.feedback.set('');
-      this.menuOpen.set(false);
       this.values = new WeakMap();
       this.choices = new WeakMap();
       this.title.setTitle((screen?.name ?? 'Екранът липсва') + ' · България, която изгубихме');
@@ -253,9 +263,9 @@ export class MockScreen {
     if (this.current()?.role === 'user') this.searchArchive();
   }
 
-  protected searchArchive(): void {
+  protected searchArchive(searchText = this.query()): void {
     const mobile = (this.current()?.w ?? 0) < 500;
-    const query = normalize(this.query());
+    const query = normalize(searchText);
     const found =
       !query || archiveTerms.some((term) => term.includes(query) || query.includes(term));
     const target = found
@@ -268,7 +278,7 @@ export class MockScreen {
     if (this.current()?.id === target) {
       this.feedback.set('Резултатите от търсенето са обновени.');
     }
-    void this.router.navigate(['/demo', target], { queryParams: { q: this.query() } });
+    void this.router.navigate([screenPath(target)], { queryParams: { q: searchText } });
   }
 
   protected action(node: MockNode): void {
@@ -281,7 +291,7 @@ export class MockScreen {
     }
     const target = node.to ?? fallbackLinks[label];
     if (target) {
-      void this.router.navigate(['/demo', target], {
+      void this.router.navigate([screenPath(target)], {
         queryParams: /файл|преглед/i.test(label) && this.file() ? { file: this.file() } : undefined,
       });
       return;
@@ -296,7 +306,7 @@ export class MockScreen {
     this.file.set(file.name);
     this.feedback.set(`Избран файл „${file.name}“.`);
     if (node.to) {
-      void this.router.navigate(['/demo', node.to], { queryParams: { file: file.name } });
+      void this.router.navigate([screenPath(node.to)], { queryParams: { file: file.name } });
     }
   }
 
@@ -306,6 +316,6 @@ export class MockScreen {
 
   protected closeDialog(): void {
     const route = this.cancelDialog();
-    if (route) void this.router.navigate(['/demo', route]);
+    if (route) void this.router.navigate([screenPath(route)]);
   }
 }

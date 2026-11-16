@@ -12,6 +12,8 @@ import {
   screens,
 } from './mock-data';
 
+import { screenPath } from './screen-links';
+
 @Component({
   imports: [FormsModule, RouterLink, NbInputModule, NbButtonModule, NbCardModule],
   template: `
@@ -19,7 +21,7 @@ import {
       <h1>Екрани с мок данни</h1>
       <nav class="mock-entry-points" aria-label="Начални екрани по роля">
         @for (entry of entries; track entry.id) {
-          <a nbButton [routerLink]="['/demo', entry.id]" status="primary" appearance="outline">
+          <a nbButton [routerLink]="screenPath(entry.id)" status="primary" appearance="outline">
             {{ entry.label }}
           </a>
         }
@@ -42,7 +44,7 @@ import {
             <ul class="mock-screen-links">
               @for (screen of group.screens; track screen.id) {
                 <li>
-                  <a [routerLink]="['/demo', screen.id]">{{ screen.name }}</a>
+                  <a [routerLink]="screenPath(screen.id)">{{ screen.name }}</a>
                   @if (screen.role === 'editor') {
                     <small>Редактор</small>
                   }
@@ -57,6 +59,7 @@ import {
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class MockCatalog {
+  protected readonly screenPath = screenPath;
   protected readonly query = signal('');
   protected readonly total = screens.length;
   protected readonly entries = [

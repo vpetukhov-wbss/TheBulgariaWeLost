@@ -1,0 +1,47 @@
+<section class="preview-archive-hero">
+  <div class="preview-archive-intro">
+    <h1>България, която изгубихме</h1>
+    <p>Дигитален архив на снимки, документи и лични истории от България.</p>
+    <app-archive-search-form (querySubmitted)="searchRequested.emit($event)" />
+    <nav class="preview-archive-links" aria-label="Избрани теми">
+      <a [routerLink]="topic">Българските железници</a>
+      <a [routerLink]="category">Категория „Транспорт“</a>
+    </nav>
+  </div>
+  <figure>
+    <img src="/mock-assets/train.jpg" alt="Парен локомотив на Българските държавни железници" />
+    <figcaption>
+      <a href="https://commons.wikimedia.org/wiki/File:BASA-3K-15-409-2-Train_of_Bulgaria.jpg">
+        Държавна агенция „Архиви“ · ф. 3К, оп. 15, а.е. 409, л. 2
+      </a>
+    </figcaption>
+  </figure>
+</section>
+<section class="preview-archive-featured" aria-labelledby="archive-featured-title">
+  <div class="preview-heading-row">
+    <h2 id="archive-featured-title">Избрано от архива</h2>
+    <a routerLink="/archive">Всички материали →</a>
+  </div>
+  <div class="preview-material-grid">
+    @for (material of materials; track material.path) {
+      <app-archive-material-card [material]="material" />
+    }
+  </div>
+</section>
+<section class="preview-contribute">
+  <div>
+    <h2>Имаш снимка, документ или спомен?</h2>
+    <p>Добави към архива свой материал с източник и информация за правата.</p>
+  </div>
+  <a class="mock-button" nbButton routerLink="/register" status="primary" size="small"
+    >Добави материал</a
+  >
+</section>
+<footer class="preview-archive-footer">
+  <span>България, която изгубихме</span>
+  <nav class="preview-archive-links" aria-label="Допълнителна навигация">
+    <a routerLink="/about">За проекта</a>
+    <a routerLink="/about">Как да допринесеш</a>
+    <a routerLink="/episodes">Епизоди</a>
+  </nav>
+</footer>
