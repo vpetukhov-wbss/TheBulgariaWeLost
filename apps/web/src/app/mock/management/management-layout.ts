@@ -1,7 +1,8 @@
 import { ChangeDetectionStrategy, Component, input, linkedSignal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NbButtonModule, NbIconModule } from '@nebular/theme';
-import { icon, MockScreenData } from '../mock-data';
+import type { MockScreenData } from '../mock-data';
+import { icon } from '../mock-data';
 import { screenPath } from '../screen-links';
 
 @Component({

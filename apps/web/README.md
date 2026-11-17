@@ -19,6 +19,17 @@ npm run typecheck
 npm run build
 ```
 
+Проверките при pull request включват форматиране, ESLint, TypeScript typecheck, OpenAPI drift/compatibility и production build:
+
+```sh
+npm run format:check
+npm run lint
+npm run typecheck
+npm run contract:validate
+npm run api:check
+npm run build
+```
+
 Готовият браузърен build се намира в `dist/bulgaria-web/browser`.
 
 ## Типизиран API клиент

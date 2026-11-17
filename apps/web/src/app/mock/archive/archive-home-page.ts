@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component, output } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NbButtonModule } from '@nebular/theme';
 import { screenPath } from '../screen-links';
-import { ArchiveMaterialCard, FeaturedMaterial } from './archive-material-card';
+import type { FeaturedMaterial } from './archive-material-card';
+import { ArchiveMaterialCard } from './archive-material-card';
 import { ArchiveSearchForm } from './archive-search-form';
 
 @Component({

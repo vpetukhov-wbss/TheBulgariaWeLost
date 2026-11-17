@@ -1,7 +1,9 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { NbAuthResult, NbAuthService, NbTokenService } from '@nebular/auth';
-import { finalize, Observable, shareReplay, tap } from 'rxjs';
+import type { NbAuthResult } from '@nebular/auth';
+import { NbAuthService, NbTokenService } from '@nebular/auth';
+import type { Observable } from 'rxjs';
+import { finalize, shareReplay, tap } from 'rxjs';
 
 @Injectable()
 export class ArchiveAuthService extends NbAuthService {

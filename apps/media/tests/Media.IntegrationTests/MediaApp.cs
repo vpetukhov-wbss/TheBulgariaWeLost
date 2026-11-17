@@ -29,7 +29,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         builder.UseEnvironment("Development");
         builder.ConfigureAppConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
-            ["MediaControl:BaseUrl"] = "http://127.0.0.1:3000/",
+            ["MediaControl:BaseUrl"] = "http://api:3000/",
             ["MediaControl:ServiceToken"] = "test-only-outbound-credential-2c39b4c67",
             ["MediaControl:ProbeToken"] = ProbeToken,
             ["MediaTransfers:QuarantineDirectory"] = quarantine

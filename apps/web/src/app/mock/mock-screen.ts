@@ -11,12 +11,10 @@ import {
   NbInputModule,
   NbSelectModule,
 } from '@nebular/theme';
+import type { MockNode, MockScreenData, MockTableRow } from './mock-data';
 import {
-  MockNode,
   adminScreen,
   homeScreen,
-  MockScreenData,
-  MockTableRow,
   color,
   icon,
   nodeText,

@@ -13,7 +13,8 @@ public static class ControlPlaneModule
         services.AddOptions<MediaControlOptions>()
             .Bind(config.GetSection("MediaControl"))
             .Validate(options => options.BaseUrl is { IsAbsoluteUri: true } url
-                && (url.Scheme == "https" || (!requireHttps && url.Scheme == "http" && url.IsLoopback))
+                && (url.Scheme == "https" || (!requireHttps && url.Scheme == "http"
+                    && (url.IsLoopback || url.Host.Equals("api", StringComparison.OrdinalIgnoreCase))))
                 && url.AbsolutePath == "/" && url.Query.Length == 0 && url.Fragment.Length == 0
                 && url.UserInfo.Length == 0, "Configure the NestJS origin in MediaControl:BaseUrl.")
             .Validate(options => options.ServiceToken.Length >= 32

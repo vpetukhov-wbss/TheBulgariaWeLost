@@ -2,7 +2,8 @@ import { ChangeDetectionStrategy, Component } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NbButtonModule } from '@nebular/theme';
 import { screenPath } from '../screen-links';
-import { AdminMetric, AdminMetricCard } from './admin-metric-card';
+import type { AdminMetric } from './admin-metric-card';
+import { AdminMetricCard } from './admin-metric-card';
 
 @Component({
   selector: 'app-admin-dashboard-page',
