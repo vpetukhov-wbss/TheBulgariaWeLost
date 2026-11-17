@@ -7,5 +7,6 @@ export interface Profile {
   firstName: string;
   id: string;
   lastName: string;
+  mfaEnabled?: boolean;
   role: Role;
 }

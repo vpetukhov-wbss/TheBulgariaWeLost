@@ -9,4 +9,6 @@ export type AuthConfig = {
   forgotExpires: StringValue;
   confirmEmailSecret: string;
   confirmEmailExpires: StringValue;
+  mfaEncryptionKey: string;
+  mfaVerifiedMaxAgeMs: number;
 };

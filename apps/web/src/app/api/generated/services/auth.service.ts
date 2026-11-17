@@ -12,6 +12,8 @@ import { StrictHttpResponse } from '../strict-http-response';
 
 import { confirmEmail } from '../fn/auth/confirm-email';
 import { ConfirmEmail$Params } from '../fn/auth/confirm-email';
+import { confirmMfaEnrollment } from '../fn/auth/confirm-mfa-enrollment';
+import { ConfirmMfaEnrollment$Params } from '../fn/auth/confirm-mfa-enrollment';
 import { confirmNewEmail } from '../fn/auth/confirm-new-email';
 import { ConfirmNewEmail$Params } from '../fn/auth/confirm-new-email';
 import { getProfile } from '../fn/auth/get-profile';
@@ -21,7 +23,13 @@ import { Login$Params } from '../fn/auth/login';
 import { LoginResponse } from '../models/login-response';
 import { logout } from '../fn/auth/logout';
 import { Logout$Params } from '../fn/auth/logout';
+import { logoutAll } from '../fn/auth/logout-all';
+import { LogoutAll$Params } from '../fn/auth/logout-all';
+import { MfaEnrollment } from '../models/mfa-enrollment';
+import { MfaRecoveryCodes } from '../models/mfa-recovery-codes';
 import { Profile } from '../models/profile';
+import { recoverMfa } from '../fn/auth/recover-mfa';
+import { RecoverMfa$Params } from '../fn/auth/recover-mfa';
 import { refreshSession } from '../fn/auth/refresh-session';
 import { RefreshSession$Params } from '../fn/auth/refresh-session';
 import { register } from '../fn/auth/register';
@@ -30,9 +38,13 @@ import { requestPasswordReset } from '../fn/auth/request-password-reset';
 import { RequestPasswordReset$Params } from '../fn/auth/request-password-reset';
 import { resetPassword } from '../fn/auth/reset-password';
 import { ResetPassword$Params } from '../fn/auth/reset-password';
+import { startMfaEnrollment } from '../fn/auth/start-mfa-enrollment';
+import { StartMfaEnrollment$Params } from '../fn/auth/start-mfa-enrollment';
 import { TokenPair } from '../models/token-pair';
 import { updateProfile } from '../fn/auth/update-profile';
 import { UpdateProfile$Params } from '../fn/auth/update-profile';
+import { verifyMfa } from '../fn/auth/verify-mfa';
+import { VerifyMfa$Params } from '../fn/auth/verify-mfa';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService extends BaseService {
@@ -305,6 +317,141 @@ export class AuthService extends BaseService {
    */
   logout(params?: Logout$Params, context?: HttpContext): Observable<void> {
     const resp = this.logout$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<void>): void => r.body)
+    );
+  }
+
+  /** Path part for operation `logoutAll()` */
+  static readonly LogoutAllPath = '/api/v1/auth/logout/all';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `logoutAll()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  logoutAll$Response(params?: LogoutAll$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+    const obs = logoutAll(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `logoutAll$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  logoutAll(params?: LogoutAll$Params, context?: HttpContext): Observable<void> {
+    const resp = this.logoutAll$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<void>): void => r.body)
+    );
+  }
+
+  /** Path part for operation `startMfaEnrollment()` */
+  static readonly StartMfaEnrollmentPath = '/api/v1/auth/mfa/enrollment';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `startMfaEnrollment()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  startMfaEnrollment$Response(params: StartMfaEnrollment$Params, context?: HttpContext): Observable<StrictHttpResponse<MfaEnrollment>> {
+    const obs = startMfaEnrollment(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `startMfaEnrollment$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  startMfaEnrollment(params: StartMfaEnrollment$Params, context?: HttpContext): Observable<MfaEnrollment> {
+    const resp = this.startMfaEnrollment$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<MfaEnrollment>): MfaEnrollment => r.body)
+    );
+  }
+
+  /** Path part for operation `confirmMfaEnrollment()` */
+  static readonly ConfirmMfaEnrollmentPath = '/api/v1/auth/mfa/enrollment/confirm';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `confirmMfaEnrollment()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  confirmMfaEnrollment$Response(params: ConfirmMfaEnrollment$Params, context?: HttpContext): Observable<StrictHttpResponse<MfaRecoveryCodes>> {
+    const obs = confirmMfaEnrollment(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `confirmMfaEnrollment$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  confirmMfaEnrollment(params: ConfirmMfaEnrollment$Params, context?: HttpContext): Observable<MfaRecoveryCodes> {
+    const resp = this.confirmMfaEnrollment$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<MfaRecoveryCodes>): MfaRecoveryCodes => r.body)
+    );
+  }
+
+  /** Path part for operation `verifyMfa()` */
+  static readonly VerifyMfaPath = '/api/v1/auth/mfa/verify';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `verifyMfa()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  verifyMfa$Response(params: VerifyMfa$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+    const obs = verifyMfa(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `verifyMfa$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  verifyMfa(params: VerifyMfa$Params, context?: HttpContext): Observable<void> {
+    const resp = this.verifyMfa$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<void>): void => r.body)
+    );
+  }
+
+  /** Path part for operation `recoverMfa()` */
+  static readonly RecoverMfaPath = '/api/v1/auth/mfa/recover';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `recoverMfa()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  recoverMfa$Response(params: RecoverMfa$Params, context?: HttpContext): Observable<StrictHttpResponse<void>> {
+    const obs = recoverMfa(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `recoverMfa$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  recoverMfa(params: RecoverMfa$Params, context?: HttpContext): Observable<void> {
+    const resp = this.recoverMfa$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<void>): void => r.body)
     );

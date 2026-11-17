@@ -4,6 +4,7 @@
 export interface BackOfficePrincipal {
   displayName: string;
   id: string;
+  mfaVerifiedAtUtc?: string;
   permissions: Array<string>;
   role: 'Editor' | 'Administrator';
 }

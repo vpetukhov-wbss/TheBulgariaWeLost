@@ -13,16 +13,30 @@ docker compose up -d --wait
 npm run start:dev
 ```
 
-| Услуга | Адрес |
-| --- | --- |
-| API | http://localhost:3000/api/v1 |
-| Swagger | http://localhost:3000/docs |
-| OpenAPI JSON | http://localhost:3000/docs-json |
+| Услуга              | Адрес                               |
+| ------------------- | ----------------------------------- |
+| API                 | http://localhost:3000/api/v1        |
+| Swagger             | http://localhost:3000/docs          |
+| OpenAPI JSON        | http://localhost:3000/docs-json     |
 | Проверка на MongoDB | http://localhost:3000/api/v1/health |
-| Mailpit | http://localhost:8025 |
-| Angular | http://localhost:4200 |
+| Mailpit             | http://localhost:8025               |
+| Angular             | http://localhost:4200               |
 
-Compose стартира MongoDB 8 като локален replica set с един възел и Mailpit. Хост портовете са вързани към loopback. Angular proxy обслужва `/api/**` през порт 3000. `FRONTEND_DOMAIN` определя къде сочат линковете за потвърждение и парола. За сървър използвай собствен MongoDB replica set с удостоверяване, мрежова изолация и реални SMTP настройки. NestJS изисква четири различни силни auth ключа в production. Swagger е включен в development и test.
+Compose стартира MongoDB 8 като локален replica set с един възел и Mailpit. Хост портовете са вързани към loopback. Angular proxy обслужва `/api/**` през порт 3000. `FRONTEND_DOMAIN` определя къде сочат линковете за потвърждение и парола. За сървър използвай собствен MongoDB replica set с удостоверяване, мрежова изолация и реални SMTP настройки. NestJS изисква пет различни силни auth ключа в production, включително отделен ключ за криптиране на MFA тайните. Swagger е включен в development и test.
+
+### Първи администратор и MFA
+
+Първият и само първият администратор се създава с еднократна команда срещу MongoDB replica set:
+
+```sh
+export ADMIN_BOOTSTRAP_EMAIL=admin@example.org
+read -rsp 'One-time admin password: ' ADMIN_BOOTSTRAP_PASSWORD
+export ADMIN_BOOTSTRAP_PASSWORD
+ADMIN_BOOTSTRAP_CONFIRM=CREATE_FIRST_ADMIN npm run bootstrap:admin
+unset ADMIN_BOOTSTRAP_PASSWORD
+```
+
+Командата приключва завинаги след създаването на първия `Administrator`, не отпечатва паролата и прекратява старите сесии, ако повишава съществуващ профил. Администраторът трябва да активира TOTP през `/api/v1/auth/mfa/enrollment` и да запази показаните веднъж recovery кодове. Админските маршрути приемат само MFA потвърждение от последните 10 минути. `/api/v1/auth/logout/all` увеличава `authVersion` и отнема незабавно всички access и refresh сесии.
 
 ### Синтетични профили
 

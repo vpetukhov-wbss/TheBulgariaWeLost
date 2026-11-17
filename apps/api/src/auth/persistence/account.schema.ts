@@ -43,6 +43,21 @@ export class Account {
 
   @Prop({ default: 0, required: true })
   authVersion: number;
+
+  @Prop({ default: false, required: true })
+  mfaEnabled: boolean;
+
+  @Prop({ select: false })
+  mfaSecretEncrypted?: string;
+
+  @Prop({ select: false })
+  mfaPendingSecretEncrypted?: string;
+
+  @Prop({ type: [String], select: false })
+  mfaRecoveryCodeHashes?: string[];
+
+  @Prop({ select: false })
+  mfaLastUsedStep?: number;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
