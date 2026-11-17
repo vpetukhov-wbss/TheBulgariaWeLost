@@ -72,3 +72,5 @@ dotnet build --no-restore
 dotnet test --no-build
 dotnet format --no-restore --verify-no-changes
 ```
+
+Интеграционните тестове заменят SFTP и контролния HTTP клиент с ограничени in-memory реализации. Примерна отделна конфигурация за ръчно стартиране в `Testing` е в [`appsettings.Testing.example.json`](appsettings.Testing.example.json); в нея няма production достъпи и worker-ът е изключен.

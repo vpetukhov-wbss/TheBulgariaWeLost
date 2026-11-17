@@ -1,0 +1,168 @@
+name: the-bulgaria-we-lost
+
+x-api-environment: &api-environment
+  NODE_ENV: development
+  APP_PORT: 3000
+  APP_NAME: The Bulgaria We Lost
+  FRONTEND_DOMAIN: http://localhost:4200
+  APP_CORS_ORIGINS: http://localhost:4200
+  APP_TRUST_PROXY_HOPS: 0
+  DATABASE_URL: mongodb://mongo:27017/bulgaria_archive_dev?replicaSet=rs0&directConnection=true
+  MAIL_HOST: mailpit
+  MAIL_PORT: 1025
+  MAIL_DEFAULT_EMAIL: noreply@example.test
+  MAIL_DEFAULT_NAME: The Bulgaria We Lost
+  MAIL_IGNORE_TLS: "true"
+  MAIL_SECURE: "false"
+  MAIL_REQUIRE_TLS: "false"
+  AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  AUTH_REFRESH_SECRET: ${AUTH_REFRESH_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  AUTH_FORGOT_SECRET: ${AUTH_FORGOT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  AUTH_CONFIRM_EMAIL_SECRET: ${AUTH_CONFIRM_EMAIL_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  AUTH_JWT_TOKEN_EXPIRES_IN: 15m
+  AUTH_REFRESH_TOKEN_EXPIRES_IN: 30d
+  AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m
+  AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN: 1d
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        - CMD
+        - mongosh
+        - --quiet
+        - --eval
+        - >-
+          try { rs.status(); } catch (error) {
+            if (error.code !== 94) throw error;
+            rs.initiate({_id:"rs0",members:[{_id:0,host:"mongo:27017"}]});
+          }
+          if (!db.hello().isWritablePrimary) quit(1);
+      interval: 3s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  mailpit:
+    image: axllent/mailpit:v1.28.0
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
+  sftp:
+    image: atmoz/sftp:alpine
+    command: ["media::1001:1001:archive"]
+    ports:
+      - "127.0.0.1:2222:22"
+    volumes:
+      - ./.dev/sftp/media_ed25519.pub:/home/media/.ssh/keys/media_ed25519.pub:ro
+      - ./.dev/sftp/ssh_host_ed25519_key:/etc/ssh/ssh_host_ed25519_key:ro
+      - ./.dev/sftp/ssh_host_ed25519_key.pub:/etc/ssh/ssh_host_ed25519_key.pub:ro
+      - ./infra/sftp/init.sh:/etc/sftp.d/init.sh:ro
+      - sftp-data:/home/media/archive
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment: *api-environment
+    depends_on:
+      mongo:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  media:
+    build:
+      context: .
+      dockerfile: apps/media/Dockerfile
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      ASPNETCORE_URLS: http://0.0.0.0:8080
+      MediaControl__BaseUrl: http://api:3000/
+      MediaControl__ServiceToken: ${MEDIA_SERVICE_TOKEN:?Run ./scripts/dev-up.sh to generate local secrets}
+      MediaControl__ProbeToken: ${MEDIA_PROBE_TOKEN:?Run ./scripts/dev-up.sh to generate local secrets}
+      MediaStorage__Profiles__archive__Host: sftp
+      MediaStorage__Profiles__archive__Port: 22
+      MediaStorage__Profiles__archive__Username: media
+      MediaStorage__Profiles__archive__PrivateKeyPath: /run/dev-secrets/media_ed25519
+      MediaStorage__Profiles__archive__HostKeySha256: ${SFTP_HOST_KEY_SHA256:?Run ./scripts/dev-up.sh to create the local SFTP keys}
+      MediaStorage__Profiles__archive__Root: /archive
+      MediaTransfers__QuarantineDirectory: /tmp/media-quarantine
+      MediaProcessing__Enabled: "false"
+    depends_on:
+      api:
+        condition: service_healthy
+      sftp:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:5088:8080"
+    volumes:
+      - ./.dev/sftp/media_ed25519:/run/dev-secrets/media_ed25519:ro
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/media/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    depends_on:
+      api:
+        condition: service_healthy
+      media:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4200:8080"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+
+  seed:
+    profiles: ["tools"]
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      <<: *api-environment
+      ALLOW_LOCAL_SEED: "true"
+      SEED_PROFILE: ${SEED_PROFILE:-demo}
+      SEED_PASSWORD:
+    depends_on:
+      mongo:
+        condition: service_healthy
+    command: ["npm", "run", "seed:dev"]
+
+volumes:
+  mongo-data:
+  sftp-data:

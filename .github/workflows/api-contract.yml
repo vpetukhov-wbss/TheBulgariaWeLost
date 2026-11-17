@@ -1,26 +1,28 @@
-name: API contract
+name: PR quality and API contract
 
 on:
   pull_request:
-    paths:
-      - '.github/workflows/api-contract.yml'
-      - 'contracts/openapi/**'
-      - 'apps/api/**'
-      - 'apps/media/**'
-      - 'apps/web/**'
   push:
     branches: [main]
-    paths:
-      - '.github/workflows/api-contract.yml'
-      - 'contracts/openapi/**'
-      - 'apps/api/**'
-      - 'apps/media/**'
-      - 'apps/web/**'
 
 permissions:
   contents: read
 
 jobs:
+  development-stack-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, seed and verify the local stack
+        run: ./scripts/dev-up.sh
+      - name: Stop local stack
+        if: always()
+        run: |
+          if [ -f .dev/compose.env ]; then
+            docker compose --env-file .dev/compose.env down --volumes
+          fi
+
   contract-and-angular:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +40,8 @@ jobs:
       - name: Validate contract and generated client
         working-directory: apps/web
         run: |
+          npm run format:check
+          npm run lint
           npm run contract:validate
           npm run api:check
           npm run typecheck
@@ -77,7 +81,14 @@ jobs:
         run: docker compose up -d --wait
       - name: Run API example requests
         working-directory: apps/api
-        run: npm run test:e2e
+        env:
+          NODE_ENV: development
+          DATABASE_URL: mongodb://127.0.0.1:27017/bulgaria_archive_dev?replicaSet=rs0&directConnection=true
+          ALLOW_LOCAL_SEED: 'true'
+          SEED_PROFILE: minimal
+        run: |
+          SEED_PASSWORD="$(openssl rand -hex 32)" npm run seed:dev
+          npm run test:e2e
       - name: Stop fixtures
         if: always()
         working-directory: apps/api
@@ -96,5 +107,6 @@ jobs:
         working-directory: apps/media
         run: |
           dotnet restore Media.slnx --locked-mode
+          dotnet format Media.slnx --no-restore --verify-no-changes
           dotnet build Media.slnx --no-restore --configuration Release
           dotnet test Media.slnx --no-build --configuration Release

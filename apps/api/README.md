@@ -24,6 +24,16 @@ npm run start:dev
 
 Compose стартира MongoDB 8 като локален replica set с един възел и Mailpit. Хост портовете са вързани към loopback. Angular proxy обслужва `/api/**` през порт 3000. `FRONTEND_DOMAIN` определя къде сочат линковете за потвърждение и парола. За сървър използвай собствен MongoDB replica set с удостоверяване, мрежова изолация и реални SMTP настройки. NestJS изисква четири различни силни auth ключа в production. Swagger е включен в development и test.
 
+### Синтетични профили
+
+След локалното стартиране можеш да заредиш идемпотентен профил `minimal` или `demo`:
+
+```sh
+npm run seed:dev
+```
+
+Командата изисква `NODE_ENV=development|test` и `ALLOW_LOCAL_SEED=true`. Тя отказва remote MongoDB, `mongodb+srv` и база без development/test име. Всички адреси са в запазения домейн `example.test`; паролата идва от `SEED_PASSWORD`. `demo` създава активни Administrator, Editor и User, както и Pending и Disabled потребител. Повторното зареждане обновява само тези синтетични профили и прекратява техните стари сесии.
+
 ## Потоци и достъп
 
 - `/api/v1/auth` запазва маршрутите на Brocoders за вход, регистрация, потвърждаване на имейл, профил, възстановяване, refresh и изход. Refresh получава refresh JWT като Bearer. Останалите защитени заявки използват access JWT.
@@ -39,7 +49,8 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm run build
+npm run seed:dev
 npm run test:e2e
 ```
 
-За интеграционните тестове държи Compose услугите стартирани. Тестът стартира отделен API процес с порт 3011, отделна база с генерирано име и синтетични акаунти. Използва реалния MongoDB и локалния Mailpit.
+За интеграционните тестове държи Compose услугите стартирани. Тестът стартира отделен API процес с порт 3011, отделна база с генерирано име и синтетични акаунти. Използва реалния MongoDB и локалния Mailpit. Примерните отделни test стойности са в [`.env.test.example`](.env.test.example).

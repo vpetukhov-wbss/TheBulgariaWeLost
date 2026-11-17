@@ -1,9 +1,9 @@
-import { HttpRequest, HttpResponse } from '@angular/common/http';
+import type { HttpRequest, HttpResponse } from '@angular/common/http';
+import type { NbPasswordAuthStrategyOptions } from '@nebular/auth';
 import {
   NbAuthIllegalTokenError,
   NbAuthOAuth2JWTToken,
   NbPasswordAuthStrategy,
-  NbPasswordAuthStrategyOptions,
 } from '@nebular/auth';
 
 export const AUTH_STRATEGY = 'email';

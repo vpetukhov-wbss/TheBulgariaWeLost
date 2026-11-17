@@ -7,3 +7,6 @@ CLAUDE.local.md
 .env.*
 !.env.example
 !.env.*.example
+
+# Generated local development keys and Compose values
+.dev/

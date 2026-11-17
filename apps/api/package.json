@@ -12,9 +12,10 @@
     "start:prod": "node dist/main",
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
-    "format:check": "prettier --check src test",
+    "format:check": "prettier --check src test scripts",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node --experimental-strip-types --test test/*.e2e-spec.ts"
+    "test:e2e": "node --experimental-strip-types --test test/*.e2e-spec.ts",
+    "seed:dev": "node scripts/seed.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.10",

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { NbAuthSimpleToken, NbAuthToken, NbTokenStorage } from '@nebular/auth';
+import type { NbAuthToken } from '@nebular/auth';
+import { NbAuthSimpleToken, NbTokenStorage } from '@nebular/auth';
 
 @Injectable()
 export class MemoryTokenStorage extends NbTokenStorage {

@@ -1,0 +1,10 @@
+.git
+.dev
+**/node_modules
+**/dist
+**/bin
+**/obj
+**/.angular
+**/.quarantine
+CLAUDE.local.md
+.claude/settings.local.json

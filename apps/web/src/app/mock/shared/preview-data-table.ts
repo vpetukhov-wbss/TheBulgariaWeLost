@@ -1,15 +1,9 @@
 import { NgTemplateOutlet } from '@angular/common';
-import {
-  ChangeDetectionStrategy,
-  Component,
-  computed,
-  input,
-  model,
-  TemplateRef,
-} from '@angular/core';
+import type { TemplateRef } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, model } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NbButtonModule } from '@nebular/theme';
-import { MockNode, MockTableRow } from '../mock-data';
+import type { MockNode, MockTableRow } from '../mock-data';
 import { screenPath } from '../screen-links';
 
 @Component({

@@ -28,6 +28,16 @@
 
 Единният версиониран [OpenAPI договор](contracts/README.md) фиксира публичните, административните и вътрешните маршрути, Problem Details и correlation ID. От него възпроизводимо се генерира типизираният Angular клиент, а CI спира несъвместими промени.
 
+## Локална среда
+
+Чист checkout стартира Angular, NestJS, .NET Media API, MongoDB replica set, Mailpit и изолирано SFTP хранилище с една команда:
+
+```sh
+./scripts/dev-up.sh
+```
+
+Скриптът генерира локални SSH ключове извън Git, изчаква health проверките, зарежда само синтетични профили и изпълнява SFTP write/read/delete проба. Пълните команди, адреси, тестови конфигурации и начинът за спиране са в [ръководството за разработка](docs/development.md).
+
 ## Работа с Claude Code
 
 Стартирайте `claude` от корена на клонираното репо. Проектните инструкции са в [CLAUDE.md](CLAUDE.md). Командата `/memory` показва заредените инструкции. За конкретна задача използвайте `/design-domain-model`, `/implement-feature` или `/review-change`.

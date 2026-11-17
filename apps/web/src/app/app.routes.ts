@@ -1,4 +1,4 @@
-import { Routes } from '@angular/router';
+import type { Routes } from '@angular/router';
 import { signedInGuard } from './core/auth/auth.guard';
 
 const authPage = () => import('./features/auth/auth-page').then((m) => m.AuthPage);

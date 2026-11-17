@@ -4,8 +4,8 @@ import {
   withInterceptors,
   withInterceptorsFromDi,
 } from '@angular/common/http';
+import type { ApplicationConfig } from '@angular/core';
 import {
-  ApplicationConfig,
   importProvidersFrom,
   provideBrowserGlobalErrorListeners,
   provideZoneChangeDetection,
