@@ -26,6 +26,8 @@
 
 Настройката на SFTP профилите, проверките и вътрешния договор е в [.NET Media API `apps/media/`](apps/media/README.md).
 
+Единният версиониран [OpenAPI договор](contracts/README.md) фиксира публичните, административните и вътрешните маршрути, Problem Details и correlation ID. От него възпроизводимо се генерира типизираният Angular клиент, а CI спира несъвместими промени.
+
 ## Работа с Claude Code
 
 Стартирайте `claude` от корена на клонираното репо. Проектните инструкции са в [CLAUDE.md](CLAUDE.md). Командата `/memory` показва заредените инструкции. За конкретна задача използвайте `/design-domain-model`, `/implement-feature` или `/review-change`.

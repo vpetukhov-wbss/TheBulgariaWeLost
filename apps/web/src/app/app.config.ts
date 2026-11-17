@@ -26,13 +26,17 @@ import { brocodersRefreshInterceptor } from './core/auth/auth-refresh.intercepto
 import { ArchiveAuthService } from './core/auth/auth.service';
 import { MemoryTokenStorage } from './core/auth/auth-token.storage';
 import { ArchiveRoleProvider } from './core/auth/role.provider';
+import { correlationIdInterceptor } from './core/http/correlation-id.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection(),
     provideRouter(routes),
-    provideHttpClient(withInterceptors([brocodersRefreshInterceptor]), withInterceptorsFromDi()),
+    provideHttpClient(
+      withInterceptors([correlationIdInterceptor, brocodersRefreshInterceptor]),
+      withInterceptorsFromDi(),
+    ),
     importProvidersFrom(
       NbThemeModule.forRoot({ name: 'default' }),
       NbToastrModule.forRoot(),

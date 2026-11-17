@@ -8,6 +8,11 @@ import type { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import type { AllConfigType } from './config/config.type';
+import {
+  CORRELATION_ID_HEADER,
+  correlationIdMiddleware,
+} from './http/correlation-id.middleware';
+import { ProblemDetailsFilter } from './http/problem-details.filter';
 import validationOptions from './utils/validation-options';
 
 async function bootstrap(): Promise<void> {
@@ -18,6 +23,7 @@ async function bootstrap(): Promise<void> {
   const proxyHops = config.getOrThrow('app.trustProxyHops', { infer: true });
   if (proxyHops) app.set('trust proxy', proxyHops);
 
+  app.use(correlationIdMiddleware);
   app.use(helmet());
   app.enableCors({
     origin: config.getOrThrow('app.corsOrigins', { infer: true }),
@@ -26,6 +32,7 @@ async function bootstrap(): Promise<void> {
   app.setGlobalPrefix('api');
   app.enableVersioning({ type: VersioningType.URI });
   app.useGlobalPipes(new ValidationPipe(validationOptions));
+  app.useGlobalFilters(new ProblemDetailsFilter());
   app.use(
     '/api',
     (_request: Request, response: Response, next: NextFunction) => {
@@ -39,6 +46,14 @@ async function bootstrap(): Promise<void> {
       .setTitle('The Bulgaria We Lost API')
       .setVersion('1')
       .addBearerAuth()
+      .addGlobalParameters({
+        name: CORRELATION_ID_HEADER,
+        in: 'header',
+        required: false,
+        description:
+          'Optional request correlation ID. The same value is returned in the response header and Problem Details traceId.',
+        schema: { type: 'string', maxLength: 128 },
+      })
       .build();
     SwaggerModule.setup('docs', app, () =>
       SwaggerModule.createDocument(app, docs),

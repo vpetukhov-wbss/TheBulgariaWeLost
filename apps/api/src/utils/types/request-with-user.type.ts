@@ -1,5 +1,9 @@
 import type { Request } from 'express';
 
-export type RequestWithUser<TUser> = Request & {
+export type CorrelatedRequest = Request & {
+  correlationId: string;
+};
+
+export type RequestWithUser<TUser> = CorrelatedRequest & {
   user: TUser;
 };

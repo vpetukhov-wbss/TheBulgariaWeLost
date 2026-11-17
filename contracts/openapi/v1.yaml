@@ -1,0 +1,799 @@
+openapi: 3.0.3
+info:
+  title: The Bulgaria We Lost API
+  version: 1.0.0
+  description: Unified contract for the Angular application, NestJS control plane and .NET media plane.
+servers:
+  - url: /
+tags:
+  - name: Health
+  - name: Auth
+  - name: Back office
+  - name: Media
+  - name: Internal media
+    description: Private service-to-service operations. Never call these from a browser.
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      operationId: getApiHealth
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: API and MongoDB are available.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/email/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: JWT access and refresh tokens.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/email/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/email/confirm:
+    post:
+      tags: [Auth]
+      operationId: confirmEmail
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        $ref: '#/components/requestBodies/Hash'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/email/confirm/new:
+    post:
+      tags: [Auth]
+      operationId: confirmNewEmail
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        $ref: '#/components/requestBodies/Hash'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/forgot/password:
+    post:
+      tags: [Auth]
+      operationId: requestPasswordReset
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/reset/password:
+    post:
+      tags: [Auth]
+      operationId: resetPassword
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      operationId: getProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Current account profile.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        default:
+          $ref: '#/components/responses/Problem'
+    patch:
+      tags: [Auth]
+      operationId: updateProfile
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Updated profile.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Rotated JWT tokens.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenPair'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /api/admin/v1/me:
+    get:
+      tags: [Back office]
+      operationId: getBackOfficePrincipal
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Current editor or administrator principal.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackOfficePrincipal'
+        default:
+          $ref: '#/components/responses/Problem'
+  /media/v1/uploads/{uploadId}:
+    put:
+      tags: [Media]
+      operationId: uploadMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /media/v1/assets/{assetId}/{variant}:
+    get:
+      tags: [Media]
+      operationId: readMedia
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/Variant'
+        - $ref: '#/components/parameters/MediaGrant'
+        - name: Range
+          in: header
+          schema:
+            type: string
+          example: bytes=0-1048575
+      responses:
+        '200':
+          $ref: '#/components/responses/BinaryContent'
+        '206':
+          $ref: '#/components/responses/BinaryContent'
+        default:
+          $ref: '#/components/responses/Problem'
+    head:
+      tags: [Media]
+      operationId: inspectMedia
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AssetId'
+        - $ref: '#/components/parameters/Variant'
+        - $ref: '#/components/parameters/MediaGrant'
+      responses:
+        '200':
+          description: Media metadata headers.
+          headers:
+            X-Correlation-ID:
+              $ref: '#/components/headers/CorrelationId'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/uploads/{uploadId}/claim:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: claimUpload
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantRequest'
+      responses:
+        '200':
+          description: Exclusive upload claim.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadClaim'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/uploads/{uploadId}/complete:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: completeUpload
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/UploadId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadReceipt'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/assets/{assetId}/authorize-read:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: authorizeMediaRead
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: '#/components/parameters/AssetId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthorizeReadRequest'
+      responses:
+        '200':
+          description: Authorized storage reference.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReadDecision'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/inspections/lease:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: leaseInspection
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Inspection job lease.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InspectionLease'
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/inspections/{jobId}/complete:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: completeInspection
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: jobId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InspectionResult'
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+  /internal/media/v1/storage/{locationId}/probe:
+    post:
+      x-internal: true
+      tags: [Internal media]
+      operationId: probeStorage
+      security:
+        - serviceToken: []
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+        - name: locationId
+          in: path
+          required: true
+          schema:
+            type: string
+            maxLength: 100
+      responses:
+        '204':
+          $ref: '#/components/responses/NoContent'
+        default:
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    serviceToken:
+      type: http
+      scheme: bearer
+      description: Private, rotated service credential.
+  parameters:
+    CorrelationId:
+      name: X-Correlation-ID
+      in: header
+      required: false
+      description: Optional caller correlation ID. The server echoes it or creates a safe value.
+      schema:
+        type: string
+        maxLength: 128
+        pattern: '^[A-Za-z0-9._:-]+$'
+    UploadId:
+      name: uploadId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AssetId:
+      name: assetId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    Variant:
+      name: variant
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [original, preview]
+    MediaGrant:
+      name: grant
+      in: query
+      required: true
+      schema:
+        type: string
+        maxLength: 4096
+  headers:
+    CorrelationId:
+      description: Correlates logs and Problem Details across services.
+      required: true
+      schema:
+        type: string
+  requestBodies:
+    Hash:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/HashRequest'
+  responses:
+    NoContent:
+      description: Operation completed.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+    BinaryContent:
+      description: Authorized media bytes.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+        Accept-Ranges:
+          schema:
+            type: string
+      content:
+        application/octet-stream:
+          schema:
+            type: string
+            format: binary
+    Problem:
+      description: RFC 9457 compatible error with a stable application code.
+      headers:
+        X-Correlation-ID:
+          $ref: '#/components/headers/CorrelationId'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetails'
+  schemas:
+    HealthResponse:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok]
+    ProblemDetails:
+      type: object
+      required: [type, title, status, code, traceId]
+      properties:
+        type:
+          type: string
+          format: uri
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            type: string
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 1
+          maxLength: 72
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required: [email, password, firstName, lastName]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+          maxLength: 72
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+    HashRequest:
+      type: object
+      additionalProperties: false
+      required: [hash]
+      properties:
+        hash:
+          type: string
+    ForgotPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+    ResetPasswordRequest:
+      type: object
+      additionalProperties: false
+      required: [hash, password]
+      properties:
+        hash:
+          type: string
+        password:
+          type: string
+          minLength: 6
+          maxLength: 72
+    UpdateProfileRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+          maxLength: 72
+        oldPassword:
+          type: string
+    Profile:
+      type: object
+      additionalProperties: false
+      required: [id, email, firstName, lastName, role]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        firstName:
+          type: string
+        lastName:
+          type: string
+        role:
+          $ref: '#/components/schemas/Role'
+    Role:
+      type: string
+      enum: [User, Editor, Administrator]
+    TokenPair:
+      type: object
+      additionalProperties: false
+      required: [token, refreshToken, tokenExpires]
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        tokenExpires:
+          type: integer
+          format: int64
+    LoginResponse:
+      type: object
+      additionalProperties: false
+      required: [token, refreshToken, tokenExpires, user]
+      properties:
+        token:
+          type: string
+        refreshToken:
+          type: string
+        tokenExpires:
+          type: integer
+          format: int64
+        user:
+          $ref: '#/components/schemas/Profile'
+    BackOfficePrincipal:
+      type: object
+      additionalProperties: false
+      required: [id, displayName, role, permissions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        displayName:
+          type: string
+        role:
+          type: string
+          enum: [Editor, Administrator]
+        permissions:
+          type: array
+          items:
+            type: string
+    GrantRequest:
+      type: object
+      additionalProperties: false
+      required: [grant]
+      properties:
+        grant:
+          type: string
+          maxLength: 4096
+    AuthorizeReadRequest:
+      type: object
+      additionalProperties: false
+      required: [grant, variant]
+      properties:
+        grant:
+          type: string
+          maxLength: 4096
+        variant:
+          type: string
+          enum: [original, preview]
+    ObjectReference:
+      type: object
+      additionalProperties: false
+      required: [storageLocationId, fileKey]
+      properties:
+        storageLocationId:
+          type: string
+        fileKey:
+          type: string
+    UploadClaim:
+      type: object
+      additionalProperties: false
+      required: [attemptId, object, length, sha256]
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        object:
+          $ref: '#/components/schemas/ObjectReference'
+        length:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+    UploadReceipt:
+      type: object
+      additionalProperties: false
+      required: [attemptId, length, sha256, contentType]
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        length:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+          pattern: '^[a-f0-9]{64}$'
+        contentType:
+          type: string
+    ReadDecision:
+      type: object
+      additionalProperties: false
+      required: [object, length, contentType]
+      properties:
+        object:
+          $ref: '#/components/schemas/ObjectReference'
+        length:
+          type: integer
+          format: int64
+        contentType:
+          type: string
+    InspectionLease:
+      type: object
+      additionalProperties: false
+      required: [jobId, attemptId, object, length, sha256]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        attemptId:
+          type: string
+          format: uuid
+        object:
+          $ref: '#/components/schemas/ObjectReference'
+        length:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+    InspectionResult:
+      type: object
+      additionalProperties: false
+      required: [attemptId, outcome]
+      properties:
+        attemptId:
+          type: string
+          format: uuid
+        outcome:
+          type: string
+          enum: [inspected, missing, integrity_mismatch, unsupported_format]
+        length:
+          type: integer
+          format: int64
+        sha256:
+          type: string
+        contentType:
+          type: string

@@ -31,6 +31,8 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Media.Api --urls htt
 
 `GET /media/health/live` проверява процеса. В Development OpenAPI е на `/media/openapi/v1.json`. В production използвай HTTPS към NestJS, подай ключовете чрез конфигурацията на средата и маршрутизирай `/media/` през HTTPS входа. `/internal/media/v1/` е достъпен по частния маршрут между услугите. Прокси и приложни логове трябва да изключват `Authorization` и query параметъра `grant` от записите. Проверки на SFTP се правят по конфигурирани профили чрез вътрешния endpoint.
 
+Всеки отговор връща `X-Correlation-ID`. Грешките използват `application/problem+json` със стабилен `code` и същия идентификатор в `traceId`. Общият договор за NestJS, Angular и Media API е [`contracts/openapi/v1.yaml`](../../contracts/openapi/v1.yaml).
+
 ## HTTP договор
 
 | .NET маршрут | Действие |

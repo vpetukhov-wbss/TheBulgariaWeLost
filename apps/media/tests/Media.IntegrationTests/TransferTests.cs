@@ -22,6 +22,20 @@ public sealed class TransferTests
     }
 
     [Fact]
+    public async Task Responses_echo_the_correlation_id()
+    {
+        await using var app = new MediaApp();
+        using var client = app.CreateClient();
+        using var request = new HttpRequestMessage(HttpMethod.Get, "/media/health/live");
+        request.Headers.Add("X-Correlation-ID", "media-contract-smoke-1");
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("media-contract-smoke-1", response.Headers.GetValues("X-Correlation-ID").Single());
+    }
+
+    [Fact]
     public async Task Retrying_after_failed_acknowledgement_does_not_publish_a_second_object()
     {
         await using var app = new MediaApp();
@@ -77,6 +91,11 @@ public sealed class TransferTests
         using var response = await UploadAsync(client, mutated);
         Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
         Assert.Equal(0, app.Storage.Publications);
+        using var problem = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+        Assert.Equal(422, problem.RootElement.GetProperty("status").GetInt32());
+        Assert.Equal("upload_integrity_mismatch", problem.RootElement.GetProperty("code").GetString());
+        Assert.Equal(response.Headers.GetValues("X-Correlation-ID").Single(),
+            problem.RootElement.GetProperty("traceId").GetString());
     }
 
     [Fact]

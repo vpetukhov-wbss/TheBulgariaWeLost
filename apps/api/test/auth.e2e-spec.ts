@@ -1,12 +1,15 @@
 import 'dotenv/config';
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
 import { mongo } from 'mongoose';
 import request from 'supertest';
+import { parse } from 'yaml';
 
 const databaseUrl = new URL(
   process.env.API_TEST_DATABASE_URL ??
@@ -115,14 +118,34 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         ...process.env,
         NODE_ENV: 'test',
         APP_PORT: String(port),
+        FRONTEND_DOMAIN: process.env.FRONTEND_DOMAIN ?? 'http://127.0.0.1:4200',
         DATABASE_URL: databaseUrl.toString(),
         MAIL_HOST: '127.0.0.1',
         MAIL_PORT: process.env.API_TEST_SMTP_PORT ?? '1025',
+        MAIL_DEFAULT_EMAIL:
+          process.env.MAIL_DEFAULT_EMAIL ?? 'noreply@example.test',
+        MAIL_DEFAULT_NAME:
+          process.env.MAIL_DEFAULT_NAME ?? 'The Bulgaria We Lost tests',
         MAIL_USER: '',
         MAIL_PASSWORD: '',
         MAIL_IGNORE_TLS: 'true',
         MAIL_SECURE: 'false',
         MAIL_REQUIRE_TLS: 'false',
+        AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET ?? 'secret',
+        AUTH_REFRESH_SECRET:
+          process.env.AUTH_REFRESH_SECRET ?? 'secret_for_refresh',
+        AUTH_FORGOT_SECRET:
+          process.env.AUTH_FORGOT_SECRET ?? 'secret_for_forgot',
+        AUTH_CONFIRM_EMAIL_SECRET:
+          process.env.AUTH_CONFIRM_EMAIL_SECRET ?? 'secret_for_confirm_email',
+        AUTH_JWT_TOKEN_EXPIRES_IN:
+          process.env.AUTH_JWT_TOKEN_EXPIRES_IN ?? '15m',
+        AUTH_REFRESH_TOKEN_EXPIRES_IN:
+          process.env.AUTH_REFRESH_TOKEN_EXPIRES_IN ?? '30d',
+        AUTH_FORGOT_TOKEN_EXPIRES_IN:
+          process.env.AUTH_FORGOT_TOKEN_EXPIRES_IN ?? '30m',
+        AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN:
+          process.env.AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN ?? '1d',
       },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -149,11 +172,55 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
   });
 
   void it('should publish the versioned routes and health check', async () => {
-    await api.get('/api/v1/health').expect(200, { status: 'ok' });
+    const correlationId = 'contract-smoke-1';
+    await api
+      .get('/api/v1/health')
+      .set('X-Correlation-ID', correlationId)
+      .expect('X-Correlation-ID', correlationId)
+      .expect(200, { status: 'ok' });
     const openApi = await api.get('/docs-json').expect(200);
-    const routes = Object.keys((openApi.body as { paths: object }).paths);
+    const generated = openApi.body as {
+      paths: Record<string, Record<string, unknown>>;
+    };
+    const routes = Object.keys(generated.paths);
     assert(routes.includes('/api/v1/auth/email/login'));
     assert(routes.includes('/api/admin/v1/me'));
+
+    const contract = parse(
+      await readFile(
+        resolve(process.cwd(), '../../contracts/openapi/v1.yaml'),
+        'utf8',
+      ),
+    ) as { paths: Record<string, Record<string, unknown>> };
+    const contractRoutes = Object.keys(contract.paths).filter((path) =>
+      path.startsWith('/api/'),
+    );
+    assert.deepEqual(routes.sort(), contractRoutes.sort());
+    for (const path of routes) {
+      const methods = (item: Record<string, unknown>) =>
+        Object.keys(item).filter((key) =>
+          ['get', 'put', 'post', 'delete', 'patch', 'head'].includes(key),
+        );
+      assert.deepEqual(
+        methods(generated.paths[path]).sort(),
+        methods(contract.paths[path]).sort(),
+      );
+    }
+  });
+
+  void it('should return the shared Problem Details envelope', async () => {
+    const correlationId = 'contract-problem-1';
+    const problem = await api
+      .post(auth + '/email/login')
+      .set('X-Correlation-ID', correlationId)
+      .send({ email: 'not-an-email', password: 'short' })
+      .expect('Content-Type', /application\/problem\+json/)
+      .expect('X-Correlation-ID', correlationId)
+      .expect(422);
+
+    assert.equal(problem.body.status, 422);
+    assert.equal(problem.body.traceId, correlationId);
+    assert.equal(typeof problem.body.code, 'string');
   });
 
   void it('should require email confirmation and prevent registration from choosing a role', async () => {
