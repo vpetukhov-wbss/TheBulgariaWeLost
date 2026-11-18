@@ -25,9 +25,11 @@ npm run build
 npm run format:check
 npm run lint
 npm run typecheck
+npm run typecheck:e2e
 npm run contract:validate
 npm run api:check
 npm run build
+npm run test:e2e
 ```
 
 Готовият браузърен build се намира в `dist/bulgaria-web/browser`.
@@ -67,9 +69,10 @@ Angular добавя `X-Correlation-ID` към API заявките чрез ц�
 ## Сесии и роли
 
 - `NbAuthService` използва `NbPasswordAuthStrategy` с маршрутите на Brocoders под `/api/v1/auth/`. Вградените JWT модел и interceptor поставят access token само в подходящите API заявки. Адаптерът подава refresh token като `Authorization: Bearer` към `POST /api/v1/auth/refresh`. Паралелните заявки споделят един refresh, тъй като Brocoders ротира токена.
-- Токените се пазят в паметта на текущия таб. Презареждане на страницата или отваряне на друг таб изисква вход. За трайна сесия е необходим отделен договор с NestJS за `HttpOnly` cookie и CSRF защита.
+- Токените се пазят чрез `NbTokenStorage` в `sessionStorage`: директен маршрут и презареждане в същия таб запазват сесията, но затварянето на таба я премахва. За сесия без достъп на JavaScript до refresh token е необходим отделен договор с NestJS за `HttpOnly` cookie и CSRF защита.
 - `NbSecurityModule` управлява видимостта на навигацията за `Guest`, `User`, `Editor` и `Administrator`. JWT claim `role` може да е име или обект с `name`. Стандартните числови роли на Brocoders нямат редакторски или административен достъп в Angular.
-- `/admin` използва проектния договор `GET /api/admin/v1/me` за актуална роля, разрешения и потвърдена администраторска MFA сесия. NestJS проверява достъпа при всяка защитена заявка. Работните екрани и MFA потвърждението се интегрират с реализацията на административния API.
+- `/admin` използва проектния договор `GET /api/admin/v1/me` още в route guard-а за актуална роля, разрешения и потвърдена администраторска MFA сесия. Кодът от JWT служи само за навигация. При `mfa_required` приложението отваря `/mfa`, където администраторът може да настрои TOTP, да потвърди код или да използва еднократен recovery код.
+- Playwright сценарият в `e2e/` проверява refresh rotation, директен `/admin`, MFA връщане към разрешения маршрут, отказ на остарял Administrator claim и състояние при недостъпна услуга. CI инсталира Chromium и изпълнява теста при всеки pull request.
 
 ## Зависимости
 

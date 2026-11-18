@@ -3,6 +3,9 @@
     ><h1>{{ page.title }}</h1></nb-card-header
   >
   <nb-card-body>
+    @if (information) {
+      <nb-alert status="success" role="status">{{ information }}</nb-alert>
+    }
     @if (success(); as message) {
       <nb-alert status="success" role="status">{{ message }}</nb-alert>
       <a nbButton status="primary" routerLink="/login">Към входа</a>

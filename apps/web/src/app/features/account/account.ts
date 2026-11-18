@@ -1,59 +1,160 @@
-import { AsyncPipe } from '@angular/common';
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, inject } from '@angular/core';
-import { RouterLink } from '@angular/router';
-import { NbAlertModule, NbButtonModule, NbCardModule, NbSpinnerModule } from '@nebular/theme';
-import { catchError, map, of } from 'rxjs';
-import { AUTH_API } from '../../core/auth/auth.config';
+import { Component, inject, signal } from '@angular/core';
+import type { OnInit } from '@angular/core';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
+import { NbTokenService } from '@nebular/auth';
+import {
+  NbAlertModule,
+  NbButtonModule,
+  NbCardModule,
+  NbInputModule,
+  NbSpinnerModule,
+} from '@nebular/theme';
+import { firstValueFrom } from 'rxjs';
+import type { Profile } from '../../api/generated/models/profile';
+import { AuthService } from '../../api/generated/services/auth.service';
+import { actionError, isSessionExpired } from '../../core/auth/auth-errors';
 
-interface Profile {
-  firstName: string | null;
-  lastName: string | null;
-  email: string | null;
-}
+type AccountState = 'loading' | 'ready' | 'expired' | 'unavailable';
 
 @Component({
-  imports: [AsyncPipe, RouterLink, NbAlertModule, NbButtonModule, NbCardModule, NbSpinnerModule],
-  template: `
-    <nb-card>
-      <nb-card-header><h1>Моят профил</h1></nb-card-header>
-      <nb-card-body>
-        @if (profile$ | async; as state) {
-          @if (state.kind === 'ready') {
-            <dl>
-              <dt>Име</dt>
-              <dd>{{ state.profile.firstName }} {{ state.profile.lastName }}</dd>
-              <dt>Имейл</dt>
-              <dd>{{ state.profile.email || 'Няма въведен имейл' }}</dd>
-            </dl>
-          } @else if (state.kind === 'signed-out') {
-            <nb-alert status="warning" role="alert">Сесията е изтекла. Влез отново.</nb-alert>
-            <a nbButton status="primary" routerLink="/login">Към входа</a>
-          } @else {
-            <nb-alert status="danger" role="alert">Профилът е временно недостъпен.</nb-alert>
-          }
-        } @else {
-          <p role="status" [nbSpinner]="true">Зарежда се профилът…</p>
-        }
-      </nb-card-body>
-    </nb-card>
-  `,
-  styles: ['h1 { margin: 0; font-size: 1.5rem; } dd { margin: 0 0 1rem; }'],
+  imports: [
+    ReactiveFormsModule,
+    RouterLink,
+    NbAlertModule,
+    NbButtonModule,
+    NbCardModule,
+    NbInputModule,
+    NbSpinnerModule,
+  ],
+  templateUrl: './account.html',
+  styleUrl: './account.scss',
 })
-export class Account {
-  protected readonly profile$ = inject(HttpClient)
-    .get<Profile | null>(AUTH_API + 'me')
-    .pipe(
-      map((profile) =>
-        profile ? { kind: 'ready' as const, profile } : { kind: 'signed-out' as const },
-      ),
-      catchError((error: unknown) =>
-        of({
-          kind:
-            error instanceof HttpErrorResponse && error.status === 401
-              ? ('signed-out' as const)
-              : ('unavailable' as const),
+export class Account implements OnInit {
+  private readonly api = inject(AuthService);
+  private readonly tokens = inject(NbTokenService);
+  private readonly router = inject(Router);
+  private readonly builder = inject(FormBuilder).nonNullable;
+
+  protected readonly state = signal<AccountState>('loading');
+  protected readonly profile = signal<Profile | null>(null);
+  protected readonly saving = signal(false);
+  protected readonly endingSessions = signal(false);
+  protected readonly success = signal('');
+  protected readonly error = signal('');
+
+  protected readonly form = this.builder.group({
+    firstName: ['', Validators.required],
+    lastName: ['', Validators.required],
+    email: ['', [Validators.required, Validators.email]],
+    oldPassword: [''],
+    password: ['', Validators.minLength(6)],
+    confirmation: [''],
+  });
+
+  ngOnInit(): void {
+    void this.load();
+  }
+
+  protected async load(): Promise<void> {
+    this.state.set('loading');
+    this.error.set('');
+    try {
+      const profile = await firstValueFrom(this.api.getProfile());
+      this.profile.set(profile);
+      this.form.reset({
+        firstName: profile.firstName,
+        lastName: profile.lastName,
+        email: profile.email,
+        oldPassword: '',
+        password: '',
+        confirmation: '',
+      });
+      this.state.set('ready');
+    } catch (error: unknown) {
+      await this.handleLoadError(error);
+    }
+  }
+
+  protected async save(): Promise<void> {
+    if (this.saving()) return;
+    this.form.markAllAsTouched();
+    this.error.set('');
+    this.success.set('');
+    if (this.form.invalid) return;
+
+    const value = this.form.getRawValue();
+    if (value.password !== value.confirmation) {
+      this.error.set('Двете нови пароли трябва да съвпадат.');
+      return;
+    }
+
+    this.saving.set(true);
+    try {
+      const updated = await firstValueFrom(
+        this.api.updateProfile({
+          body: {
+            firstName: value.firstName,
+            lastName: value.lastName,
+            email: value.email,
+            ...(value.oldPassword ? { oldPassword: value.oldPassword } : {}),
+            ...(value.password ? { password: value.password } : {}),
+          },
         }),
-      ),
-    );
+      );
+      this.profile.set(updated);
+      this.form.patchValue({ oldPassword: '', password: '', confirmation: '' });
+      this.form.markAsPristine();
+      this.success.set(
+        updated.email === value.email
+          ? 'Профилът е запазен.'
+          : 'Промените са запазени. Провери новия имейл за потвърждение.',
+      );
+    } catch (error: unknown) {
+      if (isSessionExpired(error)) {
+        await this.expireSession();
+      } else {
+        this.error.set(
+          actionError(
+            error,
+            'Профилът не беше запазен. За промяна на имейл или парола въведи текущата парола.',
+          ),
+        );
+      }
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  protected async logoutEverywhere(): Promise<void> {
+    if (this.endingSessions()) return;
+    this.endingSessions.set(true);
+    this.error.set('');
+    try {
+      await firstValueFrom(this.api.logoutAll());
+      await firstValueFrom(this.tokens.clear());
+      await this.router.navigate(['/login'], { queryParams: { sessionsEnded: '1' } });
+    } catch (error: unknown) {
+      if (isSessionExpired(error)) {
+        await this.expireSession();
+      } else {
+        this.error.set(actionError(error, 'Сесиите не бяха прекратени. Опитай отново.'));
+      }
+    } finally {
+      this.endingSessions.set(false);
+    }
+  }
+
+  private async handleLoadError(error: unknown): Promise<void> {
+    if (isSessionExpired(error)) {
+      await this.expireSession();
+      return;
+    }
+    this.state.set('unavailable');
+  }
+
+  private async expireSession(): Promise<void> {
+    await firstValueFrom(this.tokens.clear());
+    this.state.set('expired');
+  }
 }

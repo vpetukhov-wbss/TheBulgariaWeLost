@@ -45,7 +45,13 @@ jobs:
           npm run contract:validate
           npm run api:check
           npm run typecheck
+          npm run typecheck:e2e
           npm run build
+      - name: Run protected-route browser tests
+        working-directory: apps/web
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
       - name: Reject breaking OpenAPI changes
         if: github.event_name == 'pull_request'
         working-directory: apps/web
