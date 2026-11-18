@@ -17,6 +17,9 @@ export class ProfileDto {
   @ApiProperty({ enum: Role })
   role: Role;
 
+  @ApiProperty({ required: false })
+  mfaEnabled?: boolean;
+
   static fromAccount(account: Account): ProfileDto {
     return {
       id: account._id,
@@ -24,6 +27,7 @@ export class ProfileDto {
       firstName: account.firstName,
       lastName: account.lastName,
       role: account.role,
+      mfaEnabled: account.mfaEnabled,
     };
   }
 }

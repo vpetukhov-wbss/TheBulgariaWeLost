@@ -10,6 +10,7 @@ const sampleSecrets = [
   'secret_for_refresh',
   'secret_for_forgot',
   'secret_for_confirm_email',
+  'development_only_mfa_encryption_key',
 ];
 const duration = /^[1-9]\d{0,5}[smhd]$/;
 
@@ -29,6 +30,10 @@ class AuthEnvironment {
   @IsString()
   @IsNotEmpty()
   AUTH_CONFIRM_EMAIL_SECRET: string;
+
+  @IsString()
+  @IsNotEmpty()
+  AUTH_MFA_ENCRYPTION_KEY: string;
 
   @Matches(duration)
   AUTH_JWT_TOKEN_EXPIRES_IN: StringValue;
@@ -50,15 +55,16 @@ export default registerAs<AuthConfig>('auth', () => {
     env.AUTH_REFRESH_SECRET,
     env.AUTH_FORGOT_SECRET,
     env.AUTH_CONFIRM_EMAIL_SECRET,
+    env.AUTH_MFA_ENCRYPTION_KEY,
   ];
   if (new Set(secrets).size !== secrets.length)
-    throw new Error('Configure four distinct auth secrets.');
+    throw new Error('Configure five distinct auth secrets.');
   const weak = secrets.some(
     (value) => sampleSecrets.includes(value) || Buffer.byteLength(value) < 32,
   );
   if (weak && process.env.NODE_ENV === 'production') {
     throw new Error(
-      'Configure four strong auth secrets before running in production.',
+      'Configure five strong auth secrets before running in production.',
     );
   }
   if (weak) new Logger('AuthConfig').warn('Using development auth secrets.');
@@ -72,5 +78,7 @@ export default registerAs<AuthConfig>('auth', () => {
     forgotExpires: env.AUTH_FORGOT_TOKEN_EXPIRES_IN,
     confirmEmailSecret: env.AUTH_CONFIRM_EMAIL_SECRET,
     confirmEmailExpires: env.AUTH_CONFIRM_EMAIL_TOKEN_EXPIRES_IN,
+    mfaEncryptionKey: env.AUTH_MFA_ENCRYPTION_KEY,
+    mfaVerifiedMaxAgeMs: 10 * 60 * 1000,
   };
 });

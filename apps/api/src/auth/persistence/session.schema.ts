@@ -17,6 +17,9 @@ export class Session {
 
   @Prop({ required: true, expires: 0 })
   expiresAt: Date;
+
+  @Prop()
+  mfaVerifiedAt?: Date;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

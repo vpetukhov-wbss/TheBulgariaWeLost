@@ -8,7 +8,11 @@ import { AuthService } from '../auth.service';
 import { ProfileDto } from '../dto/profile.dto';
 import { JwtPayloadType } from './types/jwt-payload.type';
 
-export type SignedInAccount = { profile: ProfileDto; sessionId: string };
+export type SignedInAccount = {
+  profile: ProfileDto;
+  sessionId: string;
+  mfaVerifiedAt?: Date;
+};
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -27,9 +31,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (!isUUID(payload.id, '7') || !isUUID(payload.sessionId, '7')) {
       throw new UnauthorizedException();
     }
-    return {
-      profile: await this.auth.activeProfile(payload.sessionId, payload.id),
-      sessionId: payload.sessionId,
-    };
+    const active = await this.auth.activeSession(payload.sessionId, payload.id);
+    return { ...active, sessionId: payload.sessionId };
   }
 }

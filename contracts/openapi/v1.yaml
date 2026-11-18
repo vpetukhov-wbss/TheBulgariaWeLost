@@ -18,120 +18,120 @@ paths:
       tags: [Health]
       operationId: getApiHealth
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '200':
+        "200":
           description: API and MongoDB are available.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/HealthResponse'
+                $ref: "#/components/schemas/HealthResponse"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/email/login:
     post:
       tags: [Auth]
       operationId: login
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: JWT access and refresh tokens.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/LoginResponse'
+                $ref: "#/components/schemas/LoginResponse"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/email/register:
     post:
       tags: [Auth]
       operationId: register
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/email/confirm:
     post:
       tags: [Auth]
       operationId: confirmEmail
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
-        $ref: '#/components/requestBodies/Hash'
+        $ref: "#/components/requestBodies/Hash"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/email/confirm/new:
     post:
       tags: [Auth]
       operationId: confirmNewEmail
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
-        $ref: '#/components/requestBodies/Hash'
+        $ref: "#/components/requestBodies/Hash"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/forgot/password:
     post:
       tags: [Auth]
       operationId: requestPasswordReset
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForgotPasswordRequest'
+              $ref: "#/components/schemas/ForgotPasswordRequest"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/reset/password:
     post:
       tags: [Auth]
       operationId: resetPassword
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ResetPasswordRequest'
+              $ref: "#/components/schemas/ResetPasswordRequest"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/me:
     get:
       tags: [Auth]
@@ -139,44 +139,44 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '200':
+        "200":
           description: Current account profile.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Profile'
+                $ref: "#/components/schemas/Profile"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
     patch:
       tags: [Auth]
       operationId: updateProfile
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateProfileRequest'
+              $ref: "#/components/schemas/UpdateProfileRequest"
       responses:
-        '200':
+        "200":
           description: Updated profile.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Profile'
+                $ref: "#/components/schemas/Profile"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/refresh:
     post:
       tags: [Auth]
@@ -184,19 +184,19 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '200':
+        "200":
           description: Rotated JWT tokens.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/TokenPair'
+                $ref: "#/components/schemas/TokenPair"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /api/v1/auth/logout:
     post:
       tags: [Auth]
@@ -204,12 +204,109 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
+  /api/v1/auth/logout/all:
+    post:
+      tags: [Auth]
+      operationId: logoutAll
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/auth/mfa/enrollment:
+    post:
+      tags: [Auth]
+      operationId: startMfaEnrollment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaEnrollmentRequest"
+      responses:
+        "200":
+          description: One-time TOTP enrollment values.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaEnrollment"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/auth/mfa/enrollment/confirm:
+    post:
+      tags: [Auth]
+      operationId: confirmMfaEnrollment
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaCodeRequest"
+      responses:
+        "200":
+          description: Recovery codes shown exactly once.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MfaRecoveryCodes"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/auth/mfa/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyMfa
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaCodeRequest"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/auth/mfa/recover:
+    post:
+      tags: [Auth]
+      operationId: recoverMfa
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MfaRecoveryCodeRequest"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/admin/v1/me:
     get:
       tags: [Back office]
@@ -217,19 +314,19 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '200':
+        "200":
           description: Current editor or administrator principal.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BackOfficePrincipal'
+                $ref: "#/components/schemas/BackOfficePrincipal"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /media/v1/uploads/{uploadId}:
     put:
       tags: [Media]
@@ -237,8 +334,8 @@ paths:
       security:
         - bearerAuth: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/UploadId'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/UploadId"
       requestBody:
         required: true
         content:
@@ -247,47 +344,47 @@ paths:
               type: string
               format: binary
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /media/v1/assets/{assetId}/{variant}:
     get:
       tags: [Media]
       operationId: readMedia
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/AssetId'
-        - $ref: '#/components/parameters/Variant'
-        - $ref: '#/components/parameters/MediaGrant'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AssetId"
+        - $ref: "#/components/parameters/Variant"
+        - $ref: "#/components/parameters/MediaGrant"
         - name: Range
           in: header
           schema:
             type: string
           example: bytes=0-1048575
       responses:
-        '200':
-          $ref: '#/components/responses/BinaryContent'
-        '206':
-          $ref: '#/components/responses/BinaryContent'
+        "200":
+          $ref: "#/components/responses/BinaryContent"
+        "206":
+          $ref: "#/components/responses/BinaryContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
     head:
       tags: [Media]
       operationId: inspectMedia
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/AssetId'
-        - $ref: '#/components/parameters/Variant'
-        - $ref: '#/components/parameters/MediaGrant'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AssetId"
+        - $ref: "#/components/parameters/Variant"
+        - $ref: "#/components/parameters/MediaGrant"
       responses:
-        '200':
+        "200":
           description: Media metadata headers.
           headers:
             X-Correlation-ID:
-              $ref: '#/components/headers/CorrelationId'
+              $ref: "#/components/headers/CorrelationId"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/uploads/{uploadId}/claim:
     post:
       x-internal: true
@@ -296,23 +393,23 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/UploadId'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/UploadId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/GrantRequest'
+              $ref: "#/components/schemas/GrantRequest"
       responses:
-        '200':
+        "200":
           description: Exclusive upload claim.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UploadClaim'
+                $ref: "#/components/schemas/UploadClaim"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/uploads/{uploadId}/complete:
     post:
       x-internal: true
@@ -321,19 +418,19 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/UploadId'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/UploadId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UploadReceipt'
+              $ref: "#/components/schemas/UploadReceipt"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/assets/{assetId}/authorize-read:
     post:
       x-internal: true
@@ -342,23 +439,23 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
-        - $ref: '#/components/parameters/AssetId'
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AssetId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/AuthorizeReadRequest'
+              $ref: "#/components/schemas/AuthorizeReadRequest"
       responses:
-        '200':
+        "200":
           description: Authorized storage reference.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReadDecision'
+                $ref: "#/components/schemas/ReadDecision"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/inspections/lease:
     post:
       x-internal: true
@@ -367,18 +464,18 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
       responses:
-        '200':
+        "200":
           description: Inspection job lease.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InspectionLease'
-        '204':
-          $ref: '#/components/responses/NoContent'
+                $ref: "#/components/schemas/InspectionLease"
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/inspections/{jobId}/complete:
     post:
       x-internal: true
@@ -387,7 +484,7 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
         - name: jobId
           in: path
           required: true
@@ -399,12 +496,12 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/InspectionResult'
+              $ref: "#/components/schemas/InspectionResult"
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/storage/{locationId}/probe:
     post:
       x-internal: true
@@ -413,7 +510,7 @@ paths:
       security:
         - serviceToken: []
       parameters:
-        - $ref: '#/components/parameters/CorrelationId'
+        - $ref: "#/components/parameters/CorrelationId"
         - name: locationId
           in: path
           required: true
@@ -421,10 +518,10 @@ paths:
             type: string
             maxLength: 100
       responses:
-        '204':
-          $ref: '#/components/responses/NoContent'
+        "204":
+          $ref: "#/components/responses/NoContent"
         default:
-          $ref: '#/components/responses/Problem'
+          $ref: "#/components/responses/Problem"
 components:
   securitySchemes:
     bearerAuth:
@@ -444,7 +541,7 @@ components:
       schema:
         type: string
         maxLength: 128
-        pattern: '^[A-Za-z0-9._:-]+$'
+        pattern: "^[A-Za-z0-9._:-]+$"
     UploadId:
       name: uploadId
       in: path
@@ -485,18 +582,18 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/HashRequest'
+            $ref: "#/components/schemas/HashRequest"
   responses:
     NoContent:
       description: Operation completed.
       headers:
         X-Correlation-ID:
-          $ref: '#/components/headers/CorrelationId'
+          $ref: "#/components/headers/CorrelationId"
     BinaryContent:
       description: Authorized media bytes.
       headers:
         X-Correlation-ID:
-          $ref: '#/components/headers/CorrelationId'
+          $ref: "#/components/headers/CorrelationId"
         Accept-Ranges:
           schema:
             type: string
@@ -509,11 +606,11 @@ components:
       description: RFC 9457 compatible error with a stable application code.
       headers:
         X-Correlation-ID:
-          $ref: '#/components/headers/CorrelationId'
+          $ref: "#/components/headers/CorrelationId"
       content:
         application/problem+json:
           schema:
-            $ref: '#/components/schemas/ProblemDetails'
+            $ref: "#/components/schemas/ProblemDetails"
   schemas:
     HealthResponse:
       type: object
@@ -642,7 +739,9 @@ components:
         lastName:
           type: string
         role:
-          $ref: '#/components/schemas/Role'
+          $ref: "#/components/schemas/Role"
+        mfaEnabled:
+          type: boolean
     Role:
       type: string
       enum: [User, Editor, Administrator]
@@ -671,7 +770,7 @@ components:
           type: integer
           format: int64
         user:
-          $ref: '#/components/schemas/Profile'
+          $ref: "#/components/schemas/Profile"
     BackOfficePrincipal:
       type: object
       additionalProperties: false
@@ -689,6 +788,58 @@ components:
           type: array
           items:
             type: string
+        mfaVerifiedAtUtc:
+          type: string
+          format: date-time
+    MfaEnrollmentRequest:
+      type: object
+      additionalProperties: false
+      required: [currentPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 72
+    MfaEnrollment:
+      type: object
+      additionalProperties: false
+      required: [secret, provisioningUri]
+      properties:
+        secret:
+          type: string
+          pattern: "^[A-Z2-7]{32}$"
+        provisioningUri:
+          type: string
+          format: uri
+    MfaCodeRequest:
+      type: object
+      additionalProperties: false
+      required: [code]
+      properties:
+        code:
+          type: string
+          pattern: '^\\d{6}$'
+    MfaRecoveryCodeRequest:
+      type: object
+      additionalProperties: false
+      required: [recoveryCode]
+      properties:
+        recoveryCode:
+          type: string
+          pattern: "^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$"
+    MfaRecoveryCodes:
+      type: object
+      additionalProperties: false
+      required: [recoveryCodes]
+      properties:
+        recoveryCodes:
+          type: array
+          minItems: 10
+          maxItems: 10
+          items:
+            type: string
+            pattern: "^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$"
     GrantRequest:
       type: object
       additionalProperties: false
@@ -726,13 +877,13 @@ components:
           type: string
           format: uuid
         object:
-          $ref: '#/components/schemas/ObjectReference'
+          $ref: "#/components/schemas/ObjectReference"
         length:
           type: integer
           format: int64
         sha256:
           type: string
-          pattern: '^[a-f0-9]{64}$'
+          pattern: "^[a-f0-9]{64}$"
     UploadReceipt:
       type: object
       additionalProperties: false
@@ -746,7 +897,7 @@ components:
           format: int64
         sha256:
           type: string
-          pattern: '^[a-f0-9]{64}$'
+          pattern: "^[a-f0-9]{64}$"
         contentType:
           type: string
     ReadDecision:
@@ -755,7 +906,7 @@ components:
       required: [object, length, contentType]
       properties:
         object:
-          $ref: '#/components/schemas/ObjectReference'
+          $ref: "#/components/schemas/ObjectReference"
         length:
           type: integer
           format: int64
@@ -773,7 +924,7 @@ components:
           type: string
           format: uuid
         object:
-          $ref: '#/components/schemas/ObjectReference'
+          $ref: "#/components/schemas/ObjectReference"
         length:
           type: integer
           format: int64

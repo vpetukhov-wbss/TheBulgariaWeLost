@@ -15,7 +15,8 @@
     "format:check": "prettier --check src test scripts",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node --experimental-strip-types --test test/*.e2e-spec.ts",
-    "seed:dev": "node scripts/seed.mjs"
+    "seed:dev": "node scripts/seed.mjs",
+    "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {
     "@nestjs/common": "11.2.10",

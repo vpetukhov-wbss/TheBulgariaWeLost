@@ -1,12 +1,13 @@
 import 'dotenv/config';
-import { randomUUID } from 'node:crypto';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { createHmac, randomUUID } from 'node:crypto';
+import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { once } from 'node:events';
 import { setTimeout as delay } from 'node:timers/promises';
+import { promisify } from 'node:util';
 import { mongo } from 'mongoose';
 import request from 'supertest';
 import { parse } from 'yaml';
@@ -31,6 +32,9 @@ const details = {
 };
 let child: ChildProcess | undefined;
 let serverLog = '';
+const sensitiveSamples: string[] = [];
+const execFileAsync = promisify(execFile);
+const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 
 interface Tokens {
   token: string;
@@ -104,6 +108,46 @@ async function login(
   return result.body as Tokens;
 }
 
+function totp(secret: string, step = Math.floor(Date.now() / 30_000)): string {
+  let bits = 0;
+  let value = 0;
+  const bytes: number[] = [];
+  for (const character of secret) {
+    value = (value << 5) | base32Alphabet.indexOf(character);
+    bits += 5;
+    if (bits >= 8) {
+      bytes.push((value >>> (bits - 8)) & 255);
+      bits -= 8;
+    }
+  }
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(step));
+  const digest = createHmac('sha1', Buffer.from(bytes))
+    .update(counter)
+    .digest();
+  const offset = digest[digest.length - 1] & 15;
+  const binary =
+    (((digest[offset] & 127) << 24) |
+      (digest[offset + 1] << 16) |
+      (digest[offset + 2] << 8) |
+      digest[offset + 3]) >>>
+    0;
+  return String(binary % 1_000_000).padStart(6, '0');
+}
+
+function bootstrapAdmin(email: string, password: string) {
+  return execFileAsync(process.execPath, ['scripts/bootstrap-admin.mjs'], {
+    cwd: process.cwd(),
+    env: {
+      ...process.env,
+      DATABASE_URL: databaseUrl.toString(),
+      ADMIN_BOOTSTRAP_CONFIRM: 'CREATE_FIRST_ADMIN',
+      ADMIN_BOOTSTRAP_EMAIL: email,
+      ADMIN_BOOTSTRAP_PASSWORD: password,
+    },
+  });
+}
+
 void describe('NestJS archive API', { timeout: 30_000 }, () => {
   before(async () => {
     await db.connect();
@@ -138,6 +182,9 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
           process.env.AUTH_FORGOT_SECRET ?? 'secret_for_forgot',
         AUTH_CONFIRM_EMAIL_SECRET:
           process.env.AUTH_CONFIRM_EMAIL_SECRET ?? 'secret_for_confirm_email',
+        AUTH_MFA_ENCRYPTION_KEY:
+          process.env.AUTH_MFA_ENCRYPTION_KEY ??
+          'test-only-mfa-encryption-key-material',
         AUTH_JWT_TOKEN_EXPIRES_IN:
           process.env.AUTH_JWT_TOKEN_EXPIRES_IN ?? '15m',
         AUTH_REFRESH_TOKEN_EXPIRES_IN:
@@ -308,15 +355,20 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     await login(email, password);
   });
 
-  void it('should use the current stored role and require MFA for administrators', async () => {
+  void it('should use the current stored role and revoke tokens after a role change', async () => {
     const email = `${randomUUID()}@example.test`;
     await register(email);
     await confirm(email);
+    const user = await login(email);
     const users = db.db().collection('users');
     await users.updateOne(
       { email },
       { $set: { role: 'Editor' }, $inc: { authVersion: 1 } },
     );
+    await api
+      .get(auth + '/me')
+      .auth(user.token, { type: 'bearer' })
+      .expect(401);
     const editor = await login(email);
     const principal = await api
       .get('/api/admin/v1/me')
@@ -328,23 +380,114 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       'BackOffice.Access',
       'Editorial.Manage',
     ]);
-    await users.updateOne(
-      { email },
-      { $set: { role: 'Administrator' }, $inc: { authVersion: 1 } },
+  });
+
+  void it('should bootstrap one administrator, verify MFA and consume recovery codes once', async () => {
+    const email = `admin-${randomUUID()}@example.test`;
+    const password = `Admin-${randomUUID()}-password`;
+    sensitiveSamples.push(password);
+    const bootstrap = await bootstrapAdmin(email, password);
+    assert.match(bootstrap.stdout, /Created the first administrator/);
+    assert(!bootstrap.stdout.includes(password));
+    await assert.rejects(
+      bootstrapAdmin(`second-${email}`, password),
+      /administrator already exists/i,
     );
+
+    const first = await login(email, password);
+    sensitiveSamples.push(first.token, first.refreshToken);
+    await api.get('/api/admin/v1/me').expect(401);
+    const mfaRequired = await api
+      .get('/api/admin/v1/me')
+      .auth(first.token, { type: 'bearer' })
+      .expect(403);
+    assert.equal((mfaRequired.body as { code: string }).code, 'mfa_required');
+    await api
+      .post(auth + '/mfa/enrollment')
+      .auth(first.token, { type: 'bearer' })
+      .send({ currentPassword: 'incorrect-password' })
+      .expect(422);
+    const enrollment = await api
+      .post(auth + '/mfa/enrollment')
+      .auth(first.token, { type: 'bearer' })
+      .send({ currentPassword: password })
+      .expect(200);
+    const secret = (enrollment.body as { secret: string }).secret;
+    sensitiveSamples.push(secret);
+    assert.match(secret, /^[A-Z2-7]{32}$/);
+    assert.match(
+      (enrollment.body as { provisioningUri: string }).provisioningUri,
+      /^otpauth:\/\/totp\//,
+    );
+    const confirmed = await api
+      .post(auth + '/mfa/enrollment/confirm')
+      .auth(first.token, { type: 'bearer' })
+      .send({ code: totp(secret) })
+      .expect(200);
+    const codes = (confirmed.body as { recoveryCodes: string[] }).recoveryCodes;
+    assert.equal(codes.length, 10);
+    sensitiveSamples.push(...codes);
+    const principal = await api
+      .get('/api/admin/v1/me')
+      .auth(first.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal((principal.body as { role: string }).role, 'Administrator');
+    assert.equal(
+      typeof (principal.body as { mfaVerifiedAtUtc: string }).mfaVerifiedAtUtc,
+      'string',
+    );
+
+    const second = await login(email, password);
     await api
       .get('/api/admin/v1/me')
-      .auth(editor.token, { type: 'bearer' })
-      .expect(401);
-    const admin = await login(email);
-    const denied = await api
-      .get('/api/admin/v1/me')
-      .auth(admin.token, { type: 'bearer' })
+      .auth(second.token, { type: 'bearer' })
       .expect(403);
-    assert.equal((denied.body as { code: string }).code, 'mfa_required');
-    assert.match(
-      String(denied.headers['content-type']),
-      /application\/problem\+json/,
-    );
+    await api
+      .post(auth + '/mfa/verify')
+      .auth(second.token, { type: 'bearer' })
+      .send({ code: totp(secret, Math.floor(Date.now() / 30_000) + 1) })
+      .expect(204);
+    await api
+      .get('/api/admin/v1/me')
+      .auth(second.token, { type: 'bearer' })
+      .expect(200);
+
+    const recovered = await login(email, password);
+    await api
+      .post(auth + '/mfa/recover')
+      .auth(recovered.token, { type: 'bearer' })
+      .send({ recoveryCode: codes[0] })
+      .expect(204);
+    await api
+      .get('/api/admin/v1/me')
+      .auth(recovered.token, { type: 'bearer' })
+      .expect(200);
+    const replay = await login(email, password);
+    await api
+      .post(auth + '/mfa/recover')
+      .auth(replay.token, { type: 'bearer' })
+      .send({ recoveryCode: codes[0] })
+      .expect(422);
+
+    await api
+      .post(auth + '/logout/all')
+      .auth(second.token, { type: 'bearer' })
+      .expect(204);
+    for (const token of [first.token, second.token, recovered.token]) {
+      await api
+        .get(auth + '/me')
+        .auth(token, { type: 'bearer' })
+        .expect(401);
+    }
+    await api
+      .post(auth + '/refresh')
+      .auth(first.refreshToken, { type: 'bearer' })
+      .expect(401);
+  });
+
+  void it('should keep passwords, tokens and MFA values out of application logs', () => {
+    for (const value of sensitiveSamples) {
+      assert(!serverLog.includes(value));
+    }
   });
 });

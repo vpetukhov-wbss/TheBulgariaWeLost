@@ -90,6 +90,7 @@ async function run() {
             status,
             passwordHash,
             authVersion: 0,
+            mfaEnabled: false,
             updatedAt: now,
           },
           $setOnInsert: { _id: uuidv7(), createdAt: now },

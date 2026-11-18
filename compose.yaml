@@ -19,6 +19,7 @@ x-api-environment: &api-environment
   AUTH_REFRESH_SECRET: ${AUTH_REFRESH_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   AUTH_FORGOT_SECRET: ${AUTH_FORGOT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   AUTH_CONFIRM_EMAIL_SECRET: ${AUTH_CONFIRM_EMAIL_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  AUTH_MFA_ENCRYPTION_KEY:
   AUTH_JWT_TOKEN_EXPIRES_IN: 15m
   AUTH_REFRESH_TOKEN_EXPIRES_IN: 30d
   AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m
@@ -124,7 +125,14 @@ services:
     volumes:
       - ./.dev/sftp/media_ed25519:/run/dev-secrets/media_ed25519:ro
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/media/health/live"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "http://127.0.0.1:8080/media/health/live",
+        ]
       interval: 5s
       timeout: 3s
       retries: 30
@@ -142,7 +150,8 @@ services:
     ports:
       - "127.0.0.1:4200:8080"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
+      test:
+        ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1:8080/healthz"]
       interval: 5s
       timeout: 3s
       retries: 20

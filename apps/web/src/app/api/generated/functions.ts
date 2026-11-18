@@ -23,6 +23,16 @@ export type { RefreshSession$Params as RefreshSession$Params } from './fn/auth/r
 export { refreshSession as refreshSession } from './fn/auth/refresh-session';
 export type { Logout$Params as Logout$Params } from './fn/auth/logout';
 export { logout as logout } from './fn/auth/logout';
+export type { LogoutAll$Params as LogoutAll$Params } from './fn/auth/logout-all';
+export { logoutAll as logoutAll } from './fn/auth/logout-all';
+export type { StartMfaEnrollment$Params as StartMfaEnrollment$Params } from './fn/auth/start-mfa-enrollment';
+export { startMfaEnrollment as startMfaEnrollment } from './fn/auth/start-mfa-enrollment';
+export type { ConfirmMfaEnrollment$Params as ConfirmMfaEnrollment$Params } from './fn/auth/confirm-mfa-enrollment';
+export { confirmMfaEnrollment as confirmMfaEnrollment } from './fn/auth/confirm-mfa-enrollment';
+export type { VerifyMfa$Params as VerifyMfa$Params } from './fn/auth/verify-mfa';
+export { verifyMfa as verifyMfa } from './fn/auth/verify-mfa';
+export type { RecoverMfa$Params as RecoverMfa$Params } from './fn/auth/recover-mfa';
+export { recoverMfa as recoverMfa } from './fn/auth/recover-mfa';
 export type { GetBackOfficePrincipal$Params as GetBackOfficePrincipal$Params } from './fn/back-office/get-back-office-principal';
 export { getBackOfficePrincipal as getBackOfficePrincipal } from './fn/back-office/get-back-office-principal';
 export type { UploadMedia$Params as UploadMedia$Params } from './fn/media/upload-media';

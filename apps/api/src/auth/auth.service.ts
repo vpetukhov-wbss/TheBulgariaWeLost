@@ -190,17 +190,22 @@ export class AuthService {
     if (!changed.modifiedCount) throw this.invalid('hash', 'invalidHash');
   }
 
-  async activeProfile(
+  async activeSession(
     sessionId: string,
     accountId?: string,
-  ): Promise<ProfileDto> {
+  ): Promise<{ profile: ProfileDto; mfaVerifiedAt?: Date }> {
     const session = await this.sessions
       .findOne({ _id: sessionId, expiresAt: { $gt: new Date() } })
       .exec();
     if (!session || (accountId && session.accountId !== accountId))
       throw new UnauthorizedException();
     const account = await this.activeAccount(session);
-    return ProfileDto.fromAccount(account);
+    return {
+      profile: ProfileDto.fromAccount(account),
+      ...(session.mfaVerifiedAt
+        ? { mfaVerifiedAt: session.mfaVerifiedAt }
+        : {}),
+    };
   }
 
   async update(id: string, dto: AuthUpdateDto): Promise<ProfileDto> {
@@ -289,6 +294,15 @@ export class AuthService {
 
   async logout(sessionId: string): Promise<void> {
     await this.sessions.deleteOne({ _id: sessionId });
+  }
+
+  async logoutAll(accountId: string): Promise<void> {
+    const revoked = await this.accounts.updateOne(
+      { _id: accountId, status: AccountStatus.Active },
+      { $inc: { authVersion: 1 } },
+    );
+    if (!revoked.modifiedCount) throw new UnauthorizedException();
+    await this.sessions.deleteMany({ accountId });
   }
 
   private async activeAccount(session: Session): Promise<Account> {
