@@ -1,5 +1,5 @@
 import type { Routes } from '@angular/router';
-import { signedInGuard } from './core/auth/auth.guard';
+import { backOfficeGuard, signedInGuard } from './core/auth/auth.guard';
 
 const authPage = () => import('./features/auth/auth-page').then((m) => m.AuthPage);
 
@@ -18,8 +18,17 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    canActivate: [signedInGuard],
+    canActivate: [signedInGuard, backOfficeGuard],
     loadComponent: () => import('./features/back-office/back-office').then((m) => m.BackOffice),
+  },
+  {
+    path: 'mfa',
+    canActivate: [signedInGuard],
+    loadComponent: () => import('./features/auth/mfa-page').then((m) => m.MfaPage),
+  },
+  {
+    path: 'forbidden',
+    loadComponent: () => import('./features/auth/forbidden-page').then((m) => m.ForbiddenPage),
   },
   { path: '**', loadComponent: () => import('./not-found').then((m) => m.NotFound) },
 ];

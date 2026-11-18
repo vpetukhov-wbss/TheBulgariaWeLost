@@ -1,0 +1,65 @@
+nb-card {
+  width: min(100%, 40rem);
+  margin: 1rem auto;
+}
+
+h1,
+.eyebrow {
+  margin: 0;
+}
+
+h1 {
+  font-size: 1.5rem;
+}
+
+.eyebrow {
+  color: var(--text-hint-color);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+form,
+label {
+  display: grid;
+  gap: 0.5rem;
+}
+
+form {
+  gap: 1rem;
+  margin-block: 1rem;
+}
+
+form button,
+nb-card-body > button,
+nb-card-body > a {
+  justify-self: start;
+}
+
+code {
+  overflow-wrap: anywhere;
+}
+
+.uri {
+  font-size: 0.75rem;
+}
+
+.recovery-codes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+  padding-inline-start: 1.5rem;
+}
+
+.state {
+  min-height: 6rem;
+  display: grid;
+  place-items: center;
+}
+
+@media (max-width: 30rem) {
+  .recovery-codes {
+    grid-template-columns: 1fr;
+  }
+}

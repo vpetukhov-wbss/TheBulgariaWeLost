@@ -1,0 +1,114 @@
+<nb-card>
+  <nb-card-header>
+    <div class="title-row">
+      <div>
+        <p class="eyebrow">Акаунт</p>
+        <h1>Моят профил</h1>
+      </div>
+      @if (profile(); as current) {
+        <span class="role">{{ current.role }}</span>
+      }
+    </div>
+  </nb-card-header>
+  <nb-card-body>
+    @switch (state()) {
+      @case ('loading') {
+        <div class="state" role="status" [nbSpinner]="true" nbSpinnerStatus="primary">
+          Зарежда се профилът…
+        </div>
+      }
+      @case ('expired') {
+        <nb-alert status="warning" role="alert">Сесията е изтекла. Влез отново.</nb-alert>
+        <a nbButton status="primary" routerLink="/login" [queryParams]="{ returnTo: '/account' }">
+          Към входа
+        </a>
+      }
+      @case ('unavailable') {
+        <nb-alert status="danger" role="alert">Профилът е временно недостъпен.</nb-alert>
+        <button nbButton status="primary" type="button" (click)="load()">Опитай отново</button>
+      }
+      @case ('ready') {
+        @if (success()) {
+          <nb-alert status="success" role="status">{{ success() }}</nb-alert>
+        }
+        @if (error()) {
+          <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="save()" [nbSpinner]="saving()">
+          <div class="names">
+            <label>
+              Име
+              <input nbInput fullWidth formControlName="firstName" autocomplete="given-name" />
+            </label>
+            <label>
+              Фамилия
+              <input nbInput fullWidth formControlName="lastName" autocomplete="family-name" />
+            </label>
+          </div>
+          <label>
+            Имейл
+            <input nbInput fullWidth type="email" formControlName="email" autocomplete="email" />
+          </label>
+
+          <div class="passwords">
+            <h2>Сигурност</h2>
+            <p>Текущата парола е задължителна при смяна на имейл или парола.</p>
+            <label>
+              Текуща парола
+              <input
+                nbInput
+                fullWidth
+                type="password"
+                formControlName="oldPassword"
+                autocomplete="current-password"
+              />
+            </label>
+            <label>
+              Нова парола
+              <input
+                nbInput
+                fullWidth
+                type="password"
+                formControlName="password"
+                autocomplete="new-password"
+              />
+            </label>
+            <label>
+              Потвърди новата парола
+              <input
+                nbInput
+                fullWidth
+                type="password"
+                formControlName="confirmation"
+                autocomplete="new-password"
+              />
+            </label>
+          </div>
+
+          <div class="actions">
+            <button nbButton status="primary" type="submit" [disabled]="saving()">Запази</button>
+            @if (profile()?.role === 'Administrator') {
+              <a nbButton status="info" outline routerLink="/mfa">Настрой MFA</a>
+            }
+          </div>
+        </form>
+
+        <section class="sessions" aria-labelledby="sessions-title">
+          <h2 id="sessions-title">Активни сесии</h2>
+          <p>Прекрати всички сесии, включително тази, ако подозираш чужд достъп.</p>
+          <button
+            nbButton
+            status="danger"
+            outline
+            type="button"
+            [disabled]="endingSessions()"
+            (click)="logoutEverywhere()"
+          >
+            Излез от всички устройства
+          </button>
+        </section>
+      }
+    }
+  </nb-card-body>
+</nb-card>

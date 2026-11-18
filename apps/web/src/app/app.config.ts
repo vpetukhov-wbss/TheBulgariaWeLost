@@ -20,11 +20,12 @@ import {
 } from '@nebular/auth';
 import { NbRoleProvider, NbSecurityModule } from '@nebular/security';
 import { NbThemeModule, NbToastrModule } from '@nebular/theme';
+import { provideArchiveApiConfiguration } from './api/generated/archive-api-configuration';
 import { routes } from './app.routes';
 import { emailStrategy, skipBearer } from './core/auth/auth.config';
 import { brocodersRefreshInterceptor } from './core/auth/auth-refresh.interceptor';
 import { ArchiveAuthService } from './core/auth/auth.service';
-import { MemoryTokenStorage } from './core/auth/auth-token.storage';
+import { SessionTokenStorage } from './core/auth/auth-token.storage';
 import { ArchiveRoleProvider } from './core/auth/role.provider';
 import { correlationIdInterceptor } from './core/http/correlation-id.interceptor';
 
@@ -33,6 +34,7 @@ export const appConfig: ApplicationConfig = {
     provideBrowserGlobalErrorListeners(),
     provideZoneChangeDetection(),
     provideRouter(routes),
+    provideArchiveApiConfiguration(''),
     provideHttpClient(
       withInterceptors([correlationIdInterceptor, brocodersRefreshInterceptor]),
       withInterceptorsFromDi(),
@@ -51,7 +53,7 @@ export const appConfig: ApplicationConfig = {
       }),
     ),
     { provide: NbAuthService, useClass: ArchiveAuthService },
-    { provide: NbTokenStorage, useClass: MemoryTokenStorage },
+    { provide: NbTokenStorage, useClass: SessionTokenStorage },
     { provide: NbRoleProvider, useClass: ArchiveRoleProvider },
     { provide: NB_AUTH_TOKEN_INTERCEPTOR_FILTER, useValue: skipBearer },
     { provide: HTTP_INTERCEPTORS, useClass: NbAuthJWTInterceptor, multi: true },

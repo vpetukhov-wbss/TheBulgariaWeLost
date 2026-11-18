@@ -1,4 +1,4 @@
-import { HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
@@ -11,7 +11,10 @@ import {
   NbSpinnerModule,
 } from '@nebular/theme';
 import { firstValueFrom } from 'rxjs';
-import { AUTH_API, AUTH_STRATEGY } from '../../core/auth/auth.config';
+import { AuthService } from '../../api/generated/services/auth.service';
+import { actionError } from '../../core/auth/auth-errors';
+import { AUTH_STRATEGY } from '../../core/auth/auth.config';
+import { safeReturnTo } from '../../core/auth/auth-navigation';
 
 const pages = {
   login: { title: 'Вход', submit: 'Влез' },
@@ -43,7 +46,7 @@ function isAuthAction(value: unknown): value is AuthAction {
 })
 export class AuthPage {
   private readonly auth = inject(NbAuthService);
-  private readonly http = inject(HttpClient);
+  private readonly api = inject(AuthService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly builder = inject(FormBuilder).nonNullable;
@@ -54,6 +57,9 @@ export class AuthPage {
   protected readonly error = signal('');
   protected readonly success = signal('');
   protected readonly hash = this.route.snapshot.queryParamMap.get('hash');
+  protected readonly information = this.route.snapshot.queryParamMap.has('sessionsEnded')
+    ? 'Всички сесии бяха прекратени успешно.'
+    : '';
   protected readonly usesLink = ['reset', 'confirm', 'confirm-new'].includes(this.action);
 
   protected readonly form = this.builder.group({
@@ -101,15 +107,17 @@ export class AuthPage {
             this.auth.authenticate(AUTH_STRATEGY, { email, password }),
           );
           if (!result.isSuccess()) {
-            this.error.set('Входът е неуспешен. Провери данните си и опитай отново.');
+            this.error.set(
+              actionError(
+                result.getResponse(),
+                'Входът е неуспешен. Провери данните си и опитай отново.',
+              ),
+            );
             return;
           }
-          const returnTo = this.route.snapshot.queryParamMap.get('returnTo');
-          const destination =
-            returnTo && /^\/(?:account|admin)(?=[/?#]|$)/.test(returnTo) && !returnTo.includes('\\')
-              ? returnTo
-              : '/account';
-          await this.router.navigateByUrl(destination);
+          await this.router.navigateByUrl(
+            safeReturnTo(this.route.snapshot.queryParamMap.get('returnTo')),
+          );
           break;
         }
         case 'register': {
@@ -119,7 +127,12 @@ export class AuthPage {
           if (result.isSuccess()) {
             this.success.set('Провери имейла си за линк за активиране на профила.');
           } else {
-            this.error.set('Регистрацията е неуспешна. Провери данните си и опитай отново.');
+            this.error.set(
+              actionError(
+                result.getResponse(),
+                'Регистрацията е неуспешна. Провери данните си и опитай отново.',
+              ),
+            );
           }
           break;
         }
@@ -132,7 +145,7 @@ export class AuthPage {
           ) {
             this.success.set('Ако имейлът е свързан с профил, ще получиш линк за нова парола.');
           } else {
-            this.error.set('Заявката не успя. Опитай отново.');
+            this.error.set(actionError(response, 'Заявката не успя. Опитай отново.'));
           }
           break;
         }
@@ -141,14 +154,22 @@ export class AuthPage {
           if (result.isSuccess()) {
             this.success.set('Паролата е сменена. Можеш да влезеш с новата парола.');
           } else {
-            this.error.set('Паролата не беше сменена. Поискай нов линк и опитай отново.');
+            this.error.set(
+              actionError(
+                result.getResponse(),
+                'Паролата не беше сменена. Поискай нов линк и опитай отново.',
+              ),
+            );
           }
           break;
         }
         case 'confirm':
         case 'confirm-new': {
-          const endpoint = this.action === 'confirm' ? 'email/confirm' : 'email/confirm/new';
-          await firstValueFrom(this.http.post<void>(AUTH_API + endpoint, { hash: this.hash }));
+          if (this.action === 'confirm') {
+            await firstValueFrom(this.api.confirmEmail({ body: { hash: this.hash! } }));
+          } else {
+            await firstValueFrom(this.api.confirmNewEmail({ body: { hash: this.hash! } }));
+          }
           this.success.set('Имейлът е потвърден. Можеш да влезеш в профила си.');
           break;
         }
@@ -159,7 +180,7 @@ export class AuthPage {
           error instanceof HttpErrorResponse &&
           [400, 401, 404, 422].includes(error.status)
           ? 'Линкът е невалиден или е изтекъл.'
-          : 'Възникна проблем. Опитай отново.',
+          : actionError(error, 'Възникна проблем. Опитай отново.'),
       );
     } finally {
       this.busy.set(false);

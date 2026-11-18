@@ -1,0 +1,143 @@
+<nb-card>
+  <nb-card-header>
+    <p class="eyebrow">Администраторска сигурност</p>
+    <h1>Многофакторно удостоверяване</h1>
+  </nb-card-header>
+  <nb-card-body>
+    @if (error()) {
+      <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+    }
+
+    @switch (stage()) {
+      @case ('loading') {
+        <div class="state" role="status" [nbSpinner]="true" nbSpinnerStatus="primary">
+          Проверява се MFA защитата…
+        </div>
+      }
+      @case ('expired') {
+        <nb-alert status="warning" role="alert">Сесията е изтекла. Влез отново.</nb-alert>
+        <a nbButton status="primary" routerLink="/login" [queryParams]="{ returnTo }">
+          Към входа
+        </a>
+      }
+      @case ('forbidden') {
+        <nb-alert status="warning" role="alert">
+          MFA управлението е достъпно само за администратори.
+        </nb-alert>
+        <a nbButton status="basic" routerLink="/account">Към профила</a>
+      }
+      @case ('unavailable') {
+        <nb-alert status="danger" role="alert">MFA услугата е временно недостъпна.</nb-alert>
+        <button nbButton status="primary" type="button" (click)="load()">Опитай отново</button>
+      }
+      @case ('enroll') {
+        <p>За да активираш MFA, потвърди текущата си парола.</p>
+        <form [formGroup]="passwordForm" (ngSubmit)="startEnrollment()">
+          <label>
+            Текуща парола
+            <input
+              nbInput
+              fullWidth
+              type="password"
+              formControlName="currentPassword"
+              autocomplete="current-password"
+              required
+            />
+          </label>
+          <button nbButton status="primary" type="submit" [disabled]="busy()">
+            Започни настройката
+          </button>
+        </form>
+      }
+      @case ('confirm') {
+        @if (enrollment(); as setup) {
+          <ol>
+            <li>Добави нов акаунт в приложението си за кодове.</li>
+            <li>Въведи ръчно тайната или отвори provisioning адреса.</li>
+            <li>Потвърди първия шестцифрен код.</li>
+          </ol>
+          <dl>
+            <dt>Тайна</dt>
+            <dd>
+              <code>{{ setup.secret }}</code>
+            </dd>
+            <dt>Provisioning адрес</dt>
+            <dd>
+              <code class="uri">{{ setup.provisioningUri }}</code>
+            </dd>
+          </dl>
+          <form [formGroup]="codeForm" (ngSubmit)="confirmEnrollment()">
+            <label>
+              Шестцифрен код
+              <input
+                nbInput
+                fullWidth
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                formControlName="code"
+                required
+              />
+            </label>
+            <button nbButton status="primary" type="submit" [disabled]="busy()">
+              Активирай MFA
+            </button>
+          </form>
+        }
+      }
+      @case ('verify') {
+        <p>Въведи нов код, за да отвориш администраторската част.</p>
+        @if (useRecoveryCode()) {
+          <form [formGroup]="recoveryForm" (ngSubmit)="verify()">
+            <label>
+              Резервен код
+              <input
+                nbInput
+                fullWidth
+                formControlName="recoveryCode"
+                autocomplete="one-time-code"
+                placeholder="ABCD-EFGH-IJKL-MNOP"
+                required
+              />
+            </label>
+            <button nbButton status="primary" type="submit" [disabled]="busy()">Продължи</button>
+          </form>
+        } @else {
+          <form [formGroup]="codeForm" (ngSubmit)="verify()">
+            <label>
+              Шестцифрен код
+              <input
+                nbInput
+                fullWidth
+                inputmode="numeric"
+                autocomplete="one-time-code"
+                maxlength="6"
+                formControlName="code"
+                required
+              />
+            </label>
+            <button nbButton status="primary" type="submit" [disabled]="busy()">Продължи</button>
+          </form>
+        }
+        <button nbButton ghost status="basic" type="button" (click)="toggleRecovery()">
+          {{ useRecoveryCode() ? 'Използвай код от приложението' : 'Използвай резервен код' }}
+        </button>
+      }
+      @case ('recovery-codes') {
+        <nb-alert status="warning" role="alert">
+          Запази тези кодове сега. Всеки работи само веднъж и повече няма да бъдат показани.
+        </nb-alert>
+        <ul class="recovery-codes" aria-label="Резервни MFA кодове">
+          @for (code of recoveryCodes(); track code) {
+            <li>
+              <code>{{ code }}</code>
+            </li>
+          }
+        </ul>
+        <button nbButton status="primary" type="button" (click)="continueAfterEnrollment()">
+          Запазих кодовете
+        </button>
+      }
+    }
+  </nb-card-body>
+</nb-card>
