@@ -10,7 +10,9 @@ public static class StorageModule
     {
         services.AddOptions<SftpOptions>()
             .Bind(config.GetSection("MediaStorage"))
-            .Validate(options => options.Profiles.Values.All(profile =>
+            .Validate(options => options.PartialRetentionMinutes is >= 1 and <= 10_080
+                && options.CleanupIntervalSeconds is >= 10 and <= 3_600
+                && options.Profiles.Values.All(profile =>
                 !string.IsNullOrWhiteSpace(profile.Host)
                 && profile.Port is >= 1 and <= 65535
                 && !string.IsNullOrWhiteSpace(profile.Username)
@@ -24,7 +26,9 @@ public static class StorageModule
                 "Each SFTP profile requires a host, username, private key, SHA256 host fingerprint and absolute directory.")
             .ValidateOnStart();
 
-        return services.AddSingleton<IObjectStorage, SftpObjectStorage>();
+        services.AddSingleton<IObjectStorage, SftpObjectStorage>();
+        services.AddHostedService<SftpPartialCleanupWorker>();
+        return services;
     }
 
     public static bool IsFileKey(string? key) => key is { Length: 64 } &&

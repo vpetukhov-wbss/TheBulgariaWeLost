@@ -21,6 +21,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/ab8x4sAAAAASUVORK5CYII=");
 
     private readonly string quarantine = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+    public string QuarantineDirectory => quarantine;
     public FakeStorage Storage { get; } = new();
     public ControlFixtures Control { get; } = new();
 
@@ -32,7 +33,9 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
             ["MediaControl:BaseUrl"] = "http://api:3000/",
             ["MediaControl:ServiceToken"] = "test-only-outbound-credential-2c39b4c67",
             ["MediaControl:ProbeToken"] = ProbeToken,
-            ["MediaTransfers:QuarantineDirectory"] = quarantine
+            ["MediaTransfers:QuarantineDirectory"] = quarantine,
+            ["MediaTransfers:QuarantineRetentionMinutes"] = "1",
+            ["MediaTransfers:QuarantineCleanupIntervalSeconds"] = "1"
         }));
         builder.ConfigureTestServices(services =>
         {
@@ -78,6 +81,9 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
             ProbeCount++;
             return Task.CompletedTask;
         }
+
+        public Task CleanupExpiredPartialsAsync(DateTime cutoffUtc, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
     }
 
     internal sealed class ControlFixtures : HttpMessageHandler

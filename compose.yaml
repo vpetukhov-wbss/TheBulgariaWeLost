@@ -117,7 +117,7 @@ services:
       MediaStorage__Profiles__archive__PrivateKeyPath: /run/dev-secrets/media_ed25519
       MediaStorage__Profiles__archive__HostKeySha256: ${SFTP_HOST_KEY_SHA256:?Run ./scripts/dev-up.sh to create the local SFTP keys}
       MediaStorage__Profiles__archive__Root: /archive
-      MediaTransfers__QuarantineDirectory: /tmp/media-quarantine
+      MediaTransfers__QuarantineDirectory: /var/lib/media-quarantine
       MediaProcessing__Enabled: "false"
     depends_on:
       api:
@@ -128,6 +128,7 @@ services:
       - "127.0.0.1:5088:8080"
     volumes:
       - ./.dev/sftp/media_ed25519:/run/dev-secrets/media_ed25519:ro
+      - media-quarantine:/var/lib/media-quarantine
     healthcheck:
       test:
         [
@@ -179,3 +180,4 @@ services:
 volumes:
   mongo-data:
   sftp-data:
+  media-quarantine:

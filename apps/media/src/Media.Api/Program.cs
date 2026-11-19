@@ -3,7 +3,6 @@ using Media.ControlPlane;
 using Media.Processing;
 using Media.Storage;
 using Media.Transfers;
-using Microsoft.Extensions.Options;
 
 var builder = WebApplication.CreateBuilder(new WebApplicationOptions
 {
@@ -36,8 +35,6 @@ builder.WebHost.ConfigureKestrel(options =>
 });
 
 var app = builder.Build();
-var transfers = app.Services.GetRequiredService<IOptions<TransferOptions>>().Value;
-Directory.CreateDirectory(transfers.QuarantineDirectory);
 
 app.Use(async (context, next) =>
 {

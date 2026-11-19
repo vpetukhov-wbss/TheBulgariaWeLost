@@ -10,7 +10,8 @@ internal static class UploadEndpoint
 {
     public static async Task<IResult> HandleAsync(
         Guid uploadId, HttpRequest request, MediaControlClient control, IObjectStorage storage,
-        TransferSlots slots, IOptions<TransferOptions> options, CancellationToken requestAborted)
+        UploadQuarantine quarantine, TransferSlots slots, IOptions<TransferOptions> options,
+        CancellationToken requestAborted)
     {
         var grant = TransferGrant.Read(request, allowQuery: false);
         if (grant is null) return TransferProblems.Create(401, "missing_grant");
@@ -44,18 +45,19 @@ internal static class UploadEndpoint
                 if (request.ContentLength is long declaredLength && declaredLength != claim.Length)
                     return TransferProblems.Create(422, "upload_length_mismatch");
 
-                var path = Path.Combine(limits.QuarantineDirectory, $"{Guid.NewGuid():N}.upload");
-                await using var temporary = new FileStream(path, FileMode.CreateNew, FileAccess.ReadWrite,
-                    FileShare.None, 64 * 1024, FileOptions.Asynchronous | FileOptions.DeleteOnClose);
-                content = await MediaContent.InspectAsync(request.Body, claim.Length, temporary, cancellationToken);
+                await using var temporary = quarantine.Create(uploadId, claim.AttemptId, cancellationToken);
+                content = await MediaContent.InspectAsync(
+                    request.Body, claim.Length, temporary.Content, cancellationToken);
                 if (content is null) return TransferProblems.Create(413, "upload_too_large");
                 if (content.ContentType is null) return TransferProblems.Create(415, "unsupported_media_format");
                 if (!content.Matches(claim.Length, claim.Sha256))
                     return TransferProblems.Create(422, "upload_integrity_mismatch");
 
-                temporary.Position = 0;
-                await storage.PublishAsync(location, key, temporary, cancellationToken);
+                temporary.Content.Position = 0;
+                await storage.PublishAsync(location, key, temporary.Content, cancellationToken);
                 content = await InspectStoredAsync(storage, claim, cancellationToken);
+                if (content?.ContentType is not null && content.Matches(claim.Length, claim.Sha256))
+                    await temporary.DeleteAsync();
             }
 
             // Also covers retries after the bytes were committed and the acknowledgement was lost.
