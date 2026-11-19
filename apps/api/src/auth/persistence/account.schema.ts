@@ -18,6 +18,9 @@ export class Account {
   @Prop({ type: String, default: uuidv7 })
   _id: string;
 
+  @Prop({ type: Number, default: 1, required: true })
+  schemaVersion: number;
+
   @Prop({ required: true, unique: true })
   email: string;
 
@@ -61,3 +64,5 @@ export class Account {
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);
+
+AccountSchema.index({ role: 1, status: 1, _id: 1 });

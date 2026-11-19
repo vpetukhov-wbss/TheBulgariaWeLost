@@ -2,6 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { mongo } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
+import { runMigrations } from './migrations/runner.mjs';
 
 function configuration() {
   if (process.env.ADMIN_BOOTSTRAP_CONFIRM !== 'CREATE_FIRST_ADMIN') {
@@ -28,6 +29,7 @@ function configuration() {
 
 async function run() {
   const { databaseUrl, email, password } = configuration();
+  await runMigrations({ databaseUrl });
   const client = new mongo.MongoClient(databaseUrl, {
     serverSelectionTimeoutMS: 5_000,
   });
@@ -63,6 +65,7 @@ async function run() {
               $set: {
                 role: 'Administrator',
                 status: 'Active',
+                schemaVersion: 1,
                 passwordHash: await bcrypt.hash(password, 12),
                 mfaEnabled: false,
                 updatedAt: now,
@@ -90,6 +93,7 @@ async function run() {
               passwordHash: await bcrypt.hash(password, 12),
               role: 'Administrator',
               status: 'Active',
+              schemaVersion: 1,
               authVersion: 0,
               mfaEnabled: false,
               createdAt: now,

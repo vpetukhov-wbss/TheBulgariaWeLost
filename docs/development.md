@@ -19,7 +19,7 @@
 
 1. генерира отделни Ed25519 client и host ключове за локалния SFTP;
 2. изгражда и стартира шестте услуги и изчаква Docker health checks;
-3. зарежда идемпотентни синтетични акаунти в `bulgaria_archive_dev`;
+3. прилага версираните MongoDB миграции и зарежда идемпотентни синтетични акаунти в `bulgaria_archive_dev`;
 4. проверява Angular, NestJS + MongoDB, .NET, Mailpit и реален SFTP write/read/delete цикъл.
 
 | Компонент                | Адрес                                                                                 |
@@ -58,6 +58,8 @@ SEED_PROFILE=minimal ./scripts/dev-up.sh
 ```
 
 За контролирана проверка на first-admin потока използвай отделна празна development/test база и командата `npm run bootstrap:admin`, описана в [`apps/api/README.md`](../apps/api/README.md). Командата отказва втори администратор и изисква MongoDB replica set.
+
+Версирането на схемите, индексите, допустимите rollback стъпки и отделната процедура за синтетични staging данни са описани в [MongoDB миграции](mongodb-migrations.md).
 
 ## Ежедневни команди
 

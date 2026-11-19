@@ -24,6 +24,8 @@ npm run start:dev
 
 Compose стартира MongoDB 8 като локален replica set с един възел и Mailpit. Хост портовете са вързани към loopback. Angular proxy обслужва `/api/**` през порт 3000. `FRONTEND_DOMAIN` определя къде сочат линковете за потвърждение и парола. За сървър използвай собствен MongoDB replica set с удостоверяване, мрежова изолация и реални SMTP настройки. NestJS изисква пет различни силни auth ключа в production, включително отделен ключ за криптиране на MFA тайните. Swagger е включен в development и test.
 
+Преди локален `npm run start:dev` приложи схемите и индексите с `npm run migrate`. Production стартът, bootstrap-ът и seed командите правят това автоматично. Правилата за checksum, повторение, rollback и staging seed са в [документацията за MongoDB миграциите](../../docs/mongodb-migrations.md).
+
 ### Първи администратор и MFA
 
 Първият и само първият администратор се създава с еднократна команда срещу MongoDB replica set:
@@ -63,6 +65,7 @@ npm run format:check
 npm run lint
 npm run typecheck
 npm run build
+npm run migrate
 npm run seed:dev
 npm run test:e2e
 ```

@@ -9,13 +9,15 @@
   "scripts": {
     "start": "nest start",
     "start:dev": "nest start --watch",
-    "start:prod": "node dist/main",
+    "start:prod": "npm run migrate && node dist/main",
     "build": "nest build",
     "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
     "format:check": "prettier --check src test scripts",
     "typecheck": "tsc --noEmit",
-    "test:e2e": "node --experimental-strip-types --test test/*.e2e-spec.ts",
+    "test:e2e": "node --experimental-strip-types --test --test-concurrency=1 test/*.e2e-spec.ts",
+    "migrate": "node scripts/migrate.mjs",
     "seed:dev": "node scripts/seed.mjs",
+    "seed:staging": "node scripts/seed.mjs --staging",
     "bootstrap:admin": "node scripts/bootstrap-admin.mjs"
   },
   "dependencies": {

@@ -6,6 +6,9 @@ export class Session {
   @Prop({ type: String, default: uuidv7 })
   _id: string;
 
+  @Prop({ type: Number, default: 1, required: true })
+  schemaVersion: number;
+
   @Prop({ required: true, index: true })
   accountId: string;
 
@@ -23,3 +26,5 @@ export class Session {
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);
+
+SessionSchema.index({ accountId: 1, authVersion: 1, expiresAt: 1 });

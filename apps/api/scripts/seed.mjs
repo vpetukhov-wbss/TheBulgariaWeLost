@@ -2,6 +2,7 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { mongo } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
+import { runMigrations } from './migrations/runner.mjs';
 
 const profiles = {
   minimal: [
@@ -19,32 +20,54 @@ const profiles = {
 };
 
 function seedConfiguration() {
-  if (
-    process.env.NODE_ENV !== 'development' &&
-    process.env.NODE_ENV !== 'test'
-  ) {
-    throw new Error('Seed is allowed only with NODE_ENV=development or test.');
-  }
-  if (process.env.ALLOW_LOCAL_SEED !== 'true') {
-    throw new Error(
-      'Set ALLOW_LOCAL_SEED=true explicitly to load synthetic data.',
-    );
-  }
-
+  const target = process.argv.includes('--staging') ? 'staging' : 'local';
   const databaseUrl = process.env.DATABASE_URL;
   if (!databaseUrl) throw new Error('DATABASE_URL is required.');
   const parsed = new URL(databaseUrl);
-  const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]', 'mongo']);
-  if (parsed.protocol !== 'mongodb:' || !localHosts.has(parsed.hostname)) {
-    throw new Error('Seed refuses remote and mongodb+srv databases.');
-  }
   const databaseName = parsed.pathname.replace(/^\//, '');
-  if (
-    databaseName !== 'bulgaria_archive_dev' &&
-    databaseName !== 'bulgaria_archive' &&
-    !/^archive_(?:test|e2e)(?:_|$)/.test(databaseName)
-  ) {
-    throw new Error('Seed requires a dedicated development or test database.');
+
+  if (target === 'staging') {
+    if (process.env.NODE_ENV !== 'staging') {
+      throw new Error('Staging seed requires NODE_ENV=staging.');
+    }
+    if (process.env.ALLOW_SYNTHETIC_STAGING !== 'LOAD_EXAMPLE_TEST_DATA') {
+      throw new Error(
+        'Set ALLOW_SYNTHETIC_STAGING=LOAD_EXAMPLE_TEST_DATA explicitly.',
+      );
+    }
+    if (!/^mongodb(?:\+srv)?:$/.test(parsed.protocol)) {
+      throw new Error('Staging seed requires a MongoDB connection string.');
+    }
+    if (!/(?:^|[_-])staging(?:[_-]|$)/.test(databaseName)) {
+      throw new Error('Staging seed requires staging in the database name.');
+    }
+  } else {
+    if (
+      process.env.NODE_ENV !== 'development' &&
+      process.env.NODE_ENV !== 'test'
+    ) {
+      throw new Error(
+        'Seed is allowed only with NODE_ENV=development or test.',
+      );
+    }
+    if (process.env.ALLOW_LOCAL_SEED !== 'true') {
+      throw new Error(
+        'Set ALLOW_LOCAL_SEED=true explicitly to load synthetic data.',
+      );
+    }
+    const localHosts = new Set(['127.0.0.1', 'localhost', '[::1]', 'mongo']);
+    if (parsed.protocol !== 'mongodb:' || !localHosts.has(parsed.hostname)) {
+      throw new Error('Seed refuses remote and mongodb+srv databases.');
+    }
+    if (
+      databaseName !== 'bulgaria_archive_dev' &&
+      databaseName !== 'bulgaria_archive' &&
+      !/^archive_(?:test|e2e)(?:_|$)/.test(databaseName)
+    ) {
+      throw new Error(
+        'Seed requires a dedicated development or test database.',
+      );
+    }
   }
 
   const profileName = process.env.SEED_PROFILE ?? 'minimal';
@@ -63,11 +86,13 @@ function seedConfiguration() {
       'SEED_PASSWORD must contain between 12 and 128 characters.',
     );
   }
-  return { databaseUrl, profileName, accounts, password };
+  return { databaseUrl, profileName, accounts, password, target };
 }
 
 async function run() {
-  const { databaseUrl, profileName, accounts, password } = seedConfiguration();
+  const { databaseUrl, profileName, accounts, password, target } =
+    seedConfiguration();
+  await runMigrations({ databaseUrl });
   const client = new mongo.MongoClient(databaseUrl, {
     serverSelectionTimeoutMS: 5_000,
   });
@@ -78,7 +103,6 @@ async function run() {
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date();
 
-    await users.createIndex({ email: 1 }, { unique: true });
     for (const [email, firstName, lastName, role, status] of accounts) {
       await users.updateOne(
         { email },
@@ -91,6 +115,12 @@ async function run() {
             passwordHash,
             authVersion: 0,
             mfaEnabled: false,
+            schemaVersion: 1,
+            syntheticSeed: {
+              source: 'managed-v1',
+              profile: profileName,
+              target,
+            },
             updatedAt: now,
           },
           $setOnInsert: { _id: uuidv7(), createdAt: now },
@@ -110,7 +140,7 @@ async function run() {
     });
 
     process.stdout.write(
-      `Loaded ${accounts.length} synthetic ${profileName} accounts into ${database.databaseName}:\n` +
+      `Loaded ${accounts.length} synthetic ${profileName} ${target} accounts into ${database.databaseName}:\n` +
         accounts
           .map(([email, , , role, status]) => `- ${email} (${role}, ${status})`)
           .join('\n') +
