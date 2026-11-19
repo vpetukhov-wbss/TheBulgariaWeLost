@@ -20,6 +20,10 @@ x-api-environment: &api-environment
   AUTH_FORGOT_SECRET: ${AUTH_FORGOT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   AUTH_CONFIRM_EMAIL_SECRET: ${AUTH_CONFIRM_EMAIL_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   AUTH_MFA_ENCRYPTION_KEY:
+  MEDIA_SERVICE_TOKEN: ${MEDIA_SERVICE_TOKEN:?Run ./scripts/dev-up.sh to generate local secrets}
+  MEDIA_UPLOAD_GRANT_SECRET: ${MEDIA_UPLOAD_GRANT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  MEDIA_DEFAULT_STORAGE_LOCATION_ID: archive
+  MEDIA_MAX_UPLOAD_BYTES: 33554432
   AUTH_JWT_TOKEN_EXPIRES_IN: 15m
   AUTH_REFRESH_TOKEN_EXPIRES_IN: 30d
   AUTH_FORGOT_TOKEN_EXPIRES_IN: 30m

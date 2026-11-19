@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { ValidationPipe, VersioningType } from '@nestjs/common';
+import { RequestMethod, ValidationPipe, VersioningType } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -29,7 +29,14 @@ async function bootstrap(): Promise<void> {
     origin: config.getOrThrow('app.corsOrigins', { infer: true }),
   });
   app.enableShutdownHooks();
-  app.setGlobalPrefix('api');
+  app.setGlobalPrefix('api', {
+    exclude: [
+      {
+        path: 'internal/media/v1/{*path}',
+        method: RequestMethod.ALL,
+      },
+    ],
+  });
   app.enableVersioning({ type: VersioningType.URI });
   app.useGlobalPipes(new ValidationPipe(validationOptions));
   app.useGlobalFilters(new ProblemDetailsFilter());
@@ -46,6 +53,14 @@ async function bootstrap(): Promise<void> {
       .setTitle('The Bulgaria We Lost API')
       .setVersion('1')
       .addBearerAuth()
+      .addBearerAuth(
+        {
+          type: 'http',
+          scheme: 'bearer',
+          description: 'Private rotated credential used by the .NET media API.',
+        },
+        'serviceToken',
+      )
       .addGlobalParameters({
         name: CORRELATION_ID_HEADER,
         in: 'header',

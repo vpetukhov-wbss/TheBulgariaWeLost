@@ -68,8 +68,14 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           databaseUrl: url,
           logger: () => {},
         });
-        assert.deepEqual(first.applied, ['001-auth-foundation']);
-        assert.deepEqual(second.skipped, ['001-auth-foundation']);
+        assert.deepEqual(first.applied, [
+          '001-auth-foundation',
+          '002-media-uploads',
+        ]);
+        assert.deepEqual(second.skipped, [
+          '001-auth-foundation',
+          '002-media-uploads',
+        ]);
 
         const client = new mongo.MongoClient(url);
         await client.connect();
@@ -77,7 +83,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            1,
+            2,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -144,6 +150,15 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           }),
           (error: unknown) =>
             error instanceof mongo.MongoServerError && error.code === 11000,
+        );
+        const uploadIndexes = await database
+          .collection('mediaUploads')
+          .indexes();
+        assert(uploadIndexes.some((index) => index.name === 'fileKey_1'));
+        assert(
+          uploadIndexes.some(
+            (index) => index.name === 'accountId_1_status_1_expiresAt_1',
+          ),
         );
 
         const editors = await users

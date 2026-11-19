@@ -4,6 +4,7 @@ public sealed record ObjectReference(string StorageLocationId, string FileKey);
 
 public sealed record UploadClaim(
     Guid AttemptId,
+    int AttemptVersion,
     ObjectReference Object,
     long Length,
     string Sha256);

@@ -104,7 +104,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
             }
             if (path?.EndsWith("/claim", StringComparison.Ordinal) == true)
                 return Deny ? new HttpResponseMessage(HttpStatusCode.Forbidden)
-                    : Json(new UploadClaim(Guid.NewGuid(), location, ExpectedBytes.Length, Sha256(ExpectedBytes)));
+                    : Json(new UploadClaim(Guid.NewGuid(), 1, location, ExpectedBytes.Length, Sha256(ExpectedBytes)));
             if (path?.EndsWith("/complete", StringComparison.Ordinal) == true && request.Content is not null)
             {
                 if (FailNextCompletion)

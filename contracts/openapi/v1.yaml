@@ -327,6 +327,32 @@ paths:
                 $ref: "#/components/schemas/BackOfficePrincipal"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/media/uploads:
+    post:
+      tags: [Media]
+      operationId: createUploadSession
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUploadRequest"
+      responses:
+        "201":
+          description: Short-lived upload session bound to the current account session.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadSession"
+        default:
+          $ref: "#/components/responses/Problem"
   /media/v1/uploads/{uploadId}:
     put:
       tags: [Media]
@@ -840,6 +866,51 @@ components:
           items:
             type: string
             pattern: "^[A-Z2-7]{4}(?:-[A-Z2-7]{4}){3}$"
+    CreateUploadRequest:
+      type: object
+      additionalProperties: false
+      required: [purpose, length, sha256]
+      properties:
+        purpose:
+          type: string
+          enum:
+            [
+              profile-image,
+              material-original,
+              source-document,
+              advertisement-creative,
+            ]
+        length:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 33554432
+        sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+    UploadSession:
+      type: object
+      additionalProperties: false
+      required:
+        [uploadId, uploadUrl, grant, expiresAtUtc, maxBytes, attemptVersion]
+      properties:
+        uploadId:
+          type: string
+          format: uuid
+        uploadUrl:
+          type: string
+          pattern: "^/media/v1/uploads/[0-9a-f-]+$"
+        grant:
+          type: string
+        expiresAtUtc:
+          type: string
+          format: date-time
+        maxBytes:
+          type: integer
+          format: int64
+        attemptVersion:
+          type: integer
+          minimum: 1
     GrantRequest:
       type: object
       additionalProperties: false
@@ -876,6 +947,9 @@ components:
         attemptId:
           type: string
           format: uuid
+        attemptVersion:
+          type: integer
+          minimum: 1
         object:
           $ref: "#/components/schemas/ObjectReference"
         length:

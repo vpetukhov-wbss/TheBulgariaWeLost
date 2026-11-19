@@ -35,6 +35,8 @@ export type { RecoverMfa$Params as RecoverMfa$Params } from './fn/auth/recover-m
 export { recoverMfa as recoverMfa } from './fn/auth/recover-mfa';
 export type { GetBackOfficePrincipal$Params as GetBackOfficePrincipal$Params } from './fn/back-office/get-back-office-principal';
 export { getBackOfficePrincipal as getBackOfficePrincipal } from './fn/back-office/get-back-office-principal';
+export type { CreateUploadSession$Params as CreateUploadSession$Params } from './fn/media/create-upload-session';
+export { createUploadSession as createUploadSession } from './fn/media/create-upload-session';
 export type { UploadMedia$Params as UploadMedia$Params } from './fn/media/upload-media';
 export { uploadMedia as uploadMedia } from './fn/media/upload-media';
 export type { ReadMedia$Params as ReadMedia$Params } from './fn/media/read-media';

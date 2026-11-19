@@ -58,6 +58,14 @@ npm run seed:dev
 - Възстановяването връща еднакъв статус за регистриран и непознат имейл. Локалните ограничения на честотата са на процес и IP. При повече инстанции осигури общо ограничаване през входния proxy или споделено хранилище. Задай `APP_TRUST_PROXY_HOPS` само когато достъпът до API е ограничен до известната верига от proxy сървъри.
 - Всички отговори връщат `X-Correlation-ID`. Безопасна подадена стойност се запазва; иначе API създава нов UUID. Грешките са `application/problem+json` със стабилен `code` и същия идентификатор в `traceId`. Единният договор е в [`contracts/openapi/v1.yaml`](../../contracts/openapi/v1.yaml).
 
+### Контрол на качванията
+
+`POST /api/v1/media/uploads` резервира квота за текущия профил и създава краткотрайно разрешение. То е подписано отделно от access JWT и е обвързано с `uploadId`, акаунт, реална auth сесия, предназначение, точен брой байтове и версия на опита. Записът фиксира SFTP целта и генериран файлов ключ; смяна на активното хранилище не премества вече създадено качване.
+
+.NET Media API използва частните `POST /internal/media/v1/uploads/{uploadId}/claim` и `/complete` със собствен `MEDIA_SERVICE_TOKEN`. Claim-ът е атомарен lease. Изтекъл lease допуска нов `attemptId`, а completion от стария опит се отказва. Еднакъв повторен completion връща `204`; различен размер, checksum или резултат връща конфликт или validation error. Изтекла или прекратена потребителска сесия не може да claim-не качването.
+
+За production задай независими `MEDIA_SERVICE_TOKEN` и `MEDIA_UPLOAD_GRANT_SECRET` с поне 32 символа. `MEDIA_MAX_UPLOAD_BYTES` трябва да съвпада с лимита на .NET Media API. `MEDIA_ACCOUNT_QUOTA_BYTES`, `MEDIA_UPLOAD_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_UPLOAD_LEASE_SECONDS` и `MEDIA_DEFAULT_STORAGE_LOCATION_ID` управляват квотата, сроковете и routing целта.
+
 ## Проверки
 
 ```sh

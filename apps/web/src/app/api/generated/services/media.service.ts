@@ -10,17 +10,47 @@ import { BaseService } from '../base-service';
 import { ArchiveApiConfiguration } from '../archive-api-configuration';
 import { StrictHttpResponse } from '../strict-http-response';
 
+import { createUploadSession } from '../fn/media/create-upload-session';
+import { CreateUploadSession$Params } from '../fn/media/create-upload-session';
 import { inspectMedia } from '../fn/media/inspect-media';
 import { InspectMedia$Params } from '../fn/media/inspect-media';
 import { readMedia } from '../fn/media/read-media';
 import { ReadMedia$Params } from '../fn/media/read-media';
 import { uploadMedia } from '../fn/media/upload-media';
 import { UploadMedia$Params } from '../fn/media/upload-media';
+import { UploadSession } from '../models/upload-session';
 
 @Injectable({ providedIn: 'root' })
 export class MediaService extends BaseService {
   constructor(config: ArchiveApiConfiguration, http: HttpClient) {
     super(config, http);
+  }
+
+  /** Path part for operation `createUploadSession()` */
+  static readonly CreateUploadSessionPath = '/api/v1/media/uploads';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `createUploadSession()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  createUploadSession$Response(params: CreateUploadSession$Params, context?: HttpContext): Observable<StrictHttpResponse<UploadSession>> {
+    const obs = createUploadSession(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `createUploadSession$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  createUploadSession(params: CreateUploadSession$Params, context?: HttpContext): Observable<UploadSession> {
+    const resp = this.createUploadSession$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<UploadSession>): UploadSession => r.body)
+    );
   }
 
   /** Path part for operation `uploadMedia()` */
