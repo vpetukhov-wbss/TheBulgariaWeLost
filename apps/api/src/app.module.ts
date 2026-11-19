@@ -12,12 +12,14 @@ import type { AllConfigType } from './config/config.type';
 import databaseConfig from './database/database.config';
 import { HealthController } from './health/health.controller';
 import mailConfig from './mail/config/mail.config';
+import mediaConfig from './media/config/media.config';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [appConfig, authConfig, databaseConfig, mailConfig],
+      load: [appConfig, authConfig, databaseConfig, mailConfig, mediaConfig],
     }),
     MongooseModule.forRootAsync({
       inject: [ConfigService],
@@ -39,6 +41,7 @@ import mailConfig from './mail/config/mail.config';
     }),
     AuthModule,
     BackOfficeModule,
+    MediaModule,
   ],
   controllers: [HealthController],
 })

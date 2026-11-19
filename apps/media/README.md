@@ -2,13 +2,13 @@
 
 Едно ASP.NET Core приложение на .NET 10 LTS и C# 14. Модулите са отделни проекти в една solution и се пускат в един процес.
 
-| Модул | Отговорност |
-| --- | --- |
-| `Media.Api` | Composition root, liveness и защитена диагностика на хранилищата |
-| `Media.Transfers` | Vertical slices `Upload` и `Read`. HTTPS, лимити, карантина, checksum и HTTP Range |
-| `Media.Storage` | SSH.NET, одобрени SFTP профили, проверка на SSH host key и операции с файлови обекти |
-| `Media.Processing` | Vertical slice `Inspection`. BackgroundService обработва един lease наведнъж и докладва резултата |
-| `Media.ControlPlane` | Типизиран HTTP клиент към NestJS и DTO на вътрешния договор |
+| Модул                | Отговорност                                                                                       |
+| -------------------- | ------------------------------------------------------------------------------------------------- |
+| `Media.Api`          | Composition root, liveness и защитена диагностика на хранилищата                                  |
+| `Media.Transfers`    | Vertical slices `Upload` и `Read`. HTTPS, лимити, карантина, checksum и HTTP Range                |
+| `Media.Storage`      | SSH.NET, одобрени SFTP профили, проверка на SSH host key и операции с файлови обекти              |
+| `Media.Processing`   | Vertical slice `Inspection`. BackgroundService обработва един lease наведнъж и докладва резултата |
+| `Media.ControlPlane` | Типизиран HTTP клиент към NestJS и DTO на вътрешния договор                                       |
 
 NestJS пази ролите, сесиите, решенията за достъп, маршрутите към хранилищата и състоянието на заданията. Media API чете и записва байтовете в указаното хранилище. Модулите използват явни зависимости чрез project references. [Архитектура на архива](../../docs/architecture.md#файлов-поток)
 
@@ -35,23 +35,23 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Media.Api --urls htt
 
 ## HTTP договор
 
-| .NET маршрут | Действие |
-| --- | --- |
-| `PUT /media/v1/uploads/{uploadId}` | Bearer разрешение за качване и сурово тяло със съдържанието. Връща `204` след траен запис и потвърждение от NestJS |
-| `GET` / `HEAD /media/v1/assets/{assetId}/{variant}` | `original` или `preview`. Bearer разрешение или единичен `?grant=…` при пренасочване от NestJS. Проверява разрешението за всяка заявка, включително Range, и връща `Cache-Control: no-store` |
-| `POST /internal/media/v1/storage/{locationId}/probe` | Отделен служебен Bearer. Прави пробен запис, преименуване, четене и изтриване. Връща `204` при успех |
+| .NET маршрут                                         | Действие                                                                                                                                                                                     |
+| ---------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `PUT /media/v1/uploads/{uploadId}`                   | Bearer разрешение за качване и сурово тяло със съдържанието. Връща `204` след траен запис и потвърждение от NestJS                                                                           |
+| `GET` / `HEAD /media/v1/assets/{assetId}/{variant}`  | `original` или `preview`. Bearer разрешение или единичен `?grant=…` при пренасочване от NestJS. Проверява разрешението за всяка заявка, включително Range, и връща `Cache-Control: no-store` |
+| `POST /internal/media/v1/storage/{locationId}/probe` | Отделен служебен Bearer. Прави пробен запис, преименуване, четене и изтриване. Връща `204` при успех                                                                                         |
 
 ### Договор с NestJS
 
 Следните NestJS endpoints са интеграционният договор на .NET клиента. Всички получават служебния `MediaControl:ServiceToken` като Bearer. Клиентът изпраща потребителското разрешение като `grant` в JSON само при claim и проверка за четене. Отговорите използват camelCase.
 
-| NestJS маршрут | Вход | Успешен резултат |
-| --- | --- | --- |
-| `POST /internal/media/v1/uploads/{uploadId}/claim` | `grant` | `200` с `attemptId, object, length, sha256` |
-| `POST /internal/media/v1/uploads/{uploadId}/complete` | `attemptId, length, sha256, contentType` | `204` |
-| `POST /internal/media/v1/assets/{assetId}/authorize-read` | `variant, grant` | `200` с `object, length, contentType` |
-| `POST /internal/media/v1/inspections/lease` | `{}` | `200` с `jobId, attemptId, object, length, sha256` или `204` без задача |
-| `POST /internal/media/v1/inspections/{jobId}/complete` | `attemptId, outcome` и при успех `length, sha256, contentType` | `204` |
+| NestJS маршрут                                            | Вход                                                           | Успешен резултат                                                        |
+| --------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `POST /internal/media/v1/uploads/{uploadId}/claim`        | `grant`                                                        | `200` с `attemptId, attemptVersion, object, length, sha256`             |
+| `POST /internal/media/v1/uploads/{uploadId}/complete`     | `attemptId, length, sha256, contentType`                       | `204`                                                                   |
+| `POST /internal/media/v1/assets/{assetId}/authorize-read` | `variant, grant`                                               | `200` с `object, length, contentType`                                   |
+| `POST /internal/media/v1/inspections/lease`               | `{}`                                                           | `200` с `jobId, attemptId, object, length, sha256` или `204` без задача |
+| `POST /internal/media/v1/inspections/{jobId}/complete`    | `attemptId, outcome` и при успех `length, sha256, contentType` | `204`                                                                   |
 
 `object` е `{ storageLocationId, fileKey }`. NestJS определя точната дължина и SHA-256 при създаването на качването. Ключът е 64-символен lowercase hex, генериран от сървъра, и остава фиксиран заедно с хранилището, дължината и checksum през всички опити. NestJS проверява текущата сесия, права, срока и предназначението на разрешението при всеки claim или read. Активният upload опит е атомарен lease. `409` означава активен или остарял опит. След запис и изгубено потвърждение следващият разрешен опит проверява вече записания обект и може да изпрати completion без повторно записване. NestJS приема повторно completion за същия резултат идемпотентно.
 

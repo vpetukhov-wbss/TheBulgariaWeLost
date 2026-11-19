@@ -1,5 +1,5 @@
 import 'dotenv/config';
-import { createHmac, randomUUID } from 'node:crypto';
+import { createHash, createHmac, randomUUID } from 'node:crypto';
 import { execFile, spawn, type ChildProcess } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -35,11 +35,46 @@ let serverLog = '';
 const sensitiveSamples: string[] = [];
 const execFileAsync = promisify(execFile);
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+const mediaServiceToken = `${randomUUID()}${randomUUID()}`;
+const mediaGrantSecret = `${randomUUID()}${randomUUID()}`;
+const authClientIps = new Map<string, string>();
+
+function authClientIp(email: string): string {
+  const existing = authClientIps.get(email);
+  if (existing) return existing;
+  const address = `203.0.113.${authClientIps.size + 1}`;
+  authClientIps.set(email, address);
+  return address;
+}
 
 interface Tokens {
   token: string;
   refreshToken: string;
   tokenExpires: number;
+}
+
+interface UploadSession {
+  uploadId: string;
+  uploadUrl: string;
+  grant: string;
+  expiresAtUtc: string;
+  maxBytes: number;
+  attemptVersion: number;
+  length: number;
+  sha256: string;
+}
+
+interface UploadRecord {
+  _id: string;
+  accountId: string;
+  sessionId: string;
+  status: string;
+  storageLocationId: string;
+  fileKey: string;
+  expiresAt: Date;
+  leaseExpiresAt?: Date;
+  activeAttemptId?: string;
+  contentType?: string;
 }
 
 async function waitForApi() {
@@ -85,6 +120,7 @@ async function mailHash(email: string, path: string): Promise<string> {
 async function register(email: string): Promise<void> {
   await api
     .post(auth + '/email/register')
+    .set('X-Forwarded-For', authClientIp(email))
     .send({ ...details, email })
     .expect(204);
 }
@@ -103,9 +139,55 @@ async function login(
 ): Promise<Tokens> {
   const result = await api
     .post(auth + '/email/login')
+    .set('X-Forwarded-For', authClientIp(email))
     .send({ email, password })
     .expect(200);
   return result.body as Tokens;
+}
+
+async function createUpload(
+  token: string,
+  length = 128,
+): Promise<UploadSession> {
+  const sha256 = createHash('sha256')
+    .update(`${randomUUID()}:${length}`)
+    .digest('hex');
+  const response = await api
+    .post('/api/v1/media/uploads')
+    .auth(token, { type: 'bearer' })
+    .send({ purpose: 'material-original', length, sha256 })
+    .expect(201);
+  const session = response.body as Omit<UploadSession, 'length' | 'sha256'>;
+  sensitiveSamples.push(session.grant);
+  return { ...session, length, sha256 };
+}
+
+function claimUpload(upload: UploadSession) {
+  return api
+    .post(`/internal/media/v1/uploads/${upload.uploadId}/claim`)
+    .auth(mediaServiceToken, { type: 'bearer' })
+    .send({ grant: upload.grant });
+}
+
+function completeUpload(
+  upload: UploadSession,
+  attemptId: string,
+  overrides: Partial<{
+    length: number;
+    sha256: string;
+    contentType: string;
+  }> = {},
+) {
+  return api
+    .post(`/internal/media/v1/uploads/${upload.uploadId}/complete`)
+    .auth(mediaServiceToken, { type: 'bearer' })
+    .send({
+      attemptId,
+      length: upload.length,
+      sha256: upload.sha256,
+      contentType: 'image/png',
+      ...overrides,
+    });
 }
 
 function totp(secret: string, step = Math.floor(Date.now() / 30_000)): string {
@@ -162,6 +244,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         ...process.env,
         NODE_ENV: 'test',
         APP_PORT: String(port),
+        APP_TRUST_PROXY_HOPS: '1',
         FRONTEND_DOMAIN: process.env.FRONTEND_DOMAIN ?? 'http://127.0.0.1:4200',
         DATABASE_URL: databaseUrl.toString(),
         MAIL_HOST: '127.0.0.1',
@@ -185,6 +268,11 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         AUTH_MFA_ENCRYPTION_KEY:
           process.env.AUTH_MFA_ENCRYPTION_KEY ??
           'test-only-mfa-encryption-key-material',
+        MEDIA_SERVICE_TOKEN: mediaServiceToken,
+        MEDIA_UPLOAD_GRANT_SECRET: mediaGrantSecret,
+        MEDIA_DEFAULT_STORAGE_LOCATION_ID: 'archive',
+        MEDIA_ACCOUNT_QUOTA_BYTES: '1024',
+        MEDIA_MAX_UPLOAD_BYTES: '33554432',
         AUTH_JWT_TOKEN_EXPIRES_IN:
           process.env.AUTH_JWT_TOKEN_EXPIRES_IN ?? '15m',
         AUTH_REFRESH_TOKEN_EXPIRES_IN:
@@ -239,8 +327,10 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         'utf8',
       ),
     ) as { paths: Record<string, Record<string, unknown>> };
-    const contractRoutes = Object.keys(contract.paths).filter((path) =>
-      path.startsWith('/api/'),
+    const contractRoutes = Object.keys(contract.paths).filter(
+      (path) =>
+        path.startsWith('/api/') ||
+        path.startsWith('/internal/media/v1/uploads/'),
     );
     assert.deepEqual(routes.sort(), contractRoutes.sort());
     for (const path of routes) {
@@ -483,6 +573,158 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .post(auth + '/refresh')
       .auth(first.refreshToken, { type: 'bearer' })
       .expect(401);
+  });
+
+  void it('should atomically claim and idempotently complete a bound upload grant', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await register(email);
+    await confirm(email);
+    const signedIn = await login(email);
+    const upload = await createUpload(signedIn.token, 256);
+    assert.match(upload.uploadUrl, new RegExp(`${upload.uploadId}$`));
+    assert.equal(upload.maxBytes, upload.length);
+    assert.equal(upload.attemptVersion, 1);
+
+    const persisted = await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .findOne({ _id: upload.uploadId });
+    assert.equal(persisted?.storageLocationId, 'archive');
+    assert.match(persisted?.fileKey ?? '', /^[a-f0-9]{64}$/);
+    assert.match(persisted?.sessionId ?? '', /^[0-9a-f-]{36}$/);
+
+    await api
+      .post(`/internal/media/v1/uploads/${upload.uploadId}/claim`)
+      .send({ grant: upload.grant })
+      .expect(401);
+    const claims = await Promise.all([
+      claimUpload(upload),
+      claimUpload(upload),
+    ]);
+    assert.deepEqual(
+      claims.map((response) => response.status).sort(),
+      [200, 409],
+    );
+    const accepted = claims.find((response) => response.status === 200);
+    if (!accepted) throw new Error('Expected one accepted upload claim.');
+    const claim = accepted.body as {
+      attemptId: string;
+      attemptVersion: number;
+      object: { storageLocationId: string; fileKey: string };
+      length: number;
+      sha256: string;
+    };
+    assert.equal(claim.attemptVersion, 1);
+    assert.equal(claim.object.storageLocationId, 'archive');
+    assert.equal(claim.length, upload.length);
+    assert.equal(claim.sha256, upload.sha256);
+
+    await completeUpload(upload, claim.attemptId, {
+      length: upload.length + 1,
+    }).expect(422);
+    await completeUpload(upload, claim.attemptId, {
+      sha256: '0'.repeat(64),
+    }).expect(422);
+    await completeUpload(upload, claim.attemptId).expect(204);
+    await completeUpload(upload, claim.attemptId).expect(204);
+    await completeUpload(upload, claim.attemptId, {
+      contentType: 'application/pdf',
+    }).expect(409);
+
+    const completed = await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .findOne({ _id: upload.uploadId });
+    assert.equal(completed?.status, 'Completed');
+    assert.equal(completed?.contentType, 'image/png');
+  });
+
+  void it('should reject revoked and expired sessions and replace an expired claim lease', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await register(email);
+    await confirm(email);
+    const firstLogin = await login(email);
+    const revoked = await createUpload(firstLogin.token);
+    await api
+      .post(auth + '/logout')
+      .auth(firstLogin.token, { type: 'bearer' })
+      .expect(204);
+    const revokedClaim = await claimUpload(revoked).expect(403);
+    assert.equal(revokedClaim.body.code, 'upload_session_revoked');
+
+    const active = await login(email);
+    const expired = await createUpload(active.token);
+    const uploads = db.db().collection<UploadRecord>('mediaUploads');
+    await uploads.updateOne(
+      { _id: expired.uploadId },
+      { $set: { expiresAt: new Date(Date.now() - 1_000) } },
+    );
+    const expiredClaim = await claimUpload(expired).expect(403);
+    assert.equal(expiredClaim.body.code, 'upload_grant_expired');
+
+    const retried = await createUpload(active.token);
+    const firstClaim = await claimUpload(retried).expect(200);
+    await uploads.updateOne(
+      { _id: retried.uploadId },
+      { $set: { leaseExpiresAt: new Date(Date.now() - 1_000) } },
+    );
+    const secondClaim = await claimUpload(retried).expect(200);
+    assert.notEqual(firstClaim.body.attemptId, secondClaim.body.attemptId);
+    await completeUpload(retried, firstClaim.body.attemptId).expect(409);
+    await completeUpload(retried, secondClaim.body.attemptId).expect(204);
+  });
+
+  void it('should enforce quota and release an expired reservation transactionally', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await register(email);
+    await confirm(email);
+    const signedIn = await login(email);
+    const first = await createUpload(signedIn.token, 800);
+    await claimUpload(first).expect(200);
+    await api
+      .post('/api/v1/media/uploads')
+      .auth(signedIn.token, { type: 'bearer' })
+      .send({
+        purpose: 'source-document',
+        length: 800,
+        sha256: createHash('sha256').update('quota').digest('hex'),
+      })
+      .expect(413);
+
+    await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .updateOne(
+        { _id: first.uploadId },
+        { $set: { expiresAt: new Date(Date.now() - 1_000) } },
+      );
+    await api
+      .post('/api/v1/media/uploads')
+      .auth(signedIn.token, { type: 'bearer' })
+      .send({
+        purpose: 'source-document',
+        length: 800,
+        sha256: createHash('sha256').update('active-lease').digest('hex'),
+      })
+      .expect(413);
+    await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .updateOne(
+        { _id: first.uploadId },
+        { $set: { leaseExpiresAt: new Date(Date.now() - 1_000) } },
+      );
+    await createUpload(signedIn.token, 800);
+    const firstRecord = await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .findOne({ _id: first.uploadId });
+    if (!firstRecord) throw new Error('Expected the first quota reservation.');
+    const quota = await db
+      .db()
+      .collection<{ _id: string; reservedBytes: number }>('mediaQuotas')
+      .findOne({ _id: firstRecord.accountId });
+    assert.equal(quota?.reservedBytes, 800);
   });
 
   void it('should keep passwords, tokens and MFA values out of application logs', () => {

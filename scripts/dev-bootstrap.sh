@@ -49,6 +49,7 @@ ensure_value AUTH_CONFIRM_EMAIL_SECRET "$(random_hex)"
 ensure_value AUTH_MFA_ENCRYPTION_KEY "$(random_hex)"
 ensure_value MEDIA_SERVICE_TOKEN "$(random_hex)"
 ensure_value MEDIA_PROBE_TOKEN "$(random_hex)"
+ensure_value MEDIA_UPLOAD_GRANT_SECRET "$(random_hex)"
 ensure_value SEED_PASSWORD "Local-$(random_hex)"
 chmod 600 "$environment_file" "$key_directory/media_ed25519" "$key_directory/ssh_host_ed25519_key"
 
