@@ -2,6 +2,8 @@ namespace Media.Storage.Sftp;
 
 internal sealed class SftpOptions
 {
+    public int PartialRetentionMinutes { get; set; } = 60;
+    public int CleanupIntervalSeconds { get; set; } = 300;
     public Dictionary<string, SftpProfile> Profiles { get; set; } = new(StringComparer.Ordinal);
 }
 

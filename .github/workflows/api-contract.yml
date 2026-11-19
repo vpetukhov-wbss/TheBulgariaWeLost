@@ -109,10 +109,30 @@ jobs:
           dotnet-version: 10.0.x
           cache: true
           cache-dependency-path: apps/media/**/packages.lock.json
+      - name: Start pinned private SFTP fixture
+        run: |
+          ./scripts/dev-bootstrap.sh
+          docker compose --env-file .dev/compose.env up -d --wait sftp
       - name: Build and run media contract examples
         working-directory: apps/media
         run: |
+          set -a
+          . ../../.dev/compose.env
+          set +a
+          export MEDIA_TEST_SFTP_REQUIRED=true
+          export MEDIA_TEST_SFTP_HOST=127.0.0.1
+          export MEDIA_TEST_SFTP_PORT=2222
+          export MEDIA_TEST_SFTP_USERNAME=media
+          export MEDIA_TEST_SFTP_PRIVATE_KEY="$PWD/../../.dev/sftp/media_ed25519"
+          export MEDIA_TEST_SFTP_HOST_KEY_SHA256="$SFTP_HOST_KEY_SHA256"
+          export MEDIA_TEST_SFTP_ROOT=/archive
           dotnet restore Media.slnx --locked-mode
           dotnet format Media.slnx --no-restore --verify-no-changes
           dotnet build Media.slnx --no-restore --configuration Release
           dotnet test Media.slnx --no-build --configuration Release
+      - name: Stop private SFTP fixture
+        if: always()
+        run: |
+          if [ -f .dev/compose.env ]; then
+            docker compose --env-file .dev/compose.env down --volumes
+          fi

@@ -2,9 +2,14 @@
 set -eu
 
 repository_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$repository_root"
 set -a
 . "$repository_root/.dev/compose.env"
 set +a
+
+compose() {
+  docker compose --env-file "$repository_root/.dev/compose.env" "$@"
+}
 
 check() {
   name=$1
@@ -31,3 +36,14 @@ if [ "$status" != '204' ]; then
   exit 1
 fi
 printf '%-18s %s\n' 'SFTP round trip' ok
+
+before=$(compose exec -T sftp sh -c \
+  "find /home/media/archive -maxdepth 1 -type f ! -name '*.part' | wc -l")
+node "$repository_root/scripts/dev-upload-check.mjs"
+after=$(compose exec -T sftp sh -c \
+  "find /home/media/archive -maxdepth 1 -type f ! -name '*.part' | wc -l")
+if [ "$after" -ne $((before + 1)) ]; then
+  echo "Expected one new immutable SFTP object, found before=$before after=$after" >&2
+  exit 1
+fi
+printf '%-18s %s\n' 'Full upload flow' ok

@@ -6,4 +6,5 @@ public interface IObjectStorage
     Task<StoredFile?> OpenReadAsync(string locationId, string fileKey, CancellationToken cancellationToken);
     Task PublishAsync(string locationId, string fileKey, Stream content, CancellationToken cancellationToken);
     Task ProbeAsync(string locationId, CancellationToken cancellationToken);
+    Task CleanupExpiredPartialsAsync(DateTime cutoffUtc, CancellationToken cancellationToken);
 }

@@ -109,10 +109,56 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
         }
     }
 
+    public async Task CleanupExpiredPartialsAsync(DateTime cutoffUtc, CancellationToken cancellationToken)
+    {
+        foreach (var profile in profiles.Values)
+        {
+            var (client, key) = await ConnectAsync(profile, cancellationToken);
+            using (key)
+            using (client)
+            {
+                try
+                {
+                    await foreach (var file in client.ListDirectoryAsync(profile.Root, cancellationToken))
+                    {
+                        if (!file.IsRegularFile || !IsPartialName(file.Name)
+                            || file.LastWriteTimeUtc > cutoffUtc)
+                            continue;
+                        await client.DeleteFileAsync(file.FullName, cancellationToken);
+                    }
+                }
+                catch (Exception ex) when (IsStorageError(ex))
+                {
+                    throw new StorageFailure();
+                }
+            }
+        }
+    }
+
     private static string FilePath(SftpProfile profile, string fileKey)
     {
         if (!StorageModule.IsFileKey(fileKey)) throw new StorageFailure();
         return $"{profile.Root.TrimEnd('/')}/{fileKey}";
+    }
+
+    private static bool IsPartialName(string name)
+    {
+        const int keyLength = 64;
+        const int attemptLength = 32;
+        const string suffix = ".part";
+        if (name.Length != keyLength + 1 + attemptLength + suffix.Length
+            || name[keyLength] != '.' || !name.EndsWith(suffix, StringComparison.Ordinal))
+            return false;
+        return IsLowerHex(name.AsSpan(0, keyLength))
+            && IsLowerHex(name.AsSpan(keyLength + 1, attemptLength));
+    }
+
+    private static bool IsLowerHex(ReadOnlySpan<char> value)
+    {
+        foreach (var character in value)
+            if (character is not (>= 'a' and <= 'f' or >= '0' and <= '9'))
+                return false;
+        return true;
     }
 
     private static async Task<(SftpClient Client, PrivateKeyFile Key)> ConnectAsync(

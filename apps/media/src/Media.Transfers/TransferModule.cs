@@ -16,10 +16,15 @@ public static class TransferModule
             .Validate(options => options.MaxUploadBytes is >= 8 and <= 1024L * 1024 * 1024
                 && options.ConcurrentTransfers is >= 1 and <= 64
                 && options.TimeoutSeconds is >= 10 and <= 600
+                && options.QuarantineRetentionMinutes is >= 1 and <= 10_080
+                && options.QuarantineCleanupIntervalSeconds is >= 1 and <= 3_600
                 && !string.IsNullOrWhiteSpace(options.QuarantineDirectory),
                 "Configure positive transfer limits and a quarantine directory.")
             .ValidateOnStart();
-        return services.AddSingleton<TransferSlots>();
+        services.AddSingleton<TransferSlots>();
+        services.AddSingleton<UploadQuarantine>();
+        services.AddHostedService<QuarantineCleanupWorker>();
+        return services;
     }
 
     public static void MapMediaTransfers(this IEndpointRouteBuilder routes)
