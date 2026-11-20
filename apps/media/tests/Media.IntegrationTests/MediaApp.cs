@@ -16,7 +16,10 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
 {
     public static readonly Guid UploadId = Guid.Parse("11111111-1111-4111-8111-111111111111");
     public const string FileKey = "aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff0000000011111111";
-    public const string ProbeToken = "test-only-probe-credential-408a14f1f1";
+    public static readonly string ProbeToken = RandomCredential();
+    public static readonly string ServiceToken = RandomCredential();
+    public static readonly string UploadGrant = RandomCredential();
+    public static readonly string ReadGrant = RandomCredential();
     public static readonly byte[] Png = Convert.FromBase64String(
         "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMB/ab8x4sAAAAASUVORK5CYII=");
 
@@ -31,7 +34,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration(config => config.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["MediaControl:BaseUrl"] = "http://api:3000/",
-            ["MediaControl:ServiceToken"] = "test-only-outbound-credential-2c39b4c67",
+            ["MediaControl:ServiceToken"] = ServiceToken,
             ["MediaControl:ProbeToken"] = ProbeToken,
             ["MediaTransfers:QuarantineDirectory"] = quarantine,
             ["MediaTransfers:QuarantineRetentionMinutes"] = "1",
@@ -53,9 +56,22 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
 
     public static string Sha256(byte[] bytes) => Convert.ToHexStringLower(SHA256.HashData(bytes));
 
+    private static string RandomCredential() =>
+        Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
+
     internal sealed class FakeStorage : IObjectStorage
     {
-        public byte[]? Bytes { get; set; }
+        private readonly Dictionary<string, byte[]> objects = new(StringComparer.Ordinal);
+
+        public byte[]? Bytes
+        {
+            get => BytesFor(FileKey);
+            set
+            {
+                if (value is null) objects.Remove(FileKey);
+                else objects[FileKey] = value;
+            }
+        }
         public int Publications { get; private set; }
         public int ProbeCount { get; private set; }
         public int Opens { get; private set; }
@@ -65,7 +81,8 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         public Task<StoredFile?> OpenReadAsync(string locationId, string fileKey, CancellationToken cancellationToken)
         {
             Opens++;
-            return Task.FromResult(Bytes is null ? null : new StoredFile(new MemoryStream(Bytes), Bytes.Length));
+            var bytes = BytesFor(fileKey);
+            return Task.FromResult(bytes is null ? null : new StoredFile(new MemoryStream(bytes), bytes.Length));
         }
 
         public async Task PublishAsync(string locationId, string fileKey, Stream content, CancellationToken cancellationToken)
@@ -73,8 +90,11 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
             Publications++;
             using var buffer = new MemoryStream();
             await content.CopyToAsync(buffer, cancellationToken);
-            Bytes ??= buffer.ToArray();
+            objects.TryAdd(fileKey, buffer.ToArray());
         }
+
+        public byte[]? BytesFor(string fileKey) =>
+            objects.TryGetValue(fileKey, out var bytes) ? bytes : null;
 
         public Task ProbeAsync(string locationId, CancellationToken cancellationToken)
         {
@@ -97,7 +117,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (request.Headers.Authorization?.Parameter != "test-only-outbound-credential-2c39b4c67")
+            if (request.Headers.Authorization?.Parameter != ServiceToken)
                 return new HttpResponseMessage(HttpStatusCode.Unauthorized);
 
             var path = request.RequestUri?.AbsolutePath;

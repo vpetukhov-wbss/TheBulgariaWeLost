@@ -68,4 +68,57 @@ if (repeated.status !== 409) {
   throw new Error(`Completed upload replay returned HTTP ${repeated.status}, expected 409.`);
 }
 
-process.stdout.write('NestJS -> .NET -> private SFTP upload: ok\n');
+let asset;
+for (let attempt = 0; attempt < 80; attempt++) {
+  const response = await fetch(
+    `http://127.0.0.1:3000/api/v1/media/assets/${upload.uploadId}`,
+    { headers: { authorization: `Bearer ${login.token}` } },
+  );
+  asset = await json(response, 200, 'Media processing status');
+  if (asset.processingStatus === 'Ready') break;
+  if (asset.processingStatus === 'Failed') {
+    throw new Error('Media inspection rejected the uploaded fixture.');
+  }
+  await new Promise((resolve) => setTimeout(resolve, 250));
+}
+if (asset?.processingStatus !== 'Ready') {
+  throw new Error('Media inspection did not finish before the smoke-test deadline.');
+}
+if (!asset.variants.includes('preview')) {
+  throw new Error('Ready media does not advertise its verified preview.');
+}
+
+const read = await json(
+  await fetch(
+    `http://127.0.0.1:3000/api/v1/media/assets/${upload.uploadId}/read-grants`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${login.token}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ variant: 'preview' }),
+    },
+  ),
+  201,
+  'Preview read grant',
+);
+const previewUrl = new URL(read.url, 'http://127.0.0.1:5088');
+const preview = await fetch(previewUrl, {
+  headers: { authorization: `Bearer ${read.grant}` },
+});
+if (preview.status !== 200 || !Buffer.from(await preview.arrayBuffer()).equals(png)) {
+  throw new Error(`Verified preview read failed with HTTP ${preview.status}.`);
+}
+
+const range = await fetch(previewUrl, {
+  headers: {
+    authorization: `Bearer ${read.grant}`,
+    range: 'bytes=0-3',
+  },
+});
+if (range.status !== 206 || !Buffer.from(await range.arrayBuffer()).equals(png.subarray(0, 4))) {
+  throw new Error(`Verified preview Range read failed with HTTP ${range.status}.`);
+}
+
+process.stdout.write('NestJS -> .NET -> private SFTP upload, inspection and Range read: ok\n');

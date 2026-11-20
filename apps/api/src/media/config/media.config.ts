@@ -20,20 +20,25 @@ export default registerAs<MediaConfig>('media', () => {
     process.env.MEDIA_UPLOAD_GRANT_SECRET?.trim() ||
     process.env.AUTH_CONFIRM_EMAIL_SECRET ||
     '';
-  if (!serviceToken || !uploadGrantSecret) {
+  const readGrantSecret =
+    process.env.MEDIA_READ_GRANT_SECRET?.trim() || uploadGrantSecret;
+  if (!serviceToken || !uploadGrantSecret || !readGrantSecret) {
     throw new Error(
-      'MEDIA_SERVICE_TOKEN and MEDIA_UPLOAD_GRANT_SECRET are required.',
+      'MEDIA_SERVICE_TOKEN, MEDIA_UPLOAD_GRANT_SECRET and MEDIA_READ_GRANT_SECRET are required.',
     );
   }
   if (
     production &&
     (!process.env.MEDIA_SERVICE_TOKEN ||
       !process.env.MEDIA_UPLOAD_GRANT_SECRET ||
+      !process.env.MEDIA_READ_GRANT_SECRET ||
       serviceToken.length < 32 ||
-      uploadGrantSecret.length < 32)
+      uploadGrantSecret.length < 32 ||
+      readGrantSecret.length < 32 ||
+      new Set([serviceToken, uploadGrantSecret, readGrantSecret]).size !== 3)
   ) {
     throw new Error(
-      'Production media credentials must be explicit and at least 32 characters.',
+      'Production media credentials must be explicit, independent and at least 32 characters.',
     );
   }
 
@@ -46,11 +51,20 @@ export default registerAs<MediaConfig>('media', () => {
   return {
     serviceToken,
     uploadGrantSecret,
+    readGrantSecret,
     uploadGrantExpiresSeconds: positiveInteger(
       'MEDIA_UPLOAD_GRANT_EXPIRES_IN_SECONDS',
       10 * 60,
     ),
     uploadLeaseSeconds: positiveInteger('MEDIA_UPLOAD_LEASE_SECONDS', 5 * 60),
+    readGrantExpiresSeconds: positiveInteger(
+      'MEDIA_READ_GRANT_EXPIRES_IN_SECONDS',
+      5 * 60,
+    ),
+    inspectionLeaseSeconds: positiveInteger(
+      'MEDIA_INSPECTION_LEASE_SECONDS',
+      2 * 60,
+    ),
     maxUploadBytes: positiveInteger('MEDIA_MAX_UPLOAD_BYTES', 32 * 1024 * 1024),
     accountQuotaBytes: positiveInteger(
       'MEDIA_ACCOUNT_QUOTA_BYTES',

@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using Media.ControlPlane;
+using Media.Processing.Inspection;
 using Media.Storage.Content;
 using Media.Transfers;
 using Media.Transfers.Upload;
@@ -184,12 +186,36 @@ public sealed class TransferTests
     }
 
     [Fact]
+    public async Task Inspection_publishes_an_attempt_specific_verified_preview()
+    {
+        var storage = new MediaApp.FakeStorage { Bytes = MediaApp.Png };
+        var previewKey = new string('b', 64);
+        var lease = new InspectionLease(
+            Guid.NewGuid(),
+            Guid.NewGuid(),
+            new ObjectReference("archive", MediaApp.FileKey),
+            new ObjectReference("archive", previewKey),
+            MediaApp.Png.Length,
+            MediaApp.Sha256(MediaApp.Png));
+
+        var result = await InspectionProcessor.ProcessAsync(
+            lease, storage, CancellationToken.None);
+
+        Assert.Equal("inspected", result.Outcome);
+        Assert.Equal(lease.AttemptId, result.AttemptId);
+        Assert.Equal(lease.PreviewObject, result.PreviewObject);
+        Assert.Equal(MediaApp.Png, storage.BytesFor(previewKey));
+        Assert.Equal(MediaApp.Sha256(MediaApp.Png), result.PreviewSha256);
+        Assert.Equal("image/png", result.PreviewContentType);
+    }
+
+    [Fact]
     public async Task Every_range_request_rechecks_access_and_bypasses_caches()
     {
         await using var app = new MediaApp();
         using var client = app.CreateClient();
         app.Storage.Bytes = MediaApp.Png;
-        var url = $"/media/v1/assets/{MediaApp.UploadId:D}/preview?grant=signature";
+        var url = $"/media/v1/assets/{MediaApp.UploadId:D}/preview?grant={MediaApp.ReadGrant}";
         using var first = new HttpRequestMessage(HttpMethod.Get, url);
         first.Headers.Range = new RangeHeaderValue(0, 3);
         using var allowed = await client.SendAsync(first);
@@ -234,7 +260,7 @@ public sealed class TransferTests
         {
             Content = content
         };
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "upload-grant");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MediaApp.UploadGrant);
         return await client.SendAsync(request);
     }
 

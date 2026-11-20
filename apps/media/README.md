@@ -50,12 +50,12 @@ ASPNETCORE_ENVIRONMENT=Development dotnet run --project src/Media.Api --urls htt
 | `POST /internal/media/v1/uploads/{uploadId}/claim`        | `grant`                                                        | `200` с `attemptId, attemptVersion, object, length, sha256`             |
 | `POST /internal/media/v1/uploads/{uploadId}/complete`     | `attemptId, length, sha256, contentType`                       | `204`                                                                   |
 | `POST /internal/media/v1/assets/{assetId}/authorize-read` | `variant, grant`                                               | `200` с `object, length, contentType`                                   |
-| `POST /internal/media/v1/inspections/lease`               | `{}`                                                           | `200` с `jobId, attemptId, object, length, sha256` или `204` без задача |
-| `POST /internal/media/v1/inspections/{jobId}/complete`    | `attemptId, outcome` и при успех `length, sha256, contentType` | `204`                                                                   |
+| `POST /internal/media/v1/inspections/lease`               | `{}`                                                                                                                        | `200` с `jobId, attemptId, object, previewObject, length, sha256` или `204` без задача |
+| `POST /internal/media/v1/inspections/{jobId}/complete`    | `attemptId, outcome` и при успех оригиналните и preview метаданни                                                          | `204`                                                                                |
 
 `object` е `{ storageLocationId, fileKey }`. NestJS определя точната дължина и SHA-256 при създаването на качването. Ключът е 64-символен lowercase hex, генериран от сървъра, и остава фиксиран заедно с хранилището, дължината и checksum през всички опити. NestJS проверява текущата сесия, права, срока и предназначението на разрешението при всеки claim или read. Активният upload опит е атомарен lease. `409` означава активен или остарял опит. След запис и изгубено потвърждение следващият разрешен опит проверява вече записания обект и може да изпрати completion без повторно записване. NestJS приема повторно completion за същия резултат идемпотентно.
 
-Worker-ът се включва чрез `MediaProcessing__Enabled=true` след свързване на NestJS lease API. Inspection lease трябва да е по-дълъг от 60-секундния срок на обработка. Резултатите са `inspected`, `missing`, `integrity_mismatch` и `unsupported_format`. При временна грешка NestJS връща незавършена задача в опашката след изтичане на lease. Логиката за lease и правата остава в NestJS.
+Worker-ът се включва чрез `MediaProcessing__Enabled=true`. Inspection lease трябва да е по-дълъг от 60-секундния срок на обработка. Резултатите са `inspected`, `missing`, `integrity_mismatch` и `unsupported_format`. При временна грешка NestJS връща незавършена задача в опашката след изтичане на lease. Стар опит може да остави неприет производен обект, но никога не може да смени записания активен preview; lifecycle cleanup ще премахва такива обекти. Логиката за lease и правата остава в NestJS.
 
 ### Граници на първия срез
 
@@ -63,7 +63,7 @@ Worker-ът се включва чрез `MediaProcessing__Enabled=true` сле�
 - Качването буферира на частен диск с ограничение на размер и брой едновременни трансфери. Прекъснатите, повредените и неподдържаните файлове остават с права `0600` в карантината до `QuarantineRetentionMinutes`; успешният запис ги премахва. Собствен worker чисти само разпознатите изтекли quarantine имена. В Compose карантината е отделен persistent volume.
 - SFTP временните файлове имат строго име `<fileKey>.<attempt>.part`, а оригиналът се публикува с rename без презапис. След прекъсване worker изтрива само разпознати `.part`, по-стари от `MediaStorage:PartialRetentionMinutes`; други файлове не се засягат. Интервалите са `MediaTransfers:QuarantineCleanupIntervalSeconds` и `MediaStorage:CleanupIntervalSeconds`.
 - Хранилището трябва да осигурява стандартно SFTP преименуване без презапис и трайност според своята конфигурация. Прочитането след запис проверява видимост и цялост на обекта. Файлът се проверява повторно от SFTP след записа. Transport и worker могат да ползват различни SFTP профили за различни обекти.
-- Производен преглед никога не се публикува директно от непроверения вход. Генерирането и отдаването на preview е част от следващия inspection/lease срез; сегашният worker проверява цялост и формат на оригинала.
+- Производен преглед никога не се публикува директно от непроверения вход. В този първи срез worker-ът проверява оригинала, публикува byte-for-byte preview под отделен ключ за конкретния опит и проверява повторно записания preview. Преоразмеряване, OCR и видео производни се добавят в следващи срезове, без промяна на lease договора.
 
 ## Проверки
 
@@ -74,4 +74,4 @@ dotnet test --no-build
 dotnet format --no-restore --verify-no-changes
 ```
 
-HTTP интеграционните тестове използват ограничени in-memory реализации. CI стартира и отделно частно SFTP с генерирани ключове, за да докаже pinned host key, отказ при недостъпна услуга, атомарно повторение и почистване на изтекли `.part`. Development smoke тестът изпълнява целия NestJS → .NET → SFTP upload. Примерна отделна конфигурация за ръчно стартиране в `Testing` е в [`appsettings.Testing.example.json`](appsettings.Testing.example.json); в нея няма production достъпи и processing worker-ът е изключен.
+HTTP интеграционните тестове използват ограничени in-memory реализации. CI стартира и отделно частно SFTP с генерирани ключове, за да докаже pinned host key, отказ при недостъпна услуга, атомарно повторение и почистване на изтекли `.part`. Development smoke тестът изпълнява целия NestJS → .NET → SFTP upload, inspection, preview и Range read. Примерна отделна конфигурация за ръчно стартиране в `Testing` е в [`appsettings.Testing.example.json`](appsettings.Testing.example.json); в нея няма production достъпи и processing worker-ът е изключен.

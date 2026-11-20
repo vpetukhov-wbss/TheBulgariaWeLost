@@ -20,7 +20,7 @@
 1. генерира отделни Ed25519 client и host ключове за локалния SFTP;
 2. изгражда и стартира шестте услуги и изчаква Docker health checks;
 3. прилага версираните MongoDB миграции и зарежда идемпотентни синтетични акаунти в `bulgaria_archive_dev`;
-4. проверява Angular, NestJS + MongoDB, .NET, Mailpit, SFTP write/read/delete и пълно качване през NestJS → .NET → частното SFTP.
+4. проверява Angular, NestJS + MongoDB, .NET, Mailpit, SFTP write/read/delete и пълния upload → inspection → preview → Range read поток.
 
 | Компонент                | Адрес                                                                                 |
 | ------------------------ | ------------------------------------------------------------------------------------- |

@@ -3,7 +3,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AuthModule } from '../auth/auth.module';
 import {
+  InternalMediaAssetController,
+  InternalMediaInspectionController,
   InternalMediaUploadController,
+  MediaAssetController,
   MediaUploadController,
 } from './media.controller';
 import { MediaServiceGuard } from './media-service.guard';
@@ -23,7 +26,13 @@ import {
       { name: MediaQuota.name, schema: MediaQuotaSchema },
     ]),
   ],
-  controllers: [MediaUploadController, InternalMediaUploadController],
+  controllers: [
+    MediaUploadController,
+    MediaAssetController,
+    InternalMediaUploadController,
+    InternalMediaAssetController,
+    InternalMediaInspectionController,
+  ],
   providers: [MediaService, MediaServiceGuard],
 })
 export class MediaModule {}

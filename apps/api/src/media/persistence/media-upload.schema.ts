@@ -15,12 +15,26 @@ export enum UploadStatus {
   Expired = 'Expired',
 }
 
+export enum ProcessingStatus {
+  Pending = 'Pending',
+  Claimed = 'Claimed',
+  Ready = 'Ready',
+  Failed = 'Failed',
+}
+
+export enum MediaAccessStatus {
+  Active = 'Active',
+  Hidden = 'Hidden',
+  Restricted = 'Restricted',
+  Removed = 'Removed',
+}
+
 @Schema({ collection: 'mediaUploads', timestamps: true })
 export class MediaUpload {
   @Prop({ type: String, default: uuidv7 })
   _id: string;
 
-  @Prop({ type: Number, default: 1, required: true })
+  @Prop({ type: Number, default: 2, required: true })
   schemaVersion: number;
 
   @Prop({ required: true })
@@ -70,6 +84,52 @@ export class MediaUpload {
 
   @Prop()
   contentType?: string;
+
+  @Prop({ type: String, enum: ProcessingStatus })
+  processingStatus?: ProcessingStatus;
+
+  @Prop()
+  inspectionAttemptId?: string;
+
+  @Prop()
+  inspectionLeaseExpiresAt?: Date;
+
+  @Prop()
+  inspectionPreviewFileKey?: string;
+
+  @Prop()
+  inspectionCompletedAttemptId?: string;
+
+  @Prop()
+  inspectionOutcome?: string;
+
+  @Prop()
+  inspectedAt?: Date;
+
+  @Prop()
+  previewStorageLocationId?: string;
+
+  @Prop()
+  previewFileKey?: string;
+
+  @Prop()
+  previewLength?: number;
+
+  @Prop()
+  previewSha256?: string;
+
+  @Prop()
+  previewContentType?: string;
+
+  @Prop({
+    type: String,
+    enum: MediaAccessStatus,
+    default: MediaAccessStatus.Active,
+  })
+  accessStatus: MediaAccessStatus;
+
+  @Prop({ default: 1, required: true })
+  accessVersion: number;
 }
 
 export const MediaUploadSchema = SchemaFactory.createForClass(MediaUpload);
@@ -77,3 +137,9 @@ export const MediaUploadSchema = SchemaFactory.createForClass(MediaUpload);
 MediaUploadSchema.index({ fileKey: 1 }, { unique: true });
 MediaUploadSchema.index({ accountId: 1, status: 1, expiresAt: 1 });
 MediaUploadSchema.index({ status: 1, leaseExpiresAt: 1 });
+MediaUploadSchema.index({
+  status: 1,
+  processingStatus: 1,
+  inspectionLeaseExpiresAt: 1,
+  completedAt: 1,
+});

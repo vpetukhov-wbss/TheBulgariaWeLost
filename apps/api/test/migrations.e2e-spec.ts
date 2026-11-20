@@ -36,6 +36,17 @@ interface ProbeRecord {
   state: string;
 }
 
+interface MediaMigrationRecord {
+  _id: string;
+  accountId: string;
+  status: string;
+  fileKey: string;
+  schemaVersion?: number;
+  processingStatus?: string;
+  accessStatus?: string;
+  accessVersion?: number;
+}
+
 function databaseUrl(purpose: string): string {
   const url = new URL(baseDatabaseUrl);
   const suffix = randomUUID().replaceAll('-', '');
@@ -71,10 +82,12 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
         assert.deepEqual(first.applied, [
           '001-auth-foundation',
           '002-media-uploads',
+          '003-media-processing',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
           '002-media-uploads',
+          '003-media-processing',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -83,7 +96,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            2,
+            3,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -114,6 +127,8 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
         const database = client.db();
         const users = database.collection<UserRecord>('users');
         const sessions = database.collection<SessionRecord>('sessions');
+        const uploads =
+          database.collection<MediaMigrationRecord>('mediaUploads');
         const expiresAt = new Date(Date.now() + 60_000);
         await users.insertMany([
           {
@@ -135,6 +150,12 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           authVersion: 3,
           expiresAt,
         });
+        await uploads.insertOne({
+          _id: 'legacy-completed-upload',
+          accountId: 'legacy-editor',
+          status: 'Completed',
+          fileKey: 'a'.repeat(64),
+        });
         await users.createIndex({ email: 1 }, { unique: true });
         await sessions.createIndex({ accountId: 1 });
         await sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 });
@@ -143,6 +164,26 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
 
         assert.equal(await users.countDocuments({ schemaVersion: 1 }), 2);
         assert.equal(await sessions.countDocuments({ schemaVersion: 1 }), 1);
+        assert.deepEqual(
+          await uploads.findOne(
+            { _id: 'legacy-completed-upload' },
+            {
+              projection: {
+                _id: 0,
+                schemaVersion: 1,
+                processingStatus: 1,
+                accessStatus: 1,
+                accessVersion: 1,
+              },
+            },
+          ),
+          {
+            schemaVersion: 2,
+            processingStatus: 'Pending',
+            accessStatus: 'Active',
+            accessVersion: 1,
+          },
+        );
         await assert.rejects(
           users.insertOne({
             _id: 'duplicate-email',
@@ -158,6 +199,13 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
         assert(
           uploadIndexes.some(
             (index) => index.name === 'accountId_1_status_1_expiresAt_1',
+          ),
+        );
+        assert(
+          uploadIndexes.some(
+            (index) =>
+              index.name ===
+              'status_1_processingStatus_1_inspectionLeaseExpiresAt_1_completedAt_1',
           ),
         );
 

@@ -17,6 +17,7 @@ public sealed record InspectionLease(
     Guid JobId,
     Guid AttemptId,
     ObjectReference Object,
+    ObjectReference PreviewObject,
     long Length,
     string Sha256);
 
@@ -25,4 +26,8 @@ public sealed record InspectionResult(
     string Outcome,
     long? Length = null,
     string? Sha256 = null,
-    string? ContentType = null);
+    string? ContentType = null,
+    ObjectReference? PreviewObject = null,
+    long? PreviewLength = null,
+    string? PreviewSha256 = null,
+    string? PreviewContentType = null);
