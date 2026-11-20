@@ -10,10 +10,16 @@ import { BaseService } from '../base-service';
 import { ArchiveApiConfiguration } from '../archive-api-configuration';
 import { StrictHttpResponse } from '../strict-http-response';
 
+import { createMediaReadGrant } from '../fn/media/create-media-read-grant';
+import { CreateMediaReadGrant$Params } from '../fn/media/create-media-read-grant';
 import { createUploadSession } from '../fn/media/create-upload-session';
 import { CreateUploadSession$Params } from '../fn/media/create-upload-session';
+import { getMediaAsset } from '../fn/media/get-media-asset';
+import { GetMediaAsset$Params } from '../fn/media/get-media-asset';
 import { inspectMedia } from '../fn/media/inspect-media';
 import { InspectMedia$Params } from '../fn/media/inspect-media';
+import { MediaAsset } from '../models/media-asset';
+import { MediaReadGrant } from '../models/media-read-grant';
 import { readMedia } from '../fn/media/read-media';
 import { ReadMedia$Params } from '../fn/media/read-media';
 import { uploadMedia } from '../fn/media/upload-media';
@@ -50,6 +56,60 @@ export class MediaService extends BaseService {
     const resp = this.createUploadSession$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<UploadSession>): UploadSession => r.body)
+    );
+  }
+
+  /** Path part for operation `getMediaAsset()` */
+  static readonly GetMediaAssetPath = '/api/v1/media/assets/{assetId}';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `getMediaAsset()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getMediaAsset$Response(params: GetMediaAsset$Params, context?: HttpContext): Observable<StrictHttpResponse<MediaAsset>> {
+    const obs = getMediaAsset(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `getMediaAsset$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getMediaAsset(params: GetMediaAsset$Params, context?: HttpContext): Observable<MediaAsset> {
+    const resp = this.getMediaAsset$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<MediaAsset>): MediaAsset => r.body)
+    );
+  }
+
+  /** Path part for operation `createMediaReadGrant()` */
+  static readonly CreateMediaReadGrantPath = '/api/v1/media/assets/{assetId}/read-grants';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `createMediaReadGrant()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  createMediaReadGrant$Response(params: CreateMediaReadGrant$Params, context?: HttpContext): Observable<StrictHttpResponse<MediaReadGrant>> {
+    const obs = createMediaReadGrant(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `createMediaReadGrant$Response()` instead.
+   *
+   * This method sends `application/json` and handles request body of type `application/json`.
+   */
+  createMediaReadGrant(params: CreateMediaReadGrant$Params, context?: HttpContext): Observable<MediaReadGrant> {
+    const resp = this.createMediaReadGrant$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<MediaReadGrant>): MediaReadGrant => r.body)
     );
   }
 

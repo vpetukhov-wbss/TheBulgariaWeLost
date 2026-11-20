@@ -353,6 +353,48 @@ paths:
                 $ref: "#/components/schemas/UploadSession"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/media/assets/{assetId}:
+    get:
+      tags: [Media]
+      operationId: getMediaAsset
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AssetId"
+      responses:
+        "200":
+          description: Current processing state and available variants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaAsset"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/media/assets/{assetId}/read-grants:
+    post:
+      tags: [Media]
+      operationId: createMediaReadGrant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AssetId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReadGrantRequest"
+      responses:
+        "201":
+          description: Short-lived read grant bound to the current session and variant.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaReadGrant"
+        default:
+          $ref: "#/components/responses/Problem"
   /media/v1/uploads/{uploadId}:
     put:
       tags: [Media]
@@ -911,6 +953,52 @@ components:
         attemptVersion:
           type: integer
           minimum: 1
+    MediaAsset:
+      type: object
+      additionalProperties: false
+      required: [id, processingStatus, variants]
+      properties:
+        id:
+          type: string
+          format: uuid
+        processingStatus:
+          type: string
+          enum: [Pending, Claimed, Ready, Failed]
+        contentType:
+          type: string
+        variants:
+          type: array
+          uniqueItems: true
+          items:
+            type: string
+            enum: [original, preview]
+    CreateReadGrantRequest:
+      type: object
+      additionalProperties: false
+      required: [variant]
+      properties:
+        variant:
+          type: string
+          enum: [original, preview]
+    MediaReadGrant:
+      type: object
+      additionalProperties: false
+      required: [assetId, variant, grant, url, expiresAtUtc]
+      properties:
+        assetId:
+          type: string
+          format: uuid
+        variant:
+          type: string
+          enum: [original, preview]
+        grant:
+          type: string
+        url:
+          type: string
+          pattern: "^/media/v1/assets/[0-9a-f-]+/(?:original|preview)$"
+        expiresAtUtc:
+          type: string
+          format: date-time
     GrantRequest:
       type: object
       additionalProperties: false
@@ -937,8 +1025,10 @@ components:
       properties:
         storageLocationId:
           type: string
+          maxLength: 100
         fileKey:
           type: string
+          pattern: "^[a-f0-9]{64}$"
     UploadClaim:
       type: object
       additionalProperties: false
@@ -999,6 +1089,8 @@ components:
           format: uuid
         object:
           $ref: "#/components/schemas/ObjectReference"
+        previewObject:
+          $ref: "#/components/schemas/ObjectReference"
         length:
           type: integer
           format: int64
@@ -1021,4 +1113,14 @@ components:
         sha256:
           type: string
         contentType:
+          type: string
+        previewObject:
+          $ref: "#/components/schemas/ObjectReference"
+        previewLength:
+          type: integer
+          format: int64
+        previewSha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        previewContentType:
           type: string

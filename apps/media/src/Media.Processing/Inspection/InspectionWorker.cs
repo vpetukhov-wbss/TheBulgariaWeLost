@@ -44,32 +44,19 @@ internal sealed class InspectionWorker(
         if (lease is null) return;
 
         if (lease.JobId == Guid.Empty || lease.AttemptId == Guid.Empty || lease.Object is null
-            || !StorageModule.IsFileKey(lease.Object.FileKey) || !MediaContent.ValidSha256(lease.Sha256)
+            || lease.PreviewObject is null || !StorageModule.IsFileKey(lease.Object.FileKey)
+            || !StorageModule.IsFileKey(lease.PreviewObject.FileKey) || !MediaContent.ValidSha256(lease.Sha256)
             || lease.Length is <= 0 or > 1024L * 1024 * 1024)
             throw new ControlPlaneException(HttpStatusCode.ServiceUnavailable);
 
         var storage = scope.ServiceProvider.GetRequiredService<IObjectStorage>();
         var location = lease.Object.StorageLocationId;
-        if (string.IsNullOrEmpty(location) || !storage.HasLocation(location))
+        if (string.IsNullOrEmpty(location) || !storage.HasLocation(location)
+            || string.IsNullOrEmpty(lease.PreviewObject.StorageLocationId)
+            || !storage.HasLocation(lease.PreviewObject.StorageLocationId))
             throw new StorageFailure();
 
-        var result = await InspectAsync(lease, storage, cancellationToken);
+        var result = await InspectionProcessor.ProcessAsync(lease, storage, cancellationToken);
         await control.CompleteInspectionAsync(lease.JobId, result, cancellationToken);
-    }
-
-    private static async Task<InspectionResult> InspectAsync(
-        InspectionLease lease, IObjectStorage storage, CancellationToken cancellationToken)
-    {
-        await using var item = await storage.OpenReadAsync(
-            lease.Object.StorageLocationId, lease.Object.FileKey, cancellationToken);
-        if (item is null) return new InspectionResult(lease.AttemptId, "missing");
-        if (item.Length != lease.Length) return new InspectionResult(lease.AttemptId, "integrity_mismatch");
-
-        var content = await MediaContent.InspectAsync(item.Content, lease.Length, null, cancellationToken);
-        if (content is null || !content.Matches(lease.Length, lease.Sha256))
-            return new InspectionResult(lease.AttemptId, "integrity_mismatch");
-        if (content.ContentType is null)
-            return new InspectionResult(lease.AttemptId, "unsupported_format");
-        return new InspectionResult(lease.AttemptId, "inspected", content.Length, content.Sha256, content.ContentType);
     }
 }

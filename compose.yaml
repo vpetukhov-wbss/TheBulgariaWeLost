@@ -22,7 +22,10 @@ x-api-environment: &api-environment
   AUTH_MFA_ENCRYPTION_KEY:
   MEDIA_SERVICE_TOKEN: ${MEDIA_SERVICE_TOKEN:?Run ./scripts/dev-up.sh to generate local secrets}
   MEDIA_UPLOAD_GRANT_SECRET: ${MEDIA_UPLOAD_GRANT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
+  MEDIA_READ_GRANT_SECRET: ${MEDIA_READ_GRANT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   MEDIA_DEFAULT_STORAGE_LOCATION_ID: archive
+  MEDIA_READ_GRANT_EXPIRES_IN_SECONDS: 300
+  MEDIA_INSPECTION_LEASE_SECONDS: 120
   MEDIA_MAX_UPLOAD_BYTES: 33554432
   AUTH_JWT_TOKEN_EXPIRES_IN: 15m
   AUTH_REFRESH_TOKEN_EXPIRES_IN: 30d
@@ -118,7 +121,7 @@ services:
       MediaStorage__Profiles__archive__HostKeySha256: ${SFTP_HOST_KEY_SHA256:?Run ./scripts/dev-up.sh to create the local SFTP keys}
       MediaStorage__Profiles__archive__Root: /archive
       MediaTransfers__QuarantineDirectory: /var/lib/media-quarantine
-      MediaProcessing__Enabled: "false"
+      MediaProcessing__Enabled: "true"
     depends_on:
       api:
         condition: service_healthy

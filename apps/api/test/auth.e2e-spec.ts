@@ -25,10 +25,11 @@ const db = new mongo.MongoClient(databaseUrl.toString(), {
 });
 const mailUrl = process.env.MAILPIT_TEST_URL ?? 'http://127.0.0.1:8025';
 const auth = '/api/v1/auth';
+const randomCredential = (prefix: string) => `${prefix}-${randomUUID()}`;
 const details = {
   firstName: 'Мария',
   lastName: 'Димова',
-  password: 'first-test-password',
+  password: randomCredential('User'),
 };
 let child: ChildProcess | undefined;
 let serverLog = '';
@@ -37,7 +38,13 @@ const execFileAsync = promisify(execFile);
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const mediaServiceToken = `${randomUUID()}${randomUUID()}`;
 const mediaGrantSecret = `${randomUUID()}${randomUUID()}`;
+const mediaReadGrantSecret = `${randomUUID()}${randomUUID()}`;
+const authJwtSecret = randomCredential('Jwt');
+const authRefreshSecret = randomCredential('Refresh');
+const authForgotSecret = randomCredential('Forgot');
+const authConfirmSecret = randomCredential('Confirm');
 const authClientIps = new Map<string, string>();
+sensitiveSamples.push(details.password, mediaServiceToken);
 
 function authClientIp(email: string): string {
   const existing = authClientIps.get(email);
@@ -75,6 +82,12 @@ interface UploadRecord {
   leaseExpiresAt?: Date;
   activeAttemptId?: string;
   contentType?: string;
+  processingStatus?: string;
+  inspectionLeaseExpiresAt?: Date;
+  inspectionAttemptId?: string;
+  previewFileKey?: string;
+  accessStatus?: string;
+  accessVersion?: number;
 }
 
 async function waitForApi() {
@@ -190,6 +203,52 @@ function completeUpload(
     });
 }
 
+function leaseInspection() {
+  return api
+    .post('/internal/media/v1/inspections/lease')
+    .auth(mediaServiceToken, { type: 'bearer' })
+    .send({});
+}
+
+function completeInspection(jobId: string, body: Record<string, unknown>) {
+  return api
+    .post(`/internal/media/v1/inspections/${jobId}/complete`)
+    .auth(mediaServiceToken, { type: 'bearer' })
+    .send(body);
+}
+
+async function createReadGrant(
+  token: string,
+  assetId: string,
+  variant: 'original' | 'preview',
+) {
+  const response = await api
+    .post(`/api/v1/media/assets/${assetId}/read-grants`)
+    .auth(token, { type: 'bearer' })
+    .send({ variant })
+    .expect(201);
+  const body = response.body as {
+    assetId: string;
+    variant: 'original' | 'preview';
+    grant: string;
+    url: string;
+    expiresAtUtc: string;
+  };
+  sensitiveSamples.push(body.grant);
+  return body;
+}
+
+function authorizeRead(
+  assetId: string,
+  variant: 'original' | 'preview',
+  grant: string,
+) {
+  return api
+    .post(`/internal/media/v1/assets/${assetId}/authorize-read`)
+    .auth(mediaServiceToken, { type: 'bearer' })
+    .send({ variant, grant });
+}
+
 function totp(secret: string, step = Math.floor(Date.now() / 30_000)): string {
   let bits = 0;
   let value = 0;
@@ -258,18 +317,18 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         MAIL_IGNORE_TLS: 'true',
         MAIL_SECURE: 'false',
         MAIL_REQUIRE_TLS: 'false',
-        AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET ?? 'secret',
+        AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET ?? authJwtSecret,
         AUTH_REFRESH_SECRET:
-          process.env.AUTH_REFRESH_SECRET ?? 'secret_for_refresh',
-        AUTH_FORGOT_SECRET:
-          process.env.AUTH_FORGOT_SECRET ?? 'secret_for_forgot',
+          process.env.AUTH_REFRESH_SECRET ?? authRefreshSecret,
+        AUTH_FORGOT_SECRET: process.env.AUTH_FORGOT_SECRET ?? authForgotSecret,
         AUTH_CONFIRM_EMAIL_SECRET:
-          process.env.AUTH_CONFIRM_EMAIL_SECRET ?? 'secret_for_confirm_email',
+          process.env.AUTH_CONFIRM_EMAIL_SECRET ?? authConfirmSecret,
         AUTH_MFA_ENCRYPTION_KEY:
           process.env.AUTH_MFA_ENCRYPTION_KEY ??
           'test-only-mfa-encryption-key-material',
         MEDIA_SERVICE_TOKEN: mediaServiceToken,
         MEDIA_UPLOAD_GRANT_SECRET: mediaGrantSecret,
+        MEDIA_READ_GRANT_SECRET: mediaReadGrantSecret,
         MEDIA_DEFAULT_STORAGE_LOCATION_ID: 'archive',
         MEDIA_ACCOUNT_QUOTA_BYTES: '1024',
         MEDIA_MAX_UPLOAD_BYTES: '33554432',
@@ -330,7 +389,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     const contractRoutes = Object.keys(contract.paths).filter(
       (path) =>
         path.startsWith('/api/') ||
-        path.startsWith('/internal/media/v1/uploads/'),
+        (path.startsWith('/internal/media/v1/') &&
+          !path.startsWith('/internal/media/v1/storage/')),
     );
     assert.deepEqual(routes.sort(), contractRoutes.sort());
     for (const path of routes) {
@@ -429,7 +489,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .send({ email })
       .expect(204);
     const hash = await mailHash(email, '/password-change');
-    const password = 'second-test-password';
+    const password = randomCredential('Reset');
+    sensitiveSamples.push(password);
     const call = () =>
       api.post(auth + '/reset/password').send({ hash, password });
     const results = await Promise.all([call(), call()]);
@@ -495,7 +556,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     await api
       .post(auth + '/mfa/enrollment')
       .auth(first.token, { type: 'bearer' })
-      .send({ currentPassword: 'incorrect-password' })
+      .send({ currentPassword: randomCredential('Wrong') })
       .expect(422);
     const enrollment = await api
       .post(auth + '/mfa/enrollment')
@@ -672,6 +733,131 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.notEqual(firstClaim.body.attemptId, secondClaim.body.attemptId);
     await completeUpload(retried, firstClaim.body.attemptId).expect(409);
     await completeUpload(retried, secondClaim.body.attemptId).expect(204);
+  });
+
+  void it('should lease inspection idempotently and revoke prior read grants immediately', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await register(email);
+    await confirm(email);
+    const signedIn = await login(email);
+    const upload = await createUpload(signedIn.token, 384);
+    const uploadClaim = await claimUpload(upload).expect(200);
+    await completeUpload(upload, uploadClaim.body.attemptId).expect(204);
+
+    const uploads = db.db().collection<UploadRecord>('mediaUploads');
+    await uploads.updateMany(
+      { _id: { $ne: upload.uploadId }, status: 'Completed' },
+      { $set: { processingStatus: 'Failed' } },
+    );
+
+    await api.post('/internal/media/v1/inspections/lease').send({}).expect(401);
+    const firstLease = await leaseInspection().expect(200);
+    assert.equal(firstLease.body.jobId, upload.uploadId);
+    assert.match(firstLease.body.previewObject.fileKey, /^[a-f0-9]{64}$/);
+    assert.notEqual(
+      firstLease.body.previewObject.fileKey,
+      firstLease.body.object.fileKey,
+    );
+    await leaseInspection().expect(204);
+
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { inspectionLeaseExpiresAt: new Date(Date.now() - 1_000) } },
+    );
+    const secondLease = await leaseInspection().expect(200);
+    assert.notEqual(firstLease.body.attemptId, secondLease.body.attemptId);
+    assert.notEqual(
+      firstLease.body.previewObject.fileKey,
+      secondLease.body.previewObject.fileKey,
+    );
+
+    const acceptedResult = {
+      attemptId: secondLease.body.attemptId as string,
+      outcome: 'inspected',
+      length: upload.length,
+      sha256: upload.sha256,
+      contentType: 'image/png',
+      previewObject: secondLease.body.previewObject as Record<string, string>,
+      previewLength: upload.length,
+      previewSha256: upload.sha256,
+      previewContentType: 'image/png',
+    };
+    await completeInspection(upload.uploadId, {
+      ...acceptedResult,
+      attemptId: firstLease.body.attemptId,
+      previewObject: firstLease.body.previewObject,
+    }).expect(409);
+    await completeInspection(upload.uploadId, {
+      ...acceptedResult,
+      previewObject: {
+        ...secondLease.body.previewObject,
+        fileKey: '0'.repeat(64),
+      },
+    }).expect(422);
+    await completeInspection(upload.uploadId, acceptedResult).expect(204);
+    await completeInspection(upload.uploadId, acceptedResult).expect(204);
+    await completeInspection(upload.uploadId, {
+      ...acceptedResult,
+      previewSha256: '0'.repeat(64),
+    }).expect(409);
+
+    const asset = await api
+      .get(`/api/v1/media/assets/${upload.uploadId}`)
+      .auth(signedIn.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(asset.body.processingStatus, 'Ready');
+    assert.deepEqual(asset.body.variants, ['original', 'preview']);
+
+    const previewGrant = await createReadGrant(
+      signedIn.token,
+      upload.uploadId,
+      'preview',
+    );
+    assert.equal(
+      previewGrant.url,
+      `${upload.uploadUrl.replace('/uploads/', '/assets/')}/preview`,
+    );
+    await api
+      .post(`/internal/media/v1/assets/${upload.uploadId}/authorize-read`)
+      .send({ variant: 'preview', grant: previewGrant.grant })
+      .expect(401);
+    const previewDecision = await authorizeRead(
+      upload.uploadId,
+      'preview',
+      previewGrant.grant,
+    ).expect(200);
+    assert.equal(
+      previewDecision.body.object.fileKey,
+      secondLease.body.previewObject.fileKey,
+    );
+    await authorizeRead(upload.uploadId, 'original', previewGrant.grant).expect(
+      403,
+    );
+
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { accessStatus: 'Hidden' } },
+    );
+    const hidden = await authorizeRead(
+      upload.uploadId,
+      'preview',
+      previewGrant.grant,
+    ).expect(403);
+    assert.equal(hidden.body.code, 'media_access_revoked');
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { accessStatus: 'Active' } },
+    );
+    await api
+      .post(auth + '/logout')
+      .auth(signedIn.token, { type: 'bearer' })
+      .expect(204);
+    const revoked = await authorizeRead(
+      upload.uploadId,
+      'preview',
+      previewGrant.grant,
+    ).expect(403);
+    assert.equal(revoked.body.code, 'media_session_revoked');
   });
 
   void it('should enforce quota and release an expired reservation transactionally', async () => {

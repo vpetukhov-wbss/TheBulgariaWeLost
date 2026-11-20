@@ -37,6 +37,10 @@ export type { GetBackOfficePrincipal$Params as GetBackOfficePrincipal$Params } f
 export { getBackOfficePrincipal as getBackOfficePrincipal } from './fn/back-office/get-back-office-principal';
 export type { CreateUploadSession$Params as CreateUploadSession$Params } from './fn/media/create-upload-session';
 export { createUploadSession as createUploadSession } from './fn/media/create-upload-session';
+export type { GetMediaAsset$Params as GetMediaAsset$Params } from './fn/media/get-media-asset';
+export { getMediaAsset as getMediaAsset } from './fn/media/get-media-asset';
+export type { CreateMediaReadGrant$Params as CreateMediaReadGrant$Params } from './fn/media/create-media-read-grant';
+export { createMediaReadGrant as createMediaReadGrant } from './fn/media/create-media-read-grant';
 export type { UploadMedia$Params as UploadMedia$Params } from './fn/media/upload-media';
 export { uploadMedia as uploadMedia } from './fn/media/upload-media';
 export type { ReadMedia$Params as ReadMedia$Params } from './fn/media/read-media';

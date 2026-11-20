@@ -64,7 +64,9 @@ npm run seed:dev
 
 .NET Media API използва частните `POST /internal/media/v1/uploads/{uploadId}/claim` и `/complete` със собствен `MEDIA_SERVICE_TOKEN`. Claim-ът е атомарен lease. Изтекъл lease допуска нов `attemptId`, а completion от стария опит се отказва. Еднакъв повторен completion връща `204`; различен размер, checksum или резултат връща конфликт или validation error. Изтекла или прекратена потребителска сесия не може да claim-не качването.
 
-За production задай независими `MEDIA_SERVICE_TOKEN` и `MEDIA_UPLOAD_GRANT_SECRET` с поне 32 символа. `MEDIA_MAX_UPLOAD_BYTES` трябва да съвпада с лимита на .NET Media API. `MEDIA_ACCOUNT_QUOTA_BYTES`, `MEDIA_UPLOAD_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_UPLOAD_LEASE_SECONDS` и `MEDIA_DEFAULT_STORAGE_LOCATION_ID` управляват квотата, сроковете и routing целта.
+След потвърдено качване `POST /internal/media/v1/inspections/lease` отдава оригинала и отделна, специфична за опита цел за preview. NestJS приема резултат само от текущия `attemptId`, а еднакво повторно потвърждение е идемпотентно. `GET /api/v1/media/assets/{assetId}` показва състоянието, а `POST /api/v1/media/assets/{assetId}/read-grants` издава краткотрайно разрешение за `original` или `preview`. То е обвързано с текущата auth сесия, версията на достъпа и варианта. Скрит, ограничен или премахнат запис се отказва незабавно, включително с издадено по-рано разрешение.
+
+За production задай независими `MEDIA_SERVICE_TOKEN`, `MEDIA_UPLOAD_GRANT_SECRET` и `MEDIA_READ_GRANT_SECRET` с поне 32 символа. `MEDIA_MAX_UPLOAD_BYTES` трябва да съвпада с лимита на .NET Media API. `MEDIA_ACCOUNT_QUOTA_BYTES`, `MEDIA_UPLOAD_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_UPLOAD_LEASE_SECONDS`, `MEDIA_READ_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_INSPECTION_LEASE_SECONDS` и `MEDIA_DEFAULT_STORAGE_LOCATION_ID` управляват квотата, сроковете и routing целта.
 
 ## Проверки
 

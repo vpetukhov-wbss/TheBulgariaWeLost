@@ -1,17 +1,33 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Type } from 'class-transformer';
 import {
   IsEnum,
   IsInt,
+  IsOptional,
   IsString,
   IsUUID,
   Matches,
   Max,
   MaxLength,
   Min,
+  ValidateNested,
 } from 'class-validator';
 import { UploadPurpose } from '../persistence/media-upload.schema';
 
 const sha256Pattern = /^[a-f0-9]{64}$/;
+const contentTypePattern = /^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i;
+
+export enum MediaVariant {
+  Original = 'original',
+  Preview = 'preview',
+}
+
+export enum InspectionOutcome {
+  Inspected = 'inspected',
+  Missing = 'missing',
+  IntegrityMismatch = 'integrity_mismatch',
+  UnsupportedFormat = 'unsupported_format',
+}
 
 export class CreateUploadDto {
   @ApiProperty({ enum: UploadPurpose })
@@ -75,15 +91,19 @@ export class UploadReceiptDto {
   @ApiProperty({ example: 'image/png', maxLength: 255 })
   @IsString()
   @MaxLength(255)
-  @Matches(/^[a-z0-9][a-z0-9.+-]*\/[a-z0-9][a-z0-9.+-]*$/i)
+  @Matches(contentTypePattern)
   contentType: string;
 }
 
 export class ObjectReferenceDto {
   @ApiProperty()
+  @IsString()
+  @MaxLength(100)
   storageLocationId: string;
 
   @ApiProperty({ pattern: '^[a-f0-9]{64}$' })
+  @IsString()
+  @Matches(sha256Pattern)
   fileKey: string;
 }
 
@@ -102,4 +122,132 @@ export class UploadClaimDto {
 
   @ApiProperty({ pattern: '^[a-f0-9]{64}$' })
   sha256: string;
+}
+
+export class MediaAssetDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty({ enum: ['Pending', 'Claimed', 'Ready', 'Failed'] })
+  processingStatus: string;
+
+  @ApiPropertyOptional()
+  contentType?: string;
+
+  @ApiProperty({ type: [String], enum: MediaVariant })
+  variants: MediaVariant[];
+}
+
+export class CreateReadGrantDto {
+  @ApiProperty({ enum: MediaVariant })
+  @IsEnum(MediaVariant)
+  variant: MediaVariant;
+}
+
+export class ReadGrantDto {
+  @ApiProperty({ format: 'uuid' })
+  assetId: string;
+
+  @ApiProperty({ enum: MediaVariant })
+  variant: MediaVariant;
+
+  @ApiProperty()
+  grant: string;
+
+  @ApiProperty()
+  url: string;
+
+  @ApiProperty({ format: 'date-time' })
+  expiresAtUtc: string;
+}
+
+export class AuthorizeReadRequestDto extends GrantRequestDto {
+  @ApiProperty({ enum: MediaVariant })
+  @IsEnum(MediaVariant)
+  variant: MediaVariant;
+}
+
+export class ReadDecisionDto {
+  @ApiProperty({ type: ObjectReferenceDto })
+  object: ObjectReferenceDto;
+
+  @ApiProperty({ format: 'int64' })
+  length: number;
+
+  @ApiProperty()
+  contentType: string;
+}
+
+export class InspectionLeaseDto {
+  @ApiProperty({ format: 'uuid' })
+  jobId: string;
+
+  @ApiProperty({ format: 'uuid' })
+  attemptId: string;
+
+  @ApiProperty({ type: ObjectReferenceDto })
+  object: ObjectReferenceDto;
+
+  @ApiProperty({ type: ObjectReferenceDto })
+  previewObject: ObjectReferenceDto;
+
+  @ApiProperty({ format: 'int64' })
+  length: number;
+
+  @ApiProperty({ pattern: '^[a-f0-9]{64}$' })
+  sha256: string;
+}
+
+export class InspectionResultDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID('7')
+  attemptId: string;
+
+  @ApiProperty({ enum: InspectionOutcome })
+  @IsEnum(InspectionOutcome)
+  outcome: InspectionOutcome;
+
+  @ApiPropertyOptional({ format: 'int64', minimum: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  length?: number;
+
+  @ApiPropertyOptional({ pattern: '^[a-f0-9]{64}$' })
+  @IsOptional()
+  @IsString()
+  @Matches(sha256Pattern)
+  sha256?: string;
+
+  @ApiPropertyOptional({ maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Matches(contentTypePattern)
+  contentType?: string;
+
+  @ApiPropertyOptional({ type: ObjectReferenceDto })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ObjectReferenceDto)
+  previewObject?: ObjectReferenceDto;
+
+  @ApiPropertyOptional({ format: 'int64', minimum: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  previewLength?: number;
+
+  @ApiPropertyOptional({ pattern: '^[a-f0-9]{64}$' })
+  @IsOptional()
+  @IsString()
+  @Matches(sha256Pattern)
+  previewSha256?: string;
+
+  @ApiPropertyOptional({ maxLength: 255 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(255)
+  @Matches(contentTypePattern)
+  previewContentType?: string;
 }

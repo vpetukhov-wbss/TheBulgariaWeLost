@@ -17,13 +17,26 @@ import { uuidv7 } from 'uuidv7';
 import { AuthService } from '../auth/auth.service';
 import type { AllConfigType } from '../config/config.type';
 import type {
+  AuthorizeReadRequestDto,
   CreateUploadDto,
+  CreateReadGrantDto,
+  InspectionLeaseDto,
+  InspectionResultDto,
+  MediaAssetDto,
+  ReadDecisionDto,
+  ReadGrantDto,
   UploadClaimDto,
   UploadReceiptDto,
   UploadSessionDto,
 } from './dto/media-upload.dto';
+import { InspectionOutcome, MediaVariant } from './dto/media-upload.dto';
 import { MediaQuota } from './persistence/media-quota.schema';
-import { MediaUpload, UploadStatus } from './persistence/media-upload.schema';
+import {
+  MediaAccessStatus,
+  MediaUpload,
+  ProcessingStatus,
+  UploadStatus,
+} from './persistence/media-upload.schema';
 
 interface UploadGrantClaims {
   purpose: 'media-upload';
@@ -33,6 +46,15 @@ interface UploadGrantClaims {
   usage: string;
   maxBytes: number;
   attemptVersion: number;
+}
+
+interface ReadGrantClaims {
+  purpose: 'media-read';
+  sub: string;
+  sessionId: string;
+  assetId: string;
+  variant: MediaVariant;
+  accessVersion: number;
 }
 
 @Injectable()
@@ -246,6 +268,10 @@ export class MediaService {
           completedAttemptId: receipt.attemptId,
           completedAt,
           contentType: receipt.contentType,
+          processingStatus: ProcessingStatus.Pending,
+          accessStatus: MediaAccessStatus.Active,
+          accessVersion: upload.accessVersion || 1,
+          schemaVersion: 2,
         },
         $unset: { activeAttemptId: 1, leaseExpiresAt: 1 },
       },
@@ -255,6 +281,211 @@ export class MediaService {
     const concurrent = await this.uploads.findById(uploadId).exec();
     if (concurrent && this.sameReceipt(concurrent, receipt)) return;
     throw new ConflictException({ code: 'upload_completion_conflict' });
+  }
+
+  async getAsset(accountId: string, assetId: string): Promise<MediaAssetDto> {
+    const asset = await this.uploads
+      .findOne({ _id: assetId, accountId, status: UploadStatus.Completed })
+      .exec();
+    if (!asset) throw new NotFoundException({ code: 'media_not_found' });
+    return {
+      id: asset._id,
+      processingStatus: asset.processingStatus ?? ProcessingStatus.Pending,
+      ...(asset.contentType ? { contentType: asset.contentType } : {}),
+      variants:
+        asset.processingStatus === ProcessingStatus.Ready
+          ? [MediaVariant.Original, MediaVariant.Preview]
+          : [],
+    };
+  }
+
+  async createReadGrant(
+    accountId: string,
+    sessionId: string,
+    assetId: string,
+    dto: CreateReadGrantDto,
+  ): Promise<ReadGrantDto> {
+    const asset = await this.uploads.findById(assetId).exec();
+    if (!asset || asset.accountId !== accountId) {
+      throw new NotFoundException({ code: 'media_not_found' });
+    }
+    this.requireReadable(asset, dto.variant);
+
+    const expiresSeconds = this.value('readGrantExpiresSeconds');
+    const expiresAt = new Date(Date.now() + expiresSeconds * 1_000);
+    const grant = await this.jwt.signAsync(
+      {
+        purpose: 'media-read',
+        sub: accountId,
+        sessionId,
+        assetId,
+        variant: dto.variant,
+        accessVersion: asset.accessVersion,
+      } satisfies ReadGrantClaims,
+      {
+        secret: this.config.getOrThrow('media.readGrantSecret', {
+          infer: true,
+        }),
+        algorithm: 'HS256',
+        audience: 'media-read',
+        expiresIn: expiresSeconds,
+      },
+    );
+    return {
+      assetId,
+      variant: dto.variant,
+      grant,
+      url: `/media/v1/assets/${assetId}/${dto.variant}`,
+      expiresAtUtc: expiresAt.toISOString(),
+    };
+  }
+
+  async authorizeRead(
+    assetId: string,
+    dto: AuthorizeReadRequestDto,
+  ): Promise<ReadDecisionDto> {
+    const claims = await this.verifyReadGrant(dto.grant);
+    if (claims.assetId !== assetId || claims.variant !== dto.variant) {
+      this.invalidReadGrant();
+    }
+    const asset = await this.uploads.findById(assetId).exec();
+    if (!asset) throw new NotFoundException({ code: 'media_not_found' });
+    if (
+      asset.accountId !== claims.sub ||
+      asset.accessVersion !== claims.accessVersion
+    ) {
+      this.invalidReadGrant();
+    }
+    await this.requireActiveSession(
+      asset.accountId,
+      claims.sessionId,
+      'media_session_revoked',
+    );
+    this.requireReadable(asset, dto.variant);
+    return dto.variant === MediaVariant.Original
+      ? {
+          object: {
+            storageLocationId: asset.storageLocationId,
+            fileKey: asset.fileKey,
+          },
+          length: asset.length,
+          contentType: asset.contentType as string,
+        }
+      : {
+          object: {
+            storageLocationId: asset.previewStorageLocationId as string,
+            fileKey: asset.previewFileKey as string,
+          },
+          length: asset.previewLength as number,
+          contentType: asset.previewContentType as string,
+        };
+  }
+
+  async leaseInspection(): Promise<InspectionLeaseDto | null> {
+    const now = new Date();
+    const attemptId = uuidv7();
+    const previewFileKey = randomBytes(32).toString('hex');
+    const leaseExpiresAt = new Date(
+      now.getTime() + this.value('inspectionLeaseSeconds') * 1_000,
+    );
+    const claimed = await this.uploads
+      .findOneAndUpdate(
+        {
+          status: UploadStatus.Completed,
+          $or: [
+            { processingStatus: ProcessingStatus.Pending },
+            {
+              processingStatus: ProcessingStatus.Claimed,
+              inspectionLeaseExpiresAt: { $lte: now },
+            },
+          ],
+        },
+        {
+          $set: {
+            processingStatus: ProcessingStatus.Claimed,
+            inspectionAttemptId: attemptId,
+            inspectionLeaseExpiresAt: leaseExpiresAt,
+            inspectionPreviewFileKey: previewFileKey,
+          },
+        },
+        { new: true, sort: { completedAt: 1 } },
+      )
+      .exec();
+    if (!claimed) return null;
+    return {
+      jobId: claimed._id,
+      attemptId,
+      object: {
+        storageLocationId: claimed.storageLocationId,
+        fileKey: claimed.fileKey,
+      },
+      previewObject: {
+        storageLocationId: claimed.storageLocationId,
+        fileKey: previewFileKey,
+      },
+      length: claimed.length,
+      sha256: claimed.sha256,
+    };
+  }
+
+  async completeInspection(
+    jobId: string,
+    result: InspectionResultDto,
+  ): Promise<void> {
+    const asset = await this.uploads.findById(jobId).exec();
+    if (!asset) throw new NotFoundException({ code: 'media_not_found' });
+    if (
+      asset.processingStatus === ProcessingStatus.Ready ||
+      asset.processingStatus === ProcessingStatus.Failed
+    ) {
+      if (this.sameInspectionResult(asset, result)) return;
+      throw new ConflictException({ code: 'inspection_completion_conflict' });
+    }
+    if (
+      asset.processingStatus !== ProcessingStatus.Claimed ||
+      asset.inspectionAttemptId !== result.attemptId
+    ) {
+      throw new ConflictException({ code: 'inspection_attempt_mismatch' });
+    }
+    this.validateInspectionResult(asset, result);
+
+    const inspected = result.outcome === InspectionOutcome.Inspected;
+    const completedAt = new Date();
+    const set: Record<string, unknown> = {
+      processingStatus: inspected
+        ? ProcessingStatus.Ready
+        : ProcessingStatus.Failed,
+      inspectionCompletedAttemptId: result.attemptId,
+      inspectionOutcome: result.outcome,
+      inspectedAt: completedAt,
+    };
+    if (inspected) {
+      set.previewStorageLocationId = result.previewObject?.storageLocationId;
+      set.previewFileKey = result.previewObject?.fileKey;
+      set.previewLength = result.previewLength;
+      set.previewSha256 = result.previewSha256;
+      set.previewContentType = result.previewContentType;
+    }
+    const completed = await this.uploads.updateOne(
+      {
+        _id: jobId,
+        processingStatus: ProcessingStatus.Claimed,
+        inspectionAttemptId: result.attemptId,
+      },
+      {
+        $set: set,
+        $unset: {
+          inspectionAttemptId: 1,
+          inspectionLeaseExpiresAt: 1,
+          inspectionPreviewFileKey: 1,
+        },
+      },
+    );
+    if (completed.modifiedCount) return;
+
+    const concurrent = await this.uploads.findById(jobId).exec();
+    if (concurrent && this.sameInspectionResult(concurrent, result)) return;
+    throw new ConflictException({ code: 'inspection_completion_conflict' });
   }
 
   private async releaseExpiredReservations(
@@ -367,6 +598,32 @@ export class MediaService {
     }
   }
 
+  private async verifyReadGrant(grant: string): Promise<ReadGrantClaims> {
+    try {
+      const claims = await this.jwt.verifyAsync<ReadGrantClaims>(grant, {
+        secret: this.config.getOrThrow('media.readGrantSecret', {
+          infer: true,
+        }),
+        algorithms: ['HS256'],
+        audience: 'media-read',
+      });
+      if (
+        claims.purpose !== 'media-read' ||
+        !isUUID(claims.sub, '7') ||
+        !isUUID(claims.sessionId, '7') ||
+        !isUUID(claims.assetId, '7') ||
+        !Object.values(MediaVariant).includes(claims.variant) ||
+        !Number.isSafeInteger(claims.accessVersion)
+      ) {
+        this.invalidReadGrant();
+      }
+      return claims;
+    } catch (error: unknown) {
+      if (error instanceof ForbiddenException) throw error;
+      this.invalidReadGrant();
+    }
+  }
+
   private matchesGrant(
     upload: MediaUpload,
     claims: UploadGrantClaims,
@@ -383,12 +640,13 @@ export class MediaService {
   private async requireActiveSession(
     accountId: string,
     sessionId: string,
+    code = 'upload_session_revoked',
   ): Promise<void> {
     try {
       await this.auth.activeSession(sessionId, accountId);
     } catch (error: unknown) {
       if (error instanceof UnauthorizedException) {
-        throw new ForbiddenException({ code: 'upload_session_revoked' });
+        throw new ForbiddenException({ code });
       }
       throw error;
     }
@@ -404,8 +662,110 @@ export class MediaService {
     );
   }
 
+  private requireReadable(asset: MediaUpload, variant: MediaVariant): void {
+    if (
+      asset.status !== UploadStatus.Completed ||
+      asset.processingStatus !== ProcessingStatus.Ready
+    ) {
+      throw new ConflictException({ code: 'media_processing_incomplete' });
+    }
+    if (asset.accessStatus !== MediaAccessStatus.Active) {
+      throw new ForbiddenException({ code: 'media_access_revoked' });
+    }
+    if (!asset.contentType) {
+      throw new ConflictException({ code: 'media_metadata_incomplete' });
+    }
+    if (
+      variant === MediaVariant.Preview &&
+      (!asset.previewStorageLocationId ||
+        !asset.previewFileKey ||
+        !asset.previewLength ||
+        !asset.previewContentType)
+    ) {
+      throw new ConflictException({ code: 'media_preview_unavailable' });
+    }
+  }
+
+  private validateInspectionResult(
+    asset: MediaUpload,
+    result: InspectionResultDto,
+  ): void {
+    const inspected = result.outcome === InspectionOutcome.Inspected;
+    if (!inspected) {
+      if (
+        result.length !== undefined ||
+        result.sha256 !== undefined ||
+        result.contentType !== undefined ||
+        result.previewObject !== undefined ||
+        result.previewLength !== undefined ||
+        result.previewSha256 !== undefined ||
+        result.previewContentType !== undefined
+      ) {
+        throw new UnprocessableEntityException({
+          code: 'inspection_result_invalid',
+        });
+      }
+      return;
+    }
+
+    if (
+      result.length !== asset.length ||
+      result.sha256 !== asset.sha256 ||
+      result.contentType !== asset.contentType ||
+      result.previewObject?.storageLocationId !== asset.storageLocationId ||
+      result.previewObject?.fileKey !== asset.inspectionPreviewFileKey ||
+      !result.previewLength ||
+      !result.previewSha256 ||
+      !result.previewContentType
+    ) {
+      throw new UnprocessableEntityException({
+        code: 'inspection_result_invalid',
+      });
+    }
+  }
+
+  private sameInspectionResult(
+    asset: MediaUpload,
+    result: InspectionResultDto,
+  ): boolean {
+    if (
+      asset.inspectionCompletedAttemptId !== result.attemptId ||
+      asset.inspectionOutcome !== result.outcome
+    ) {
+      return false;
+    }
+    if (result.outcome !== InspectionOutcome.Inspected) {
+      return (
+        asset.processingStatus === ProcessingStatus.Failed &&
+        result.length === undefined &&
+        result.sha256 === undefined &&
+        result.contentType === undefined &&
+        result.previewObject === undefined &&
+        result.previewLength === undefined &&
+        result.previewSha256 === undefined &&
+        result.previewContentType === undefined
+      );
+    }
+    return (
+      asset.processingStatus === ProcessingStatus.Ready &&
+      asset.length === result.length &&
+      asset.sha256 === result.sha256 &&
+      asset.contentType === result.contentType &&
+      asset.previewStorageLocationId ===
+        result.previewObject?.storageLocationId &&
+      asset.previewFileKey === result.previewObject?.fileKey &&
+      asset.previewLength === result.previewLength &&
+      asset.previewSha256 === result.previewSha256 &&
+      asset.previewContentType === result.previewContentType
+    );
+  }
+
   private invalidGrant(): never {
     throw new ForbiddenException({ code: 'invalid_upload_grant' });
+  }
+
+  private invalidReadGrant(): never {
+    throw new ForbiddenException({ code: 'invalid_media_grant' });
   }
 
   private value(key: NumericMediaConfigKey): number {
@@ -417,5 +777,7 @@ export class MediaService {
 type NumericMediaConfigKey =
   | 'uploadGrantExpiresSeconds'
   | 'uploadLeaseSeconds'
+  | 'readGrantExpiresSeconds'
+  | 'inspectionLeaseSeconds'
   | 'maxUploadBytes'
   | 'accountQuotaBytes';

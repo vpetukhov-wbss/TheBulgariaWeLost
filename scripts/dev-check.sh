@@ -42,8 +42,8 @@ before=$(compose exec -T sftp sh -c \
 node "$repository_root/scripts/dev-upload-check.mjs"
 after=$(compose exec -T sftp sh -c \
   "find /home/media/archive -maxdepth 1 -type f ! -name '*.part' | wc -l")
-if [ "$after" -ne $((before + 1)) ]; then
-  echo "Expected one new immutable SFTP object, found before=$before after=$after" >&2
+if [ "$after" -ne $((before + 2)) ]; then
+  echo "Expected original and preview SFTP objects, found before=$before after=$after" >&2
   exit 1
 fi
 printf '%-18s %s\n' 'Full upload flow' ok
