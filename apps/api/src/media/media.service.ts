@@ -130,6 +130,12 @@ export class MediaService {
               purpose: dto.purpose,
               length: dto.length,
               sha256: dto.sha256,
+              ...(dto.alternativeText
+                ? { alternativeText: dto.alternativeText }
+                : {}),
+              ...(dto.rightsEvidence
+                ? { rightsEvidence: dto.rightsEvidence }
+                : {}),
               storageLocationId,
               fileKey,
               status: UploadStatus.Pending,
@@ -292,6 +298,10 @@ export class MediaService {
       id: asset._id,
       processingStatus: asset.processingStatus ?? ProcessingStatus.Pending,
       ...(asset.contentType ? { contentType: asset.contentType } : {}),
+      ...(asset.alternativeText
+        ? { alternativeText: asset.alternativeText }
+        : {}),
+      ...(asset.rightsEvidence ? { rightsEvidence: asset.rightsEvidence } : {}),
       variants:
         asset.processingStatus === ProcessingStatus.Ready
           ? [MediaVariant.Original, MediaVariant.Preview]

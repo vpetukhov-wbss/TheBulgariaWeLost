@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsEnum,
   IsInt,
@@ -10,6 +10,7 @@ import {
   Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { UploadPurpose } from '../persistence/media-upload.schema';
@@ -44,6 +45,32 @@ export class CreateUploadDto {
   @IsString()
   @Matches(sha256Pattern)
   sha256: string;
+
+  @ApiPropertyOptional({
+    maxLength: 500,
+    description: 'Accessible description supplied by the author.',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(3)
+  @MaxLength(500)
+  alternativeText?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 2_000,
+    description: 'Source, permission or licence evidence for editorial review.',
+  })
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @IsString()
+  @MinLength(3)
+  @MaxLength(2_000)
+  rightsEvidence?: string;
 }
 
 export class UploadSessionDto {
@@ -133,6 +160,12 @@ export class MediaAssetDto {
 
   @ApiPropertyOptional()
   contentType?: string;
+
+  @ApiPropertyOptional({ maxLength: 500 })
+  alternativeText?: string;
+
+  @ApiPropertyOptional({ maxLength: 2_000 })
+  rightsEvidence?: string;
 
   @ApiProperty({ type: [String], enum: MediaVariant })
   variants: MediaVariant[];

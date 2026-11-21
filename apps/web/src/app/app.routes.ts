@@ -17,6 +17,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/account/account').then((m) => m.Account),
   },
   {
+    path: 'media/upload',
+    canActivate: [signedInGuard],
+    loadComponent: () =>
+      import('./features/media/pages/media-upload-page').then((m) => m.MediaUploadPage),
+  },
+  {
     path: 'admin',
     canActivate: [signedInGuard, backOfficeGuard],
     loadComponent: () => import('./features/back-office/back-office').then((m) => m.BackOffice),

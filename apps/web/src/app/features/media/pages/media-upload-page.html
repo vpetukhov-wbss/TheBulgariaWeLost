@@ -1,0 +1,216 @@
+<section class="upload-page" aria-labelledby="media-upload-title">
+  <header class="page-header">
+    <div>
+      <p class="eyebrow">Нов архивен материал</p>
+      <h1 id="media-upload-title">Качи снимка или PDF</h1>
+      <p>
+        Файлът остава частен, докато бъде проверен. За публикуване са нужни описание и доказателство
+        за права.
+      </p>
+    </div>
+    <a nbButton ghost status="basic" routerLink="/account">
+      <nb-icon icon="arrow-back-outline" aria-hidden="true"></nb-icon>
+      Към профила
+    </a>
+  </header>
+
+  <div class="content-grid">
+    <nb-card>
+      <nb-card-header>Файл и права</nb-card-header>
+      <nb-card-body>
+        <form [formGroup]="form" (ngSubmit)="startUpload()" novalidate>
+          <div class="field">
+            <label for="media-file">Снимка или PDF</label>
+            <input
+              #fileInput
+              id="media-file"
+              class="file-input"
+              type="file"
+              accept="image/jpeg,image/png,application/pdf,.jpg,.jpeg,.png,.pdf"
+              aria-describedby="media-file-help"
+              [disabled]="isBusy()"
+              (change)="onFileSelected($event)"
+            />
+            <small id="media-file-help">JPEG, PNG или PDF · до 32 MB</small>
+            @if (file(); as selectedFile) {
+              <div class="selected-file" role="status">
+                <nb-icon icon="file-text-outline" aria-hidden="true"></nb-icon>
+                <span>{{ selectedFile.name }}</span>
+                <span>{{ fileSize() }}</span>
+              </div>
+            }
+          </div>
+
+          <div class="field">
+            <label for="alternative-text">Алтернативен текст или описание</label>
+            <textarea
+              id="alternative-text"
+              nbInput
+              fullWidth
+              rows="4"
+              maxlength="500"
+              formControlName="alternativeText"
+              aria-describedby="alternative-text-help"
+            ></textarea>
+            <small id="alternative-text-help">
+              Опиши какво се вижда или какво съдържа документът.
+            </small>
+            @if (form.controls.alternativeText.touched && form.controls.alternativeText.invalid) {
+              <small class="field-error" role="alert">Въведи поне 3 знака.</small>
+            }
+          </div>
+
+          <div class="field">
+            <label id="rights-basis-label">Основание за използване</label>
+            <nb-select fullWidth formControlName="rightsBasis" aria-labelledby="rights-basis-label">
+              <nb-option value="own-archive">Личен или семеен архив</nb-option>
+              <nb-option value="permission">Изрично разрешение</nb-option>
+              <nb-option value="public-domain">Обществено достояние</nb-option>
+              <nb-option value="licence">Лицензирано използване</nb-option>
+            </nb-select>
+          </div>
+
+          <div class="field">
+            <label for="rights-evidence">Доказателство за права и произход</label>
+            <textarea
+              id="rights-evidence"
+              nbInput
+              fullWidth
+              rows="4"
+              maxlength="2000"
+              formControlName="rightsEvidence"
+              aria-describedby="rights-evidence-help"
+            ></textarea>
+            <small id="rights-evidence-help">
+              Посочи собственик, източник, лиценз или къде се пази разрешението.
+            </small>
+            @if (form.controls.rightsEvidence.touched && form.controls.rightsEvidence.invalid) {
+              <small class="field-error" role="alert">Въведи поне 3 знака.</small>
+            }
+          </div>
+
+          <div class="form-actions">
+            <button nbButton status="primary" type="submit" [disabled]="!canSubmit()">
+              Качи и провери
+            </button>
+            @if (file()) {
+              <button
+                nbButton
+                status="basic"
+                type="button"
+                [disabled]="isBusy()"
+                (click)="replaceFile()"
+              >
+                Смени файла
+              </button>
+            }
+          </div>
+        </form>
+      </nb-card-body>
+    </nb-card>
+
+    <div class="status-column">
+      <nb-card>
+        <nb-card-header>Състояние</nb-card-header>
+        <nb-card-body aria-live="polite">
+          @switch (stage()) {
+            @case ('idle') {
+              <p class="empty-state">Избери файл и попълни данните за права.</p>
+            }
+            @case ('hashing') {
+              <div class="working" role="status" [nbSpinner]="true">
+                <strong>Подготвяне на файла</strong>
+                <span>Изчислява се контролна сума…</span>
+              </div>
+            }
+            @case ('creating-session') {
+              <div class="working" role="status" [nbSpinner]="true">
+                <strong>Създаване на защитена сесия</strong>
+                <span>Проверяват се квотата и правата…</span>
+              </div>
+            }
+            @case ('uploading') {
+              <div class="working" role="status">
+                <strong>Качване · {{ uploadPercent() }}%</strong>
+                <nb-progress-bar [value]="uploadPercent()" status="primary"></nb-progress-bar>
+                <span>Не затваряй страницата, докато трансферът завърши.</span>
+              </div>
+            }
+            @case ('processing') {
+              <div class="working" role="status" [nbSpinner]="true">
+                <strong>Проверка и безопасен преглед</strong>
+                <span>Статус: {{ processingStatus() || 'Pending' }}</span>
+              </div>
+            }
+            @case ('failed') {
+              <nb-alert status="danger" role="alert">{{ message() }}</nb-alert>
+              <div class="status-actions">
+                <button
+                  nbButton
+                  status="primary"
+                  type="button"
+                  [disabled]="!canSubmit()"
+                  (click)="startUpload()"
+                >
+                  Опитай отново
+                </button>
+                <button nbButton status="basic" type="button" (click)="replaceFile()">
+                  Избери друг файл
+                </button>
+              </div>
+            }
+            @case ('restricted') {
+              <nb-alert status="warning" role="alert">{{ message() }}</nb-alert>
+              <button nbButton status="basic" type="button" (click)="replaceFile()">
+                Избери друг файл
+              </button>
+            }
+            @case ('ready') {
+              <nb-alert status="success" role="status">{{ message() }}</nb-alert>
+            }
+          }
+        </nb-card-body>
+      </nb-card>
+
+      @if (preview(); as currentPreview) {
+        <nb-card class="preview-card">
+          <nb-card-header>Защитен преглед</nb-card-header>
+          <nb-card-body>
+            @if (isImagePreview()) {
+              <img [src]="currentPreview.objectUrl" [alt]="form.controls.alternativeText.value" />
+            } @else {
+              <div class="pdf-preview" role="group" aria-label="Защитен преглед на PDF документа">
+                <nb-icon icon="file-text-outline" aria-hidden="true"></nb-icon>
+                <strong>PDF документът е готов за преглед</strong>
+                <span>Файлът е изтеглен чрез краткотрайно разрешение.</span>
+                <a
+                  nbButton
+                  status="basic"
+                  [href]="currentPreview.objectUrl"
+                  target="_blank"
+                  rel="noopener"
+                >
+                  Отвори PDF документа
+                </a>
+              </div>
+            }
+            <dl>
+              <div>
+                <dt>Статус</dt>
+                <dd>{{ currentPreview.asset.processingStatus }}</dd>
+              </div>
+              <div>
+                <dt>Формат</dt>
+                <dd>{{ currentPreview.contentType }}</dd>
+              </div>
+              <div>
+                <dt>Достъп</dt>
+                <dd>Частен защитен преглед</dd>
+              </div>
+            </dl>
+          </nb-card-body>
+        </nb-card>
+      }
+    </div>
+  </div>
+</section>
