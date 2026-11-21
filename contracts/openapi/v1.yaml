@@ -930,6 +930,16 @@ components:
         sha256:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        alternativeText:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: Accessible description supplied by the author.
+        rightsEvidence:
+          type: string
+          minLength: 3
+          maxLength: 2000
+          description: Source, permission or licence evidence for editorial review.
     UploadSession:
       type: object
       additionalProperties: false
@@ -966,6 +976,12 @@ components:
           enum: [Pending, Claimed, Ready, Failed]
         contentType:
           type: string
+        alternativeText:
+          type: string
+          maxLength: 500
+        rightsEvidence:
+          type: string
+          maxLength: 2000
         variants:
           type: array
           uniqueItems: true

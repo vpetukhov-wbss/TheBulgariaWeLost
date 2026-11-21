@@ -82,6 +82,8 @@ interface UploadRecord {
   leaseExpiresAt?: Date;
   activeAttemptId?: string;
   contentType?: string;
+  alternativeText?: string;
+  rightsEvidence?: string;
   processingStatus?: string;
   inspectionLeaseExpiresAt?: Date;
   inspectionAttemptId?: string;
@@ -161,6 +163,7 @@ async function login(
 async function createUpload(
   token: string,
   length = 128,
+  metadata: { alternativeText?: string; rightsEvidence?: string } = {},
 ): Promise<UploadSession> {
   const sha256 = createHash('sha256')
     .update(`${randomUUID()}:${length}`)
@@ -168,7 +171,7 @@ async function createUpload(
   const response = await api
     .post('/api/v1/media/uploads')
     .auth(token, { type: 'bearer' })
-    .send({ purpose: 'material-original', length, sha256 })
+    .send({ purpose: 'material-original', length, sha256, ...metadata })
     .expect(201);
   const session = response.body as Omit<UploadSession, 'length' | 'sha256'>;
   sensitiveSamples.push(session.grant);
@@ -641,7 +644,10 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     await register(email);
     await confirm(email);
     const signedIn = await login(email);
-    const upload = await createUpload(signedIn.token, 256);
+    const upload = await createUpload(signedIn.token, 256, {
+      alternativeText: 'Архивна снимка на заводския двор.',
+      rightsEvidence: 'Личен архив; писмено разрешение от дарителя.',
+    });
     assert.match(upload.uploadUrl, new RegExp(`${upload.uploadId}$`));
     assert.equal(upload.maxBytes, upload.length);
     assert.equal(upload.attemptVersion, 1);
@@ -653,6 +659,14 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.equal(persisted?.storageLocationId, 'archive');
     assert.match(persisted?.fileKey ?? '', /^[a-f0-9]{64}$/);
     assert.match(persisted?.sessionId ?? '', /^[0-9a-f-]{36}$/);
+    assert.equal(
+      persisted?.alternativeText,
+      'Архивна снимка на заводския двор.',
+    );
+    assert.equal(
+      persisted?.rightsEvidence,
+      'Личен архив; писмено разрешение от дарителя.',
+    );
 
     await api
       .post(`/internal/media/v1/uploads/${upload.uploadId}/claim`)
@@ -698,6 +712,19 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .findOne({ _id: upload.uploadId });
     assert.equal(completed?.status, 'Completed');
     assert.equal(completed?.contentType, 'image/png');
+
+    const asset = await api
+      .get(`/api/v1/media/assets/${upload.uploadId}`)
+      .auth(signedIn.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(
+      asset.body.alternativeText,
+      'Архивна снимка на заводския двор.',
+    );
+    assert.equal(
+      asset.body.rightsEvidence,
+      'Личен архив; писмено разрешение от дарителя.',
+    );
   });
 
   void it('should reject revoked and expired sessions and replace an expired claim lease', async () => {

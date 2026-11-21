@@ -16,6 +16,7 @@
           Работен панел
         </a>
         <ng-template [nbIsGranted]="['view', 'account']">
+          <a nbButton ghost status="primary" routerLink="/media/upload">Качи файл</a>
           <a nbButton ghost status="primary" routerLink="/account">Профил</a>
           <button nbButton ghost [disabled]="signingOut()" (click)="logout()">Изход</button>
         </ng-template>

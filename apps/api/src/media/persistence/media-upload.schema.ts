@@ -52,6 +52,12 @@ export class MediaUpload {
   @Prop({ required: true })
   sha256: string;
 
+  @Prop({ maxlength: 500 })
+  alternativeText?: string;
+
+  @Prop({ maxlength: 2_000 })
+  rightsEvidence?: string;
+
   @Prop({ required: true })
   storageLocationId: string;
 
