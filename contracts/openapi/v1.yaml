@@ -982,6 +982,11 @@ components:
         rightsEvidence:
           type: string
           maxLength: 2000
+        correlationId:
+          type: string
+          maxLength: 128
+          pattern: "^[A-Za-z0-9._:-]+$"
+          description: Correlation ID captured when the upload session was created.
         variants:
           type: array
           uniqueItems: true

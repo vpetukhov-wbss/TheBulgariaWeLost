@@ -22,6 +22,9 @@ public static class ControlPlaneModule
                 "Configure a distinct service token in MediaControl:ServiceToken.")
             .ValidateOnStart();
 
+        services.AddHttpContextAccessor();
+        services.AddTransient<CorrelationIdForwardingHandler>();
+
         services.AddHttpClient<MediaControlClient>((provider, client) =>
         {
             var options = provider.GetRequiredService<IOptions<MediaControlOptions>>().Value;
@@ -29,7 +32,8 @@ public static class ControlPlaneModule
             client.Timeout = TimeSpan.FromSeconds(8);
             client.MaxResponseContentBufferSize = 64 * 1024;
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ServiceToken);
-        }).ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
+        }).AddHttpMessageHandler<CorrelationIdForwardingHandler>()
+            .ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler { AllowAutoRedirect = false });
 
         return services;
     }

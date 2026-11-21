@@ -42,6 +42,28 @@ public sealed class TransferTests
     }
 
     [Fact]
+    public async Task Upload_forwards_the_correlation_id_to_every_control_plane_call()
+    {
+        await using var app = new MediaApp();
+        using var client = app.CreateClient();
+        const string correlationId = "media-vertical-slice-1";
+        using var content = new ByteArrayContent(MediaApp.Png);
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put, $"/media/v1/uploads/{MediaApp.UploadId:D}")
+        {
+            Content = content
+        };
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", MediaApp.UploadGrant);
+        request.Headers.Add("X-Correlation-ID", correlationId);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NoContent, response.StatusCode);
+        Assert.Equal(correlationId, response.Headers.GetValues("X-Correlation-ID").Single());
+        Assert.Equal([correlationId, correlationId], app.Control.CorrelationIds);
+    }
+
+    [Fact]
     public async Task Retrying_after_failed_acknowledgement_does_not_publish_a_second_object()
     {
         await using var app = new MediaApp();

@@ -73,6 +73,7 @@ export class MediaService {
   async createUpload(
     accountId: string,
     sessionId: string,
+    correlationId: string,
     dto: CreateUploadDto,
   ): Promise<UploadSessionDto> {
     const maxUploadBytes = this.value('maxUploadBytes');
@@ -124,9 +125,10 @@ export class MediaService {
           [
             {
               _id: uploadId,
-              schemaVersion: 1,
+              schemaVersion: 3,
               accountId,
               sessionId,
+              correlationId,
               purpose: dto.purpose,
               length: dto.length,
               sha256: dto.sha256,
@@ -277,7 +279,7 @@ export class MediaService {
           processingStatus: ProcessingStatus.Pending,
           accessStatus: MediaAccessStatus.Active,
           accessVersion: upload.accessVersion || 1,
-          schemaVersion: 2,
+          schemaVersion: 3,
         },
         $unset: { activeAttemptId: 1, leaseExpiresAt: 1 },
       },
@@ -302,6 +304,7 @@ export class MediaService {
         ? { alternativeText: asset.alternativeText }
         : {}),
       ...(asset.rightsEvidence ? { rightsEvidence: asset.rightsEvidence } : {}),
+      ...(asset.correlationId ? { correlationId: asset.correlationId } : {}),
       variants:
         asset.processingStatus === ProcessingStatus.Ready
           ? [MediaVariant.Original, MediaVariant.Preview]

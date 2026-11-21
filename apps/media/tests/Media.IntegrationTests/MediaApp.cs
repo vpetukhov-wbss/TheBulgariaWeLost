@@ -112,6 +112,7 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         public bool FailNextCompletion { get; set; }
         public int ReadChecks { get; private set; }
         public List<UploadReceipt> Receipts { get; } = [];
+        public List<string?> CorrelationIds { get; } = [];
         public byte[] ExpectedBytes { get; set; } = Png;
 
         protected override async Task<HttpResponseMessage> SendAsync(
@@ -119,6 +120,10 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         {
             if (request.Headers.Authorization?.Parameter != ServiceToken)
                 return new HttpResponseMessage(HttpStatusCode.Unauthorized);
+
+            CorrelationIds.Add(request.Headers.TryGetValues("X-Correlation-ID", out var values)
+                ? values.SingleOrDefault()
+                : null);
 
             var path = request.RequestUri?.AbsolutePath;
             var location = new ObjectReference("archive", FileKey);

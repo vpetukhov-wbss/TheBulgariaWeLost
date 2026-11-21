@@ -56,6 +56,7 @@ export class MediaUploadController {
     return this.media.createUpload(
       request.user.profile.id,
       request.user.sessionId,
+      request.correlationId,
       dto,
     );
   }

@@ -84,6 +84,8 @@ interface UploadRecord {
   contentType?: string;
   alternativeText?: string;
   rightsEvidence?: string;
+  correlationId?: string;
+  schemaVersion?: number;
   processingStatus?: string;
   inspectionLeaseExpiresAt?: Date;
   inspectionAttemptId?: string;
@@ -164,15 +166,21 @@ async function createUpload(
   token: string,
   length = 128,
   metadata: { alternativeText?: string; rightsEvidence?: string } = {},
+  correlationId?: string,
 ): Promise<UploadSession> {
   const sha256 = createHash('sha256')
     .update(`${randomUUID()}:${length}`)
     .digest('hex');
-  const response = await api
+  const request = api
     .post('/api/v1/media/uploads')
-    .auth(token, { type: 'bearer' })
+    .auth(token, { type: 'bearer' });
+  if (correlationId) request.set('X-Correlation-ID', correlationId);
+  const response = await request
     .send({ purpose: 'material-original', length, sha256, ...metadata })
     .expect(201);
+  if (correlationId) {
+    assert.equal(response.headers['x-correlation-id'], correlationId);
+  }
   const session = response.body as Omit<UploadSession, 'length' | 'sha256'>;
   sensitiveSamples.push(session.grant);
   return { ...session, length, sha256 };
@@ -644,10 +652,16 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     await register(email);
     await confirm(email);
     const signedIn = await login(email);
-    const upload = await createUpload(signedIn.token, 256, {
-      alternativeText: 'Архивна снимка на заводския двор.',
-      rightsEvidence: 'Личен архив; писмено разрешение от дарителя.',
-    });
+    const correlationId = `upload-acceptance-${randomUUID()}`;
+    const upload = await createUpload(
+      signedIn.token,
+      256,
+      {
+        alternativeText: 'Архивна снимка на заводския двор.',
+        rightsEvidence: 'Личен архив; писмено разрешение от дарителя.',
+      },
+      correlationId,
+    );
     assert.match(upload.uploadUrl, new RegExp(`${upload.uploadId}$`));
     assert.equal(upload.maxBytes, upload.length);
     assert.equal(upload.attemptVersion, 1);
@@ -667,6 +681,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       persisted?.rightsEvidence,
       'Личен архив; писмено разрешение от дарителя.',
     );
+    assert.equal(persisted?.correlationId, correlationId);
+    assert.equal(persisted?.schemaVersion, 3);
 
     await api
       .post(`/internal/media/v1/uploads/${upload.uploadId}/claim`)
@@ -725,6 +741,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       asset.body.rightsEvidence,
       'Личен архив; писмено разрешение от дарителя.',
     );
+    assert.equal(asset.body.correlationId, correlationId);
   });
 
   void it('should reject revoked and expired sessions and replace an expired claim lease', async () => {
