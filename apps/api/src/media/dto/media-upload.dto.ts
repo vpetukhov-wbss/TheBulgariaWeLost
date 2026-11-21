@@ -167,6 +167,9 @@ export class MediaAssetDto {
   @ApiPropertyOptional({ maxLength: 2_000 })
   rightsEvidence?: string;
 
+  @ApiPropertyOptional({ maxLength: 128 })
+  correlationId?: string;
+
   @ApiProperty({ type: [String], enum: MediaVariant })
   variants: MediaVariant[];
 }

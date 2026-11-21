@@ -34,7 +34,7 @@ export class MediaUpload {
   @Prop({ type: String, default: uuidv7 })
   _id: string;
 
-  @Prop({ type: Number, default: 2, required: true })
+  @Prop({ type: Number, default: 3, required: true })
   schemaVersion: number;
 
   @Prop({ required: true })
@@ -42,6 +42,9 @@ export class MediaUpload {
 
   @Prop({ required: true })
   sessionId: string;
+
+  @Prop({ required: true, maxlength: 128 })
+  correlationId: string;
 
   @Prop({ type: String, enum: UploadPurpose, required: true })
   purpose: UploadPurpose;

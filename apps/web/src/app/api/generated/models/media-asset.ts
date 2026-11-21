@@ -4,6 +4,11 @@
 export interface MediaAsset {
   alternativeText?: string;
   contentType?: string;
+
+  /**
+   * Correlation ID captured when the upload session was created.
+   */
+  correlationId?: string;
   id: string;
   processingStatus: 'Pending' | 'Claimed' | 'Ready' | 'Failed';
   rightsEvidence?: string;

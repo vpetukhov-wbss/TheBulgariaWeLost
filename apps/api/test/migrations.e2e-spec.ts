@@ -45,6 +45,7 @@ interface MediaMigrationRecord {
   processingStatus?: string;
   accessStatus?: string;
   accessVersion?: number;
+  correlationId?: string;
 }
 
 function databaseUrl(purpose: string): string {
@@ -83,11 +84,13 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '001-auth-foundation',
           '002-media-uploads',
           '003-media-processing',
+          '004-media-correlation',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
           '002-media-uploads',
           '003-media-processing',
+          '004-media-correlation',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -96,7 +99,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            3,
+            4,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -174,14 +177,16 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
                 processingStatus: 1,
                 accessStatus: 1,
                 accessVersion: 1,
+                correlationId: 1,
               },
             },
           ),
           {
-            schemaVersion: 2,
+            schemaVersion: 3,
             processingStatus: 'Pending',
             accessStatus: 'Active',
             accessVersion: 1,
+            correlationId: 'migration:legacy-completed-upload',
           },
         );
         await assert.rejects(
@@ -200,6 +205,9 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           uploadIndexes.some(
             (index) => index.name === 'accountId_1_status_1_expiresAt_1',
           ),
+        );
+        assert(
+          uploadIndexes.some((index) => index.name === 'correlationId_1__id_1'),
         );
         assert(
           uploadIndexes.some(
