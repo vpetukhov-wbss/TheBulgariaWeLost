@@ -10,6 +10,7 @@ tags:
   - name: Auth
   - name: Back office
   - name: Publishing
+  - name: Catalog
   - name: Media
   - name: Internal media
     description: Private service-to-service operations. Never call these from a browser.
@@ -525,6 +526,192 @@ paths:
                 $ref: "#/components/schemas/PublicMaterial"
         default:
           $ref: "#/components/responses/Problem"
+  /api/admin/v1/catalog/{kind}:
+    get:
+      tags: [Catalog]
+      operationId: listCatalogEntries
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - name: q
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [Draft, Proposed, Published, Restricted, Rejected, Merged, Approved, Hidden, Active, Archived]
+        - name: parentId
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Catalog entries visible to the back office.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      tags: [Catalog]
+      operationId: createCatalogEntry
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogInput"
+      responses:
+        "201":
+          description: Created catalog entry.
+          headers:
+            ETag:
+              $ref: "#/components/headers/CatalogEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/catalog/{kind}/{id}:
+    get:
+      tags: [Catalog]
+      operationId: getCatalogEntry
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - $ref: "#/components/parameters/CatalogId"
+      responses:
+        "200":
+          description: Current catalog entry.
+          headers:
+            ETag:
+              $ref: "#/components/headers/CatalogEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Catalog]
+      operationId: updateCatalogEntry
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - $ref: "#/components/parameters/CatalogId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogInput"
+      responses:
+        "200":
+          description: Updated catalog entry.
+          headers:
+            ETag:
+              $ref: "#/components/headers/CatalogEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/catalog/{kind}/{id}/transitions:
+    post:
+      tags: [Catalog]
+      operationId: transitionCatalogEntry
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - $ref: "#/components/parameters/CatalogId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogTransitionRequest"
+      responses:
+        "200":
+          description: Catalog entry after its state transition.
+          headers:
+            ETag:
+              $ref: "#/components/headers/CatalogEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/catalog/{kind}/{id}/merges:
+    post:
+      tags: [Catalog]
+      operationId: mergeCatalogEntry
+      description: Administrator-only canonical merge for topics and categories.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - $ref: "#/components/parameters/CatalogId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CatalogMergeRequest"
+      responses:
+        "202":
+          description: Canonical merge committed and emitted to the outbox.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogMergeAccepted"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/catalog/{kind}/{slug}:
+    get:
+      tags: [Catalog]
+      operationId: getPublicCatalogEntry
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/CatalogKind"
+        - $ref: "#/components/parameters/CatalogSlug"
+      responses:
+        "200":
+          description: Public canonical topic or category.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicCatalogEntry"
+        "308":
+          description: The historical slug redirects permanently to the canonical entry.
+          headers:
+            Location:
+              required: true
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/media/uploads:
     post:
       tags: [Media]
@@ -844,6 +1031,28 @@ components:
         type: string
         minLength: 1
         maxLength: 160
+    CatalogKind:
+      name: kind
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [topics, categories, entities, places, sources, archive-institutions]
+    CatalogId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CatalogSlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 180
     IfMatch:
       name: If-Match
       in: header
@@ -873,6 +1082,11 @@ components:
         type: string
     MaterialEtag:
       description: Strong optimistic-concurrency token for the material aggregate.
+      required: true
+      schema:
+        type: string
+    CatalogEtag:
+      description: Strong optimistic-concurrency token for one catalog entry.
       required: true
       schema:
         type: string
@@ -944,6 +1158,303 @@ components:
           type: array
           items:
             type: string
+    CatalogGeoPoint:
+      type: object
+      additionalProperties: false
+      required: [latitude, longitude]
+      properties:
+        latitude:
+          type: number
+          minimum: -90
+          maximum: 90
+        longitude:
+          type: number
+          minimum: -180
+          maximum: 180
+    CatalogLifeSpan:
+      type: object
+      additionalProperties: false
+      properties:
+        fromYear:
+          type: integer
+          minimum: -5000
+          maximum: 3000
+        toYear:
+          type: integer
+          minimum: -5000
+          maximum: 3000
+    CatalogSourceRights:
+      type: object
+      additionalProperties: false
+      required: [publicDisplayAllowed, statement]
+      properties:
+        publicDisplayAllowed:
+          type: boolean
+        statement:
+          type: string
+          minLength: 3
+          maxLength: 2000
+    CatalogSourceVerification:
+      type: object
+      additionalProperties: false
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [Unverified, Verified, Disputed]
+        note:
+          type: string
+          maxLength: 2000
+    CatalogArchiveReference:
+      type: object
+      additionalProperties: false
+      properties:
+        fund:
+          type: string
+          maxLength: 200
+        inventory:
+          type: string
+          maxLength: 200
+        archiveUnit:
+          type: string
+          maxLength: 200
+        pageOrFrame:
+          type: string
+          maxLength: 200
+    CatalogInput:
+      type: object
+      additionalProperties: false
+      description: Fields are constrained further by the selected catalog kind.
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 300
+        title:
+          type: string
+          minLength: 2
+          maxLength: 500
+        slug:
+          type: string
+          pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
+          maxLength: 180
+        aliases:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            maxLength: 300
+        summary:
+          type: string
+          maxLength: 5000
+        description:
+          type: string
+          maxLength: 10000
+        categoryIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        coverAssetId:
+          type: string
+          format: uuid
+        parentId:
+          type: string
+          format: uuid
+        sortOrder:
+          type: integer
+          minimum: -100000
+          maximum: 100000
+        icon:
+          type: string
+          maxLength: 100
+        isVisible:
+          type: boolean
+        entityType:
+          type: string
+          maxLength: 100
+        lifeSpan:
+          $ref: "#/components/schemas/CatalogLifeSpan"
+        placeIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        placeType:
+          type: string
+          maxLength: 100
+        location:
+          $ref: "#/components/schemas/CatalogGeoPoint"
+        historicalNames:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            maxLength: 300
+        sourceType:
+          type: string
+          maxLength: 100
+        url:
+          type: string
+          format: uri
+          maxLength: 2000
+        rights:
+          $ref: "#/components/schemas/CatalogSourceRights"
+        verification:
+          $ref: "#/components/schemas/CatalogSourceVerification"
+        archiveInstitutionId:
+          type: string
+          format: uuid
+        archiveReference:
+          $ref: "#/components/schemas/CatalogArchiveReference"
+        originalInstitutionName:
+          type: string
+          maxLength: 500
+        website:
+          type: string
+          format: uri
+          maxLength: 2000
+    CatalogTransitionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion]
+      properties:
+        action:
+          type: string
+          enum: [Propose, Publish, Approve, Restrict, Reject, Hide, Archive, Restore]
+        expectedVersion:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    CatalogMergeRequest:
+      type: object
+      additionalProperties: false
+      required: [targetId, expectedVersion, targetExpectedVersion, reason]
+      properties:
+        targetId:
+          type: string
+          format: uuid
+        expectedVersion:
+          type: integer
+          minimum: 1
+        targetExpectedVersion:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    CatalogSummary:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, slug, status, version, updatedAtUtc]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [topics, categories, entities, places, sources, archive-institutions]
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [Draft, Proposed, Published, Restricted, Rejected, Merged, Approved, Hidden, Active, Archived]
+        canonicalId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        updatedAtUtc:
+          type: string
+          format: date-time
+    CatalogDetail:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, slug, status, version, updatedAtUtc, fields, allowedActions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [topics, categories, entities, places, sources, archive-institutions]
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [Draft, Proposed, Published, Restricted, Rejected, Merged, Approved, Hidden, Active, Archived]
+        canonicalId:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        updatedAtUtc:
+          type: string
+          format: date-time
+        fields:
+          type: object
+          additionalProperties: true
+        allowedActions:
+          type: array
+          items:
+            type: string
+    CatalogPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogSummary"
+        nextCursor:
+          type: string
+    CatalogMergeAccepted:
+      type: object
+      additionalProperties: false
+      required: [operationId, statusUrl, sourceId, targetId]
+      properties:
+        operationId:
+          type: string
+          format: uuid
+        statusUrl:
+          type: string
+        sourceId:
+          type: string
+          format: uuid
+        targetId:
+          type: string
+          format: uuid
+    PublicCatalogEntry:
+      type: object
+      additionalProperties: false
+      required: [id, kind, name, slug, fields]
+      properties:
+        id:
+          type: string
+          format: uuid
+        kind:
+          type: string
+          enum: [topics, categories]
+        name:
+          type: string
+        slug:
+          type: string
+        fields:
+          type: object
+          additionalProperties: true
     MaterialMediaReference:
       type: object
       additionalProperties: false

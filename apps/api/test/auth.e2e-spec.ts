@@ -105,6 +105,15 @@ interface MaterialResponse {
   version: number;
 }
 
+interface CatalogResponse {
+  id: string;
+  slug: string;
+  status: string;
+  canonicalId?: string;
+  version: number;
+  fields: Record<string, unknown>;
+}
+
 async function waitForApi() {
   for (let attempt = 0; attempt < 80; attempt++) {
     if (child?.exitCode !== null) break;
@@ -189,6 +198,35 @@ async function createEditor(): Promise<{
   const account = await users.findOne({ email });
   if (!account) throw new Error('Expected the editor account to exist.');
   const signedIn = await login(email);
+  return { id: account._id, email, token: signedIn.token };
+}
+
+async function createAdministrator(): Promise<{
+  id: string;
+  email: string;
+  token: string;
+}> {
+  const email = `${randomUUID()}@example.test`;
+  await register(email);
+  await confirm(email);
+  const users = db.db().collection<{ _id: string; email: string }>('users');
+  await users.updateOne(
+    { email },
+    {
+      $set: { role: 'Administrator', mfaEnabled: true },
+      $inc: { authVersion: 1 },
+    },
+  );
+  const account = await users.findOne({ email });
+  if (!account) throw new Error('Expected the administrator account to exist.');
+  const signedIn = await login(email);
+  await db
+    .db()
+    .collection('sessions')
+    .updateOne(
+      { accountId: account._id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
   return { id: account._id, email, token: signedIn.token };
 }
 
@@ -1246,6 +1284,273 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.equal(auditCount, finalMaterial.version);
     assert.equal(outboxCount, finalMaterial.version);
   });
+
+  void it(
+    'should govern catalog proposals, hierarchies and canonical merges',
+    { timeout: 60_000 },
+    async () => {
+      const editor = await createEditor();
+      const administrator = await createAdministrator();
+      const ordinaryEmail = `${randomUUID()}@example.test`;
+      await register(ordinaryEmail);
+      await confirm(ordinaryEmail);
+      const ordinary = await login(ordinaryEmail);
+
+      const createCatalog = (
+        kind: string,
+        body: Record<string, unknown>,
+        token = editor.token,
+      ) =>
+        api
+          .post(`/api/admin/v1/catalog/${kind}`)
+          .auth(token, { type: 'bearer' })
+          .send(body);
+      const transitionCatalog = (
+        kind: string,
+        id: string,
+        action: string,
+        expectedVersion: number,
+        reason?: string,
+      ) =>
+        api
+          .post(`/api/admin/v1/catalog/${kind}/${id}/transitions`)
+          .auth(editor.token, { type: 'bearer' })
+          .send({ action, expectedVersion, ...(reason ? { reason } : {}) });
+
+      await createCatalog(
+        'topics',
+        { name: 'Забранена тема', slug: `forbidden-${randomUUID()}` },
+        ordinary.token,
+      ).expect(403);
+
+      const sourceTopicResponse = await createCatalog('topics', {
+        name: 'Стара индустриална България',
+        slug: 'stara-industrialna-bulgaria',
+        summary: 'Истории за предприятията преди прехода.',
+      }).expect(201);
+      const sourceTopic = sourceTopicResponse.body as CatalogResponse;
+      assert.equal(sourceTopic.status, 'Draft');
+      assert.equal(
+        sourceTopicResponse.headers.etag,
+        `"catalog-${sourceTopic.id}-v1"`,
+      );
+      const noEtag = await api
+        .patch(`/api/admin/v1/catalog/topics/${sourceTopic.id}`)
+        .auth(editor.token, { type: 'bearer' })
+        .send({ summary: 'Промяна без версия.' })
+        .expect(428);
+      assert.equal(noEtag.body.code, 'precondition_required');
+      await transitionCatalog('topics', sourceTopic.id, 'Propose', 1).expect(
+        200,
+      );
+      await transitionCatalog('topics', sourceTopic.id, 'Publish', 2).expect(
+        200,
+      );
+
+      const targetTopicResponse = await createCatalog('topics', {
+        name: 'Индустриалното наследство на България',
+        slug: 'industrialno-nasledstvo',
+        aliases: ['Промишлено наследство'],
+        summary: 'Каноничната тема за индустриалната история.',
+      }).expect(201);
+      const targetTopic = targetTopicResponse.body as CatalogResponse;
+      await transitionCatalog('topics', targetTopic.id, 'Propose', 1).expect(
+        200,
+      );
+      await transitionCatalog('topics', targetTopic.id, 'Publish', 2).expect(
+        200,
+      );
+
+      const linkedRevisionId = randomUUID();
+      await db
+        .db()
+        .collection<{ _id: string; [key: string]: unknown }>(
+          'materialRevisions',
+        )
+        .insertOne({
+          _id: linkedRevisionId,
+          materialId: randomUUID(),
+          revisionNumber: 1,
+          content: { topicIds: [sourceTopic.id] },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        });
+
+      const editorMerge = await api
+        .post(`/api/admin/v1/catalog/topics/${sourceTopic.id}/merges`)
+        .auth(editor.token, { type: 'bearer' })
+        .send({
+          targetId: targetTopic.id,
+          expectedVersion: 3,
+          targetExpectedVersion: 3,
+          reason: 'Дублиращи се теми.',
+        })
+        .expect(403);
+      assert.equal(
+        editorMerge.body.code,
+        'catalog_merge_requires_administrator',
+      );
+
+      const merged = await api
+        .post(`/api/admin/v1/catalog/topics/${sourceTopic.id}/merges`)
+        .auth(administrator.token, { type: 'bearer' })
+        .set('X-Correlation-ID', `catalog-merge-${randomUUID()}`)
+        .send({
+          targetId: targetTopic.id,
+          expectedVersion: 3,
+          targetExpectedVersion: 3,
+          reason: 'Обединяване към проверената канонична тема.',
+        })
+        .expect(202);
+      assert.equal(merged.body.sourceId, sourceTopic.id);
+      assert.equal(merged.body.targetId, targetTopic.id);
+
+      const mergedSource = await api
+        .get(`/api/admin/v1/catalog/topics/${sourceTopic.id}`)
+        .auth(editor.token, { type: 'bearer' })
+        .expect(200);
+      assert.equal(mergedSource.body.status, 'Merged');
+      assert.equal(mergedSource.body.canonicalId, targetTopic.id);
+      const canonicalTarget = await api
+        .get(`/api/admin/v1/catalog/topics/${targetTopic.id}`)
+        .auth(editor.token, { type: 'bearer' })
+        .expect(200);
+      assert.equal(canonicalTarget.body.version, 4);
+      assert(
+        (canonicalTarget.body.fields.aliases as string[]).includes(
+          'Стара индустриална България',
+        ),
+      );
+      const oldPublic = await api
+        .get('/api/v1/catalog/topics/stara-industrialna-bulgaria')
+        .redirects(0)
+        .expect(308);
+      assert.equal(
+        oldPublic.headers.location,
+        '/api/v1/catalog/topics/industrialno-nasledstvo',
+      );
+      await api
+        .get('/api/v1/catalog/topics/industrialno-nasledstvo')
+        .expect(200);
+      const linkedRevision = await db
+        .db()
+        .collection<{
+          _id: string;
+          content: { topicIds: string[] };
+        }>('materialRevisions')
+        .findOne({ _id: linkedRevisionId });
+      assert.deepEqual(linkedRevision?.content.topicIds, [sourceTopic.id]);
+      const mergeAudit = await db.db().collection('auditEvents').findOne({
+        targetId: sourceTopic.id,
+        action: 'CatalogMerged',
+      });
+      assert.equal(mergeAudit?.metadata?.targetId, targetTopic.id);
+      assert.equal(
+        await db.db().collection('outboxEvents').countDocuments({
+          aggregateId: sourceTopic.id,
+          aggregateVersion: 4,
+        }),
+        1,
+      );
+
+      const parentResponse = await createCatalog('categories', {
+        name: 'Стопанство',
+        slug: 'stopanstvo',
+        isVisible: true,
+      }).expect(201);
+      const parent = parentResponse.body as CatalogResponse;
+      const childResponse = await createCatalog('categories', {
+        name: 'Промишленост',
+        slug: 'promishlenost',
+        parentId: parent.id,
+        isVisible: true,
+      }).expect(201);
+      const child = childResponse.body as CatalogResponse;
+      const cycle = await api
+        .patch(`/api/admin/v1/catalog/categories/${parent.id}`)
+        .auth(editor.token, { type: 'bearer' })
+        .set('If-Match', `"catalog-${parent.id}-v1"`)
+        .send({ parentId: child.id })
+        .expect(422);
+      assert.equal(cycle.body.code, 'catalog_hierarchy_cycle');
+      await transitionCatalog('categories', parent.id, 'Approve', 1).expect(
+        200,
+      );
+
+      const replacementResponse = await createCatalog('categories', {
+        name: 'Икономика',
+        slug: 'ikonomika',
+        isVisible: true,
+      }).expect(201);
+      const replacement = replacementResponse.body as CatalogResponse;
+      await transitionCatalog(
+        'categories',
+        replacement.id,
+        'Approve',
+        1,
+      ).expect(200);
+      await api
+        .post(`/api/admin/v1/catalog/categories/${parent.id}/merges`)
+        .auth(administrator.token, { type: 'bearer' })
+        .send({
+          targetId: replacement.id,
+          expectedVersion: 2,
+          targetExpectedVersion: 2,
+          reason: 'Категорията е дубликат на икономика.',
+        })
+        .expect(202);
+      const movedChild = await api
+        .get(`/api/admin/v1/catalog/categories/${child.id}`)
+        .auth(editor.token, { type: 'bearer' })
+        .expect(200);
+      assert.equal(movedChild.body.fields.parentId, replacement.id);
+      await api
+        .get('/api/v1/catalog/categories/stopanstvo')
+        .redirects(0)
+        .expect('Location', '/api/v1/catalog/categories/ikonomika')
+        .expect(308);
+
+      const institutionResponse = await createCatalog('archive-institutions', {
+        name: 'Държавен архив – Стара Загора',
+        slug: 'darzhaven-arhiv-stara-zagora',
+        website: 'https://www.archives.government.bg/',
+      }).expect(201);
+      const institution = institutionResponse.body as CatalogResponse;
+      const archivalSource = await createCatalog('sources', {
+        title: 'Фонд на завод Берое',
+        slug: 'fond-zavod-beroe',
+        sourceType: 'ArchiveDocument',
+        rights: {
+          publicDisplayAllowed: true,
+          statement: 'Разрешено цитиране с архивна сигнатура.',
+        },
+        verification: { status: 'Verified', note: 'Проверено на място.' },
+        archiveInstitutionId: institution.id,
+        archiveReference: {
+          fund: 'Ф. 214',
+          inventory: 'Оп. 3',
+          archiveUnit: 'а.е. 18',
+          pageOrFrame: 'л. 7',
+        },
+        originalInstitutionName: 'Окръжен държавен архив – Стара Загора',
+      }).expect(201);
+      assert.equal(archivalSource.body.fields.archiveReference.fund, 'Ф. 214');
+
+      await createCatalog('places', {
+        name: 'Стара Загора',
+        slug: 'stara-zagora',
+        placeType: 'City',
+        location: { latitude: 42.4258, longitude: 25.6345 },
+        historicalNames: ['Берое', 'Августа Траяна'],
+      }).expect(201);
+      await createCatalog('entities', {
+        name: 'Завод Берое',
+        slug: 'zavod-beroe',
+        entityType: 'Organisation',
+        lifeSpan: { fromYear: 1958, toYear: 1999 },
+      }).expect(201);
+    },
+  );
 
   void it('should keep passwords, tokens and MFA values out of application logs', () => {
     for (const value of sensitiveSamples) {

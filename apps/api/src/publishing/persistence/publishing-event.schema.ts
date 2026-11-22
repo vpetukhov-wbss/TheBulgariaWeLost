@@ -24,6 +24,9 @@ export class PublishingAuditEvent {
   @Prop({ maxlength: 500 })
   reason?: string;
 
+  @Prop({ type: Object })
+  metadata?: Record<string, unknown>;
+
   @Prop({ required: true, maxlength: 128 })
   correlationId: string;
 

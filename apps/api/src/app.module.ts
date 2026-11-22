@@ -7,6 +7,7 @@ import { join } from 'node:path';
 import authConfig from './auth/config/auth.config';
 import { AuthModule } from './auth/auth.module';
 import { BackOfficeModule } from './back-office/back-office.module';
+import { CatalogModule } from './catalog/catalog.module';
 import appConfig from './config/app.config';
 import type { AllConfigType } from './config/config.type';
 import databaseConfig from './database/database.config';
@@ -44,6 +45,7 @@ import { PublishingModule } from './publishing/publishing.module';
     BackOfficeModule,
     MediaModule,
     PublishingModule,
+    CatalogModule,
   ],
   controllers: [HealthController],
 })
