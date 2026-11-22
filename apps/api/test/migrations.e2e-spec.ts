@@ -86,6 +86,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '003-media-processing',
           '004-media-correlation',
           '005-publishing-foundation',
+          '006-catalog-taxonomy',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
@@ -93,6 +94,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '003-media-processing',
           '004-media-correlation',
           '005-publishing-foundation',
+          '006-catalog-taxonomy',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -101,7 +103,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            5,
+            6,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -247,6 +249,28 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
               index.unique === true,
           ),
         );
+        for (const collection of [
+          'topics',
+          'categories',
+          'entities',
+          'places',
+          'sources',
+          'archiveInstitutions',
+        ]) {
+          const catalogIndexes = await database
+            .collection(collection)
+            .indexes();
+          assert(
+            catalogIndexes.some(
+              (index) => index.name === 'slug_1' && index.unique === true,
+            ),
+          );
+          assert(
+            catalogIndexes.some(
+              (index) => index.name === 'parentId_1_sortOrder_1_name_1__id_1',
+            ),
+          );
+        }
 
         const editors = await users
           .find({ role: 'Editor', status: 'Active' })

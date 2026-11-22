@@ -30,6 +30,8 @@
 
 Редакционният поток използва отделни работна и публикувана ревизия, optimistic concurrency и транзакционни audit/outbox записи. [Материали, ревизии и публична видимост](docs/acceptance/material-publishing-vertical-slice.md)
 
+Шестте редакционни каталога поддържат предложения, йерархии, архивни сигнатури и администраторски canonical merge, който запазва старите връзки и URL адреси. [Каталози, йерархии и канонични обединявания](docs/acceptance/catalog-taxonomy-vertical-slice.md)
+
 ## Локална среда
 
 Чист checkout стартира Angular, NestJS, .NET Media API, MongoDB replica set, Mailpit и изолирано SFTP хранилище с една команда:
