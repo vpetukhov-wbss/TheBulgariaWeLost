@@ -28,6 +28,8 @@
 
 Единният версиониран [OpenAPI договор](contracts/README.md) фиксира публичните, административните и вътрешните маршрути, Problem Details и correlation ID. От него възпроизводимо се генерира типизираният Angular клиент, а CI спира несъвместими промени.
 
+Редакционният поток използва отделни работна и публикувана ревизия, optimistic concurrency и транзакционни audit/outbox записи. [Материали, ревизии и публична видимост](docs/acceptance/material-publishing-vertical-slice.md)
+
 ## Локална среда
 
 Чист checkout стартира Angular, NestJS, .NET Media API, MongoDB replica set, Mailpit и изолирано SFTP хранилище с една команда:

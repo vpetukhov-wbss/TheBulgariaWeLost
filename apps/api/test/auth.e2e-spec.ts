@@ -94,6 +94,17 @@ interface UploadRecord {
   accessVersion?: number;
 }
 
+interface MaterialResponse {
+  id: string;
+  slug: string;
+  status: string;
+  workingStatus?: string;
+  workingRevisionNumber?: number;
+  publishedRevisionNumber?: number;
+  draft: { title: string };
+  version: number;
+}
+
 async function waitForApi() {
   for (let attempt = 0; attempt < 80; attempt++) {
     if (child?.exitCode !== null) break;
@@ -160,6 +171,25 @@ async function login(
     .send({ email, password })
     .expect(200);
   return result.body as Tokens;
+}
+
+async function createEditor(): Promise<{
+  id: string;
+  email: string;
+  token: string;
+}> {
+  const email = `${randomUUID()}@example.test`;
+  await register(email);
+  await confirm(email);
+  const users = db.db().collection<{ _id: string; email: string }>('users');
+  await users.updateOne(
+    { email },
+    { $set: { role: 'Editor' }, $inc: { authVersion: 1 } },
+  );
+  const account = await users.findOne({ email });
+  if (!account) throw new Error('Expected the editor account to exist.');
+  const signedIn = await login(email);
+  return { id: account._id, email, token: signedIn.token };
 }
 
 async function createUpload(
@@ -955,6 +985,266 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .collection<{ _id: string; reservedBytes: number }>('mediaQuotas')
       .findOne({ _id: firstRecord.accountId });
     assert.equal(quota?.reservedBytes, 800);
+  });
+
+  void it('should version, review, publish and hide materials transactionally', async () => {
+    const author = await createEditor();
+    const reviewer = await createEditor();
+    const upload = await createUpload(author.token, 256, {
+      alternativeText: 'Архивна снимка към материала.',
+      rightsEvidence: 'Писмено разрешение за публично показване.',
+    });
+    const uploadClaim = await claimUpload(upload).expect(200);
+    await completeUpload(upload, uploadClaim.body.attemptId).expect(204);
+
+    const created = await api
+      .post('/api/admin/v1/materials')
+      .auth(author.token, { type: 'bearer' })
+      .set('X-Correlation-ID', `material-create-${randomUUID()}`)
+      .send({ type: 'Story', language: 'bg', title: 'Първа чернова' })
+      .expect(201);
+    const initial = created.body as MaterialResponse;
+    assert.equal(initial.version, 1);
+    assert.equal(initial.workingRevisionNumber, 1);
+    assert.equal(initial.workingStatus, 'Draft');
+    assert.equal(
+      created.headers.location,
+      `/api/admin/v1/materials/${initial.id}`,
+    );
+
+    await api
+      .get(`/api/admin/v1/materials/${initial.id}`)
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(404);
+    const missingPrecondition = await api
+      .patch(`/api/admin/v1/materials/${initial.id}`)
+      .auth(author.token, { type: 'bearer' })
+      .send({ title: 'Промяна без версия' })
+      .expect(428);
+    assert.equal(missingPrecondition.body.code, 'precondition_required');
+
+    const categoryId = randomUUID();
+    const topicId = randomUUID();
+    const sourceId = randomUUID();
+    const update = {
+      title: 'Завършена редакторска чернова',
+      body: 'Историята на мястото, проверена по архивни източници.',
+      categoryIds: [categoryId],
+      topicIds: [topicId],
+      sourceIds: [sourceId],
+      mediaRefs: [{ mediaId: upload.uploadId, role: 'hero', order: 0 }],
+      rights: {
+        publicDisplayAllowed: true,
+        statement: 'Правата за материала са проверени.',
+      },
+      changeSummary: 'Добавени източници, права и основна снимка.',
+    };
+    const updateCall = () =>
+      api
+        .patch(`/api/admin/v1/materials/${initial.id}`)
+        .auth(author.token, { type: 'bearer' })
+        .set('If-Match', created.headers.etag as string)
+        .send(update);
+    const competingUpdates = await Promise.all([updateCall(), updateCall()]);
+    assert.deepEqual(
+      competingUpdates.map((response) => response.status).sort(),
+      [200, 412],
+    );
+    const updatedResponse = competingUpdates.find(
+      (response) => response.status === 200,
+    );
+    if (!updatedResponse) throw new Error('Expected one successful update.');
+    const updated = updatedResponse.body as MaterialResponse;
+    assert.equal(updated.version, 2);
+    assert.equal(updated.workingRevisionNumber, 2);
+
+    const initialRevision = await api
+      .get(`/api/admin/v1/materials/${initial.id}/revisions/1`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(initialRevision.body.content.title, 'Първа чернова');
+    const firstRevisionPage = await api
+      .get(`/api/admin/v1/materials/${initial.id}/revisions`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(
+      (firstRevisionPage.body.items as { revisionNumber: number }[]).map(
+        (item) => item.revisionNumber,
+      ),
+      [2, 1],
+    );
+
+    const transition = (
+      token: string,
+      action: string,
+      expectedVersion: number,
+      reason?: string,
+    ) =>
+      api
+        .post(`/api/admin/v1/materials/${initial.id}/transitions`)
+        .auth(token, { type: 'bearer' })
+        .set('X-Correlation-ID', `material-${action}-${randomUUID()}`)
+        .send({ action, expectedVersion, ...(reason ? { reason } : {}) });
+
+    const submitted = await transition(
+      author.token,
+      'SubmitForReview',
+      updated.version,
+    ).expect(200);
+    assert.equal((submitted.body as MaterialResponse).version, 3);
+    await api
+      .get(`/api/admin/v1/materials/${initial.id}`)
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(200);
+    const reviewerList = await api
+      .get('/api/admin/v1/materials')
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(200);
+    assert(
+      (reviewerList.body.items as { id: string }[]).some(
+        (item) => item.id === initial.id,
+      ),
+    );
+
+    const reviewing = await transition(reviewer.token, 'StartReview', 3).expect(
+      200,
+    );
+    assert.equal((reviewing.body as MaterialResponse).version, 4);
+
+    const blocked = await transition(reviewer.token, 'Publish', 4).expect(422);
+    assert.equal(blocked.body.code, 'publication_rights_missing');
+    assert.equal(
+      blocked.body.detail,
+      `media_rights_missing:${upload.uploadId}`,
+    );
+    assert.equal(
+      await db
+        .db()
+        .collection('auditEvents')
+        .countDocuments({ targetId: initial.id }),
+      4,
+    );
+
+    const uploads = db.db().collection<UploadRecord>('mediaUploads');
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { processingStatus: 'Ready', accessStatus: 'Active' } },
+    );
+    const publishedResponse = await transition(
+      reviewer.token,
+      'Publish',
+      4,
+    ).expect(200);
+    const published = publishedResponse.body as MaterialResponse;
+    assert.equal(published.status, 'Published');
+    assert.equal(published.publishedRevisionNumber, 2);
+    assert.equal(published.version, 5);
+
+    const publicUrl = `/api/v1/materials/${published.slug}`;
+    const publicMaterial = await api.get(publicUrl).expect(200);
+    assert.equal(publicMaterial.body.revisionNumber, 2);
+    assert.equal(publicMaterial.body.content.title, update.title);
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { accessStatus: 'Restricted' } },
+    );
+    await api.get(publicUrl).expect(404);
+    await uploads.updateOne(
+      { _id: upload.uploadId },
+      { $set: { accessStatus: 'Active' } },
+    );
+    await api.get(publicUrl).expect(200);
+
+    const workingResponse = await api
+      .patch(`/api/admin/v1/materials/${initial.id}`)
+      .auth(author.token, { type: 'bearer' })
+      .set('If-Match', publishedResponse.headers.etag as string)
+      .send({
+        title: 'Нова непубликувана редакция',
+        changeSummary: 'Подготвена следваща версия.',
+      })
+      .expect(200);
+    const working = workingResponse.body as MaterialResponse;
+    assert.equal(working.version, 6);
+    assert.equal(working.workingRevisionNumber, 3);
+    assert.equal(working.publishedRevisionNumber, 2);
+    assert.equal(working.workingStatus, 'InReview');
+    const stillPublished = await api.get(publicUrl).expect(200);
+    assert.equal(stillPublished.body.content.title, update.title);
+
+    const restoredResponse = await api
+      .post(`/api/admin/v1/materials/${initial.id}/revision-restorations`)
+      .auth(reviewer.token, { type: 'bearer' })
+      .send({
+        revisionNumber: 2,
+        expectedVersion: 6,
+        reason: 'Връщане към проверената публикувана редакция.',
+      })
+      .expect(200);
+    const restored = restoredResponse.body as MaterialResponse;
+    assert.equal(restored.version, 7);
+    assert.equal(restored.workingRevisionNumber, 4);
+    assert.equal(restored.draft.title, update.title);
+
+    const archived = await transition(
+      reviewer.token,
+      'Archive',
+      7,
+      'Временно архивиране за редакционна проверка.',
+    ).expect(200);
+    assert.equal((archived.body as MaterialResponse).status, 'Archived');
+    await api.get(publicUrl).expect(404);
+    const unarchived = await transition(
+      reviewer.token,
+      'RestoreFromArchive',
+      8,
+      'Редакционната проверка приключи.',
+    ).expect(200);
+    assert.equal((unarchived.body as MaterialResponse).version, 9);
+    assert.equal(
+      (unarchived.body as MaterialResponse).workingRevisionNumber,
+      5,
+    );
+
+    await transition(reviewer.token, 'Publish', 9).expect(200);
+    await api.get(publicUrl).expect(200);
+    const withdrawn = await transition(
+      reviewer.token,
+      'Withdraw',
+      10,
+      'Материалът се изтегля за допълнителна проверка.',
+    ).expect(200);
+    const finalMaterial = withdrawn.body as MaterialResponse;
+    assert.equal(finalMaterial.status, 'Withdrawn');
+    assert.equal(finalMaterial.version, 11);
+    await api.get(publicUrl).expect(404);
+
+    const finalRevisions = await api
+      .get(`/api/admin/v1/materials/${initial.id}/revisions`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(
+      (finalRevisions.body.items as { revisionNumber: number }[]).map(
+        (item) => item.revisionNumber,
+      ),
+      [5, 4, 3, 2, 1],
+    );
+    const restoredRevision = await api
+      .get(`/api/admin/v1/materials/${initial.id}/revisions/4`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(restoredRevision.body.restoredFromRevisionNumber, 2);
+
+    const auditCount = await db
+      .db()
+      .collection('auditEvents')
+      .countDocuments({ targetId: initial.id });
+    const outboxCount = await db
+      .db()
+      .collection('outboxEvents')
+      .countDocuments({ aggregateId: initial.id });
+    assert.equal(auditCount, finalMaterial.version);
+    assert.equal(outboxCount, finalMaterial.version);
   });
 
   void it('should keep passwords, tokens and MFA values out of application logs', () => {

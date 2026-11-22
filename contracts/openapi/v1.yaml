@@ -9,6 +9,7 @@ tags:
   - name: Health
   - name: Auth
   - name: Back office
+  - name: Publishing
   - name: Media
   - name: Internal media
     description: Private service-to-service operations. Never call these from a browser.
@@ -327,6 +328,203 @@ paths:
                 $ref: "#/components/schemas/BackOfficePrincipal"
         default:
           $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials:
+    get:
+      tags: [Publishing]
+      operationId: listMaterials
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Materials visible to the current editor or administrator.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      tags: [Publishing]
+      operationId: createMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaterialRequest"
+      responses:
+        "201":
+          description: Material and its first working revision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials/{id}:
+    get:
+      tags: [Publishing]
+      operationId: getMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "200":
+          description: Current working and published pointers for a material.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Publishing]
+      operationId: updateMaterialDraft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaterialDraftRequest"
+      responses:
+        "200":
+          description: A new immutable working revision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials/{id}/transitions:
+    post:
+      tags: [Publishing]
+      operationId: transitionMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionMaterialRequest"
+      responses:
+        "200":
+          description: Material after the editorial state transition.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials/{id}/revisions:
+    get:
+      tags: [Publishing]
+      operationId: listMaterialRevisions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "200":
+          description: Immutable revision history, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRevisionPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials/{id}/revisions/{number}:
+    get:
+      tags: [Publishing]
+      operationId: getMaterialRevision
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+        - $ref: "#/components/parameters/RevisionNumber"
+      responses:
+        "200":
+          description: One immutable material revision.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialRevisionDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/materials/{id}/revision-restorations:
+    post:
+      tags: [Publishing]
+      operationId: restoreMaterialRevision
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RestoreMaterialRevisionRequest"
+      responses:
+        "200":
+          description: A new working revision copied from the selected revision.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/materials/{slug}:
+    get:
+      tags: [Publishing]
+      operationId: getPublishedMaterial
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialSlug"
+      responses:
+        "200":
+          description: Published revision when the material and all linked media remain public.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicMaterial"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/media/uploads:
     post:
       tags: [Media]
@@ -624,6 +822,35 @@ components:
       schema:
         type: string
         format: uuid
+    MaterialId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RevisionNumber:
+      name: number
+      in: path
+      required: true
+      schema:
+        type: integer
+        minimum: 1
+    MaterialSlug:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 160
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      description: Strong material ETag returned by the latest successful read or write.
+      schema:
+        type: string
     Variant:
       name: variant
       in: path
@@ -641,6 +868,11 @@ components:
   headers:
     CorrelationId:
       description: Correlates logs and Problem Details across services.
+      required: true
+      schema:
+        type: string
+    MaterialEtag:
+      description: Strong optimistic-concurrency token for the material aggregate.
       required: true
       schema:
         type: string
@@ -712,6 +944,340 @@ components:
           type: array
           items:
             type: string
+    MaterialMediaReference:
+      type: object
+      additionalProperties: false
+      required: [mediaId, role, order]
+      properties:
+        mediaId:
+          type: string
+          format: uuid
+        role:
+          type: string
+          minLength: 2
+          maxLength: 50
+        order:
+          type: integer
+          minimum: 0
+          maximum: 1000
+        credit:
+          type: string
+          maxLength: 300
+    MaterialRights:
+      type: object
+      additionalProperties: false
+      required: [publicDisplayAllowed, statement]
+      properties:
+        publicDisplayAllowed:
+          type: boolean
+        statement:
+          type: string
+          minLength: 3
+          maxLength: 2000
+    MaterialDraft:
+      type: object
+      additionalProperties: false
+      required:
+        [title, categoryIds, topicIds, sourceIds, mediaRefs, rights]
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        subtitle:
+          type: string
+          maxLength: 300
+        summary:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 100000
+        categoryIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        topicIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        sourceIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        mediaRefs:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/MaterialMediaReference"
+        provenance:
+          type: string
+          maxLength: 2000
+        rights:
+          $ref: "#/components/schemas/MaterialRights"
+    CreateMaterialRequest:
+      type: object
+      additionalProperties: false
+      required: [type, language, title]
+      properties:
+        type:
+          type: string
+          enum: [Story, Document, PhotoEssay, Episode]
+        language:
+          type: string
+          pattern: "^[a-z]{2}(?:-[A-Z]{2})?$"
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+    UpdateMaterialDraftRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 3
+          maxLength: 200
+        subtitle:
+          type: string
+          maxLength: 300
+        summary:
+          type: string
+          maxLength: 1000
+        body:
+          type: string
+          maxLength: 100000
+        categoryIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        topicIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        sourceIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
+        mediaRefs:
+          type: array
+          maxItems: 100
+          items:
+            $ref: "#/components/schemas/MaterialMediaReference"
+        provenance:
+          type: string
+          maxLength: 2000
+        rights:
+          $ref: "#/components/schemas/MaterialRights"
+        changeSummary:
+          type: string
+          maxLength: 500
+    TransitionMaterialRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion]
+      properties:
+        action:
+          type: string
+          enum:
+            - SubmitForReview
+            - StartReview
+            - RequestChanges
+            - Publish
+            - Withdraw
+            - Archive
+            - RestoreFromArchive
+        expectedVersion:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    RestoreMaterialRevisionRequest:
+      type: object
+      additionalProperties: false
+      required: [revisionNumber, expectedVersion, reason]
+      properties:
+        revisionNumber:
+          type: integer
+          minimum: 1
+        expectedVersion:
+          type: integer
+          minimum: 1
+        reason:
+          type: string
+          minLength: 3
+          maxLength: 500
+    MaterialRevisionSummary:
+      type: object
+      additionalProperties: false
+      required:
+        [materialId, revisionNumber, createdAtUtc, createdByUserId]
+      properties:
+        materialId:
+          type: string
+          format: uuid
+        revisionNumber:
+          type: integer
+          minimum: 1
+        createdAtUtc:
+          type: string
+          format: date-time
+        createdByUserId:
+          type: string
+          format: uuid
+        changeSummary:
+          type: string
+        restoredFromRevisionNumber:
+          type: integer
+          minimum: 1
+    MaterialRevisionDetail:
+      allOf:
+        - $ref: "#/components/schemas/MaterialRevisionSummary"
+        - type: object
+          required: [content]
+          properties:
+            content:
+              $ref: "#/components/schemas/MaterialDraft"
+    MaterialRevisionPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialRevisionSummary"
+        nextCursor:
+          type: string
+    MaterialSummary:
+      type: object
+      additionalProperties: false
+      required: [id, slug, title, status, version, updatedAtUtc]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        title:
+          type: string
+        status:
+          type: string
+          enum: [Unpublished, Published, Withdrawn, Archived]
+        workingStatus:
+          type: string
+          enum: [Draft, Submitted, InReview, ChangesRequested]
+        version:
+          type: integer
+          minimum: 1
+        updatedAtUtc:
+          type: string
+          format: date-time
+    MaterialPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/MaterialSummary"
+        nextCursor:
+          type: string
+    MaterialDetail:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - slug
+        - type
+        - language
+        - authorId
+        - status
+        - publicVisibility
+        - draft
+        - allowedActions
+        - publicationBlockers
+        - version
+        - updatedAtUtc
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [Story, Document, PhotoEssay, Episode]
+        language:
+          type: string
+        authorId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [Unpublished, Published, Withdrawn, Archived]
+        workingStatus:
+          type: string
+          enum: [Draft, Submitted, InReview, ChangesRequested]
+        workingRevisionNumber:
+          type: integer
+          minimum: 1
+        publishedRevisionNumber:
+          type: integer
+          minimum: 1
+        publicVisibility:
+          type: boolean
+        draft:
+          $ref: "#/components/schemas/MaterialDraft"
+        allowedActions:
+          type: array
+          items:
+            type: string
+        publicationBlockers:
+          type: array
+          items:
+            type: string
+        version:
+          type: integer
+          minimum: 1
+        updatedAtUtc:
+          type: string
+          format: date-time
+    PublicMaterial:
+      type: object
+      additionalProperties: false
+      required: [id, slug, type, language, revisionNumber, content]
+      properties:
+        id:
+          type: string
+          format: uuid
+        slug:
+          type: string
+        type:
+          type: string
+          enum: [Story, Document, PhotoEssay, Episode]
+        language:
+          type: string
+        revisionNumber:
+          type: integer
+          minimum: 1
+        content:
+          $ref: "#/components/schemas/MaterialDraft"
     LoginRequest:
       type: object
       additionalProperties: false
