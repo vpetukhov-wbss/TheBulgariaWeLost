@@ -85,12 +85,14 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '002-media-uploads',
           '003-media-processing',
           '004-media-correlation',
+          '005-publishing-foundation',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
           '002-media-uploads',
           '003-media-processing',
           '004-media-correlation',
+          '005-publishing-foundation',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -99,7 +101,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            4,
+            5,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -214,6 +216,35 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
             (index) =>
               index.name ===
               'status_1_processingStatus_1_inspectionLeaseExpiresAt_1_completedAt_1',
+          ),
+        );
+
+        const materialIndexes = await database
+          .collection('materials')
+          .indexes();
+        assert(
+          materialIndexes.some(
+            (index) => index.name === 'slug_1' && index.unique === true,
+          ),
+        );
+        const revisionIndexes = await database
+          .collection('materialRevisions')
+          .indexes();
+        assert(
+          revisionIndexes.some(
+            (index) =>
+              index.name === 'materialId_1_revisionNumber_1' &&
+              index.unique === true,
+          ),
+        );
+        const outboxIndexes = await database
+          .collection('outboxEvents')
+          .indexes();
+        assert(
+          outboxIndexes.some(
+            (index) =>
+              index.name === 'aggregateId_1_aggregateVersion_1' &&
+              index.unique === true,
           ),
         );
 

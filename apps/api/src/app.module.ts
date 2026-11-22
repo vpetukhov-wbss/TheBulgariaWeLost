@@ -14,6 +14,7 @@ import { HealthController } from './health/health.controller';
 import mailConfig from './mail/config/mail.config';
 import mediaConfig from './media/config/media.config';
 import { MediaModule } from './media/media.module';
+import { PublishingModule } from './publishing/publishing.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { MediaModule } from './media/media.module';
     AuthModule,
     BackOfficeModule,
     MediaModule,
+    PublishingModule,
   ],
   controllers: [HealthController],
 })
