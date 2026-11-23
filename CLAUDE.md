@@ -46,14 +46,3 @@
 3. Проверявай права и бизнес правила на сървъра. За интеграции използвай ограничени timeout и retry, безопасни логове и ясни грешки. Използвай синтетични или изрично разрешени тестови материали.
 4. За документация изпълни `git diff --check HEAD`. След създаване на приложение изпълнявай и наличните проверки за форматиране, build и засегнати тестове. В отчета посочи изпълнените команди и ограниченията.
 5. Пази ключовете, production настройките, личните данни и оригиналните архивни файлове извън Git. Следвай [лиценза на кода](LICENSE) и отделните условия за всеки архивен материал.
-
-## .NET engineering workflow
-
-- Scope: Media API and its integration tests under `apps/media`. Preserve the NestJS, Angular and SFTP ownership boundaries defined above.
-- Solution/project: `apps/media/Media.slnx`.
-- SDK and targets: Use pinned SDK 10.0.404 (`apps/media/global.json`). Check project-specific and inherited build settings before changing target frameworks.
-- Verification: From `apps/media`, run `dotnet restore --locked-mode`, `dotnet build --no-restore`, `dotnet test --no-build`, and `dotnet format --no-restore --verify-no-changes`.
-
-- Follow the existing repository-specific instructions and work sequence first. Apply [C# rules](.claude/rules/dotnet-csharp.md), [async rules](.claude/rules/dotnet-async-concurrency.md), and the relevant test/contract procedures.
-- For substantial changes, use [the .NET feature procedure](.claude/skills/dotnet-feature/SKILL.md) for implementation and [the code review procedure](.claude/skills/code-review/SKILL.md) before publication. Use the relevant specialist review criteria. Check method and constructor signatures, including ambiguous primitive and Boolean arguments.
-- Run `python3 scripts/validate-setup.py` when changing the setup. Use the repository's build and test commands for application changes.
