@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(./**/.env)",
+      "Read(./**/.env.*)",
+      "Read(./**/secrets/**)",
+      "Bash(git push --force *)",
+      "Bash(terraform destroy *)",
+      "Bash(kubectl delete *)"
+    ]
+  }
+}
