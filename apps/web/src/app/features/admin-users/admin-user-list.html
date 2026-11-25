@@ -1,0 +1,96 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb"><a routerLink="/admin">Работен панел</a> / Управление</p>
+    <h1>Потребители</h1>
+  </div>
+</header>
+<nb-card>
+  <nb-card-body>
+    <form class="filters" (ngSubmit)="search()">
+      <label class="field">
+        Имейл
+        <input
+          nbInput
+          fullWidth
+          type="email"
+          name="email"
+          maxlength="254"
+          [ngModel]="email()"
+          (ngModelChange)="email.set($event)"
+        />
+      </label>
+      <button nbButton type="submit" status="primary">Търси</button>
+    </form>
+    <div class="filters divider">
+      <div class="field">
+        <label for="account-role">Роля</label>
+        <select
+          id="account-role"
+          [ngModel]="filters().role ?? ''"
+          (ngModelChange)="filter('role', $event)"
+        >
+          <option value="">Всички роли</option>
+          @for (role of roles | keyvalue; track role.key) {
+            <option [value]="role.key">{{ role.value }}</option>
+          }
+        </select>
+      </div>
+      <div class="field">
+        <label for="account-status">Статус</label>
+        <select
+          id="account-status"
+          [ngModel]="filters().status ?? ''"
+          (ngModelChange)="filter('status', $event)"
+        >
+          <option value="">Всички статуси</option>
+          @for (status of statuses | keyvalue; track status.key) {
+            <option [value]="status.key">{{ status.value }}</option>
+          }
+        </select>
+      </div>
+    </div>
+  </nb-card-body>
+</nb-card>
+
+@if (store.loadingPage()) {
+  <p role="status">Зареждане на потребителите…</p>
+} @else if (store.pageError()) {
+  <nb-alert status="danger" role="alert">{{ store.pageError() }}</nb-alert>
+  <button nbButton outline type="button" (click)="store.loadPage(request())">Опитай отново</button>
+} @else if (store.page(); as page) {
+  <nb-card>
+    <nb-card-body class="records">
+      @for (user of page.items; track user.id) {
+        <article class="record">
+          <div>
+            <h2>
+              <a [routerLink]="[user.id]" queryParamsHandling="preserve">{{ user.displayName }}</a>
+            </h2>
+            @if (user.createdAtUtc) {
+              <p class="muted">
+                Регистрация на
+                <time [attr.datetime]="user.createdAtUtc">{{
+                  user.createdAtUtc | date: 'dd.MM.yyyy'
+                }}</time>
+              </p>
+            }
+          </div>
+          <div class="actions">
+            <span class="badge">{{ roles[user.role] }}</span>
+            <span class="badge secondary">{{ statuses[user.status] }}</span>
+          </div>
+        </article>
+      } @empty {
+        <p>Няма потребители за избраните филтри.</p>
+      }
+    </nb-card-body>
+  </nb-card>
+  <div class="actions">
+    @if (cursor()) {
+      <button nbButton outline type="button" (click)="cursor.set(undefined)">Първа страница</button>
+    }
+    @if (page.nextCursor; as next) {
+      <button nbButton outline type="button" (click)="cursor.set(next)">Следваща страница</button>
+    }
+  </div>
+}

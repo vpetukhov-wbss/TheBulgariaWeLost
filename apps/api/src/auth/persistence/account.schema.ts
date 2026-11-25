@@ -61,6 +61,8 @@ export class Account {
 
   @Prop({ select: false })
   mfaLastUsedStep?: number;
+
+  createdAt?: Date;
 }
 
 export const AccountSchema = SchemaFactory.createForClass(Account);

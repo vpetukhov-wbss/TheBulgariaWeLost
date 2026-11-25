@@ -1,0 +1,37 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb">
+      <a routerLink="/admin/users" queryParamsHandling="preserve">Потребители</a> / Профил
+    </p>
+    <h1>{{ store.detail()?.displayName || 'Потребителски профил' }}</h1>
+  </div>
+</header>
+@if (store.loadingDetail()) {
+  <p role="status">Зареждане на профила…</p>
+} @else if (store.detailError()) {
+  <nb-alert status="danger" role="alert">{{ store.detailError() }}</nb-alert>
+  <button nbButton outline type="button" (click)="retry()">Опитай отново</button>
+} @else if (store.detail(); as user) {
+  <nb-card>
+    <nb-card-body>
+      <dl>
+        <dt>Роля</dt>
+        <dd>{{ roles[user.role] }}</dd>
+        <dt>Статус</dt>
+        <dd>{{ statuses[user.status] }}</dd>
+        <dt>Потвърден имейл</dt>
+        <dd>{{ user.verifiedContactMasked || 'Няма потвърден контакт' }}</dd>
+        <dt>MFA</dt>
+        <dd>{{ user.mfaEnabled ? 'Включено' : 'Изключено' }}</dd>
+        @if (user.createdAtUtc) {
+          <dt>Дата на регистрация</dt>
+          <dd>
+            <time [attr.datetime]="user.createdAtUtc">{{
+              user.createdAtUtc | date: 'dd.MM.yyyy'
+            }}</time>
+          </dd>
+        }
+      </dl>
+    </nb-card-body>
+  </nb-card>
+}

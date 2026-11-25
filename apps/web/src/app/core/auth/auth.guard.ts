@@ -22,7 +22,8 @@ export const signedInGuard: CanActivateFn = (_route, state) => {
  * The API is authoritative here. JWT roles only control navigation hints and
  * are never enough to enter the editor or administrator area.
  */
-export const backOfficeGuard: CanActivateFn = (_route, state) => {
+export const backOfficeGuard: CanActivateFn = (route, state) => {
+  const requiredPermission: unknown = route.data['requiredPermission'];
   const router = inject(Router);
   const auth = inject(NbAuthService);
   const tokens = inject(NbTokenService);
@@ -33,7 +34,11 @@ export const backOfficeGuard: CanActivateFn = (_route, state) => {
       if (!authenticated) return of(loginRoute(router, state.url));
 
       return backOffice.getBackOfficePrincipal().pipe(
-        map(() => true),
+        map((principal) =>
+          typeof requiredPermission !== 'string' ||
+          principal.permissions.includes(requiredPermission) ||
+          router.createUrlTree(['/forbidden']),
+        ),
         catchError((error: unknown) => {
           if (error instanceof HttpErrorResponse && error.status === 401) {
             return tokens.clear().pipe(map(() => loginRoute(router, state.url)));

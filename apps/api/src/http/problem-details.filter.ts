@@ -55,7 +55,7 @@ export class ProblemDetailsFilter implements ExceptionFilter {
           status === HttpStatus.INTERNAL_SERVER_ERROR
             ? 'An unexpected error occurred.'
             : messages[0],
-        instance: request.originalUrl,
+        instance: request.originalUrl.split('?')[0],
         code,
         traceId: request.correlationId,
         ...(messages.length > 1 ? { errors: messages } : {}),

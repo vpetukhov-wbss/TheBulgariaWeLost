@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { AdminUsersStore } from '../admin-users/admin-users.store';
 import { ModerationStore } from '../moderation/moderation.store';
 
 const catalogEntry = () => import('./catalog-entry').then((m) => m.CatalogEntry);
@@ -24,6 +25,24 @@ export const editorialRoutes: Routes = [
   },
   { path: 'catalog/:kind/new', loadComponent: catalogEntry },
   { path: 'catalog/:kind/:id', loadComponent: catalogEntry },
+  {
+    path: 'users',
+    providers: [AdminUsersStore],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        data: { requiredPermission: 'Users.Manage' },
+        loadComponent: () => import('../admin-users/admin-user-list').then((m) => m.AdminUserList),
+      },
+      {
+        path: ':id',
+        data: { requiredPermission: 'Users.Manage' },
+        loadComponent: () =>
+          import('../admin-users/admin-user-detail').then((m) => m.AdminUserDetail),
+      },
+    ],
+  },
   {
     path: 'moderation',
     providers: [ModerationStore],

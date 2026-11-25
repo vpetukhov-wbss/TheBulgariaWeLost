@@ -35,6 +35,10 @@ export type { RecoverMfa$Params as RecoverMfa$Params } from './fn/auth/recover-m
 export { recoverMfa as recoverMfa } from './fn/auth/recover-mfa';
 export type { GetBackOfficePrincipal$Params as GetBackOfficePrincipal$Params } from './fn/back-office/get-back-office-principal';
 export { getBackOfficePrincipal as getBackOfficePrincipal } from './fn/back-office/get-back-office-principal';
+export type { ListAdminUsers$Params as ListAdminUsers$Params } from './fn/back-office/list-admin-users';
+export { listAdminUsers as listAdminUsers } from './fn/back-office/list-admin-users';
+export type { GetAdminUser$Params as GetAdminUser$Params } from './fn/back-office/get-admin-user';
+export { getAdminUser as getAdminUser } from './fn/back-office/get-admin-user';
 export type { ListMaterials$Params as ListMaterials$Params } from './fn/publishing/list-materials';
 export { listMaterials as listMaterials } from './fn/publishing/list-materials';
 export type { CreateMaterial$Params as CreateMaterial$Params } from './fn/publishing/create-material';

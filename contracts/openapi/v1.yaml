@@ -331,6 +331,59 @@ paths:
                 $ref: "#/components/schemas/BackOfficePrincipal"
         default:
           $ref: "#/components/responses/Problem"
+  /api/admin/v1/users:
+    get:
+      tags: [Back office]
+      operationId: listAdminUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 254 }
+        - name: role
+          in: query
+          schema: { type: string, enum: [User, Editor, Administrator] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [Pending, Active, Disabled] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: Account directory with masked contact data on the detail route.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}:
+    get:
+      tags: [Back office]
+      operationId: getAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Account profile with masked verified contact.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/admin/v1/materials:
     get:
       tags: [Publishing]
@@ -2441,6 +2494,32 @@ components:
           format: int64
         user:
           $ref: "#/components/schemas/Profile"
+    AdminUserSummary:
+      type: object
+      required: [id, displayName, role, status]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        role: { type: string, enum: [User, Editor, Administrator] }
+        status: { type: string, enum: [Pending, Active, Disabled] }
+        createdAtUtc: { type: string, format: date-time }
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/AdminUserSummary"
+        - type: object
+          required: [mfaEnabled]
+          properties:
+            mfaEnabled: { type: boolean }
+            verifiedContactMasked: { type: string }
+    AdminUserPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserSummary"
+        nextCursor: { type: string }
     BackOfficePrincipal:
       type: object
       additionalProperties: false

@@ -1509,6 +1509,75 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     );
   });
 
+  void it('should restrict the account directory and mask verified contact details', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const another = await createEditor();
+    const root = '/api/admin/v1/users';
+    await api.get(root).expect(401);
+    await api.get(root).auth(editor.token, { type: 'bearer' }).expect(403);
+    await api
+      .get(root + '/' + editor.id)
+      .auth(editor.token, { type: 'bearer' })
+      .expect(403);
+
+    const sessions = db.db().collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    const denied = await api
+      .get(root)
+      .query({ q: editor.email })
+      .auth(admin.token, { type: 'bearer' })
+      .expect(403);
+    assert.equal(denied.body.code, 'mfa_required');
+    assert.equal(denied.body.instance, root);
+    assert(!denied.text.includes(editor.email));
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+
+    const find = (query: Record<string, string | number>) =>
+      api.get(root).query(query).auth(admin.token, { type: 'bearer' });
+    const exact = await find({
+      q: editor.email.toUpperCase(),
+      role: 'Editor',
+      status: 'Active',
+    }).expect(200);
+    assert.equal(exact.body.items.length, 1);
+    assert.equal(exact.body.items[0].id, editor.id);
+    assert(!exact.text.includes(editor.email));
+    await find({ q: 'example.test' }).expect(400);
+
+    const detail = await api
+      .get(root + '/' + editor.id)
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(detail.body.mfaEnabled, false);
+    assert.equal(
+      detail.body.verifiedContactMasked,
+      editor.email[0] + '***@e***',
+    );
+    assert.match(String(detail.headers['cache-control']), /no-store/);
+    assert.doesNotMatch(
+      detail.text,
+      /passwordHash|mfaSecret|authVersion|example\.test/,
+    );
+
+    const filters = { role: 'Editor', status: 'Active', limit: 1 };
+    const page = await find(filters).expect(200);
+    const cursor = page.body.nextCursor as string;
+    assert(cursor);
+    const next = await find({ ...filters, cursor }).expect(200);
+    assert.equal(page.body.items[0].id, another.id);
+    assert.equal(next.body.items[0].id, editor.id);
+    await find({ ...filters, status: 'Pending', cursor }).expect(400);
+    const altered = cursor.slice(0, -1) + (cursor.endsWith('A') ? 'B' : 'A');
+    await find({ ...filters, cursor: altered }).expect(400);
+  });
+
   void it('should deduplicate anonymous reports and require an authorized decision to restore a material', async () => {
     const editor = await createEditor();
     const admin = await createAdministrator();
