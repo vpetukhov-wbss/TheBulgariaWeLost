@@ -2,10 +2,12 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
+  ArrayUnique,
   IsArray,
   IsBoolean,
   IsEnum,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -17,6 +19,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import {
+  MaterialBlockType,
   MaterialStatus,
   MaterialType,
   WorkingStatus,
@@ -84,8 +87,24 @@ export class CreateMaterialDto {
   @ApiProperty({ minLength: 3, maxLength: 200 })
   @IsString()
   @MinLength(3)
+  @Matches(/\S/)
   @MaxLength(200)
   title: string;
+}
+
+export class MaterialBlockDto {
+  @ApiProperty({ format: 'uuid' })
+  @IsUUID()
+  id: string;
+
+  @ApiProperty({ enum: MaterialBlockType })
+  @IsEnum(MaterialBlockType)
+  type: MaterialBlockType;
+
+  @ApiProperty({ maxLength: 6_000 })
+  @IsString()
+  @MaxLength(6_000)
+  text: string;
 }
 
 export class UpdateMaterialDraftDto {
@@ -113,6 +132,16 @@ export class UpdateMaterialDraftDto {
   @IsString()
   @MaxLength(100_000)
   body?: string;
+
+  @ApiPropertyOptional({ type: [MaterialBlockDto], maxItems: 40 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(40)
+  @ArrayUnique((block: MaterialBlockDto | null) => block?.id)
+  @IsObject({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => MaterialBlockDto)
+  blocks?: MaterialBlockDto[];
 
   @ApiPropertyOptional({ type: [String], maxItems: 100 })
   @IsOptional()
@@ -151,6 +180,7 @@ export class UpdateMaterialDraftDto {
 
   @ApiPropertyOptional({ type: MaterialRightsDto })
   @IsOptional()
+  @IsObject()
   @ValidateNested()
   @Type(() => MaterialRightsDto)
   rights?: MaterialRightsDto;
@@ -178,6 +208,13 @@ export class TransitionMaterialDto {
   @MinLength(3)
   @MaxLength(500)
   reason?: string;
+}
+
+export class SubmitAuthorMaterialDto {
+  @ApiProperty({ minimum: 1 })
+  @IsInt()
+  @Min(1)
+  expectedVersion: number;
 }
 
 export class RestoreMaterialRevisionDto {
@@ -262,6 +299,9 @@ export class MaterialDetailDto {
 
   @ApiProperty({ type: [String] })
   publicationBlockers: string[];
+
+  @ApiPropertyOptional({ maxLength: 500 })
+  correctionNote?: string;
 
   @ApiProperty({ minimum: 1 })
   version: number;

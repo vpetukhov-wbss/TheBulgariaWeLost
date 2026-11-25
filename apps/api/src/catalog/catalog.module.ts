@@ -38,5 +38,6 @@ import {
   ],
   controllers: [CatalogController, PublicCatalogController],
   providers: [CatalogService, BackOfficeGuard],
+  exports: [CatalogService],
 })
 export class CatalogModule {}

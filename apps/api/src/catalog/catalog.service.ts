@@ -36,6 +36,18 @@ import {
 
 type Principal = SignedInAccount;
 
+const authorCatalog = {
+  categoryIds: {
+    kind: CatalogKind.Categories,
+    status: CatalogStatus.Approved,
+    isVisible: true,
+  },
+  topicIds: { kind: CatalogKind.Topics, status: CatalogStatus.Published },
+  sourceIds: { kind: CatalogKind.Sources, status: CatalogStatus.Active },
+} as const;
+
+export type AuthorCatalogField = keyof typeof authorCatalog;
+
 const commonFields = ['slug', 'aliases'] as const;
 const editableFields: Record<CatalogKind, readonly (keyof CatalogInputDto)[]> =
   {
@@ -138,6 +150,60 @@ export class CatalogService {
       });
     }
     return Number(versionText);
+  }
+
+  async authorOptions(
+    field: AuthorCatalogField,
+    search: string,
+    selectedIds: string[],
+  ) {
+    const { kind, ...visibility } = authorCatalog[field];
+    const escaped = search
+      .slice(0, 100)
+      .trim()
+      .replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const labelField = field === 'sourceIds' ? 'title' : 'name';
+    const model = this.model(kind);
+    const projection = { _id: 1, [labelField]: 1 };
+    const [entries, selected] = await Promise.all([
+      model
+        .find({
+          ...visibility,
+          [labelField]: { $regex: escaped, $options: 'i' },
+        })
+        .select(projection)
+        .sort({ [labelField]: 1, _id: 1 })
+        .limit(30)
+        .exec(),
+      selectedIds.length
+        ? model
+            .find({ ...visibility, _id: { $in: selectedIds } })
+            .select(projection)
+            .exec()
+        : [],
+    ]);
+    return Array.from(
+      new Map(
+        [...entries, ...selected].map((entry) => [entry._id, entry]),
+      ).values(),
+    ).map((entry) => ({
+      id: entry._id,
+      label: entry[labelField]!,
+    }));
+  }
+
+  async authorSelectionValid(
+    field: AuthorCatalogField,
+    ids: string[],
+    session: ClientSession,
+  ) {
+    const { kind, ...visibility } = authorCatalog[field];
+    const unique = [...new Set(ids)];
+    const count = await this.model(kind)
+      .countDocuments({ ...visibility, _id: { $in: unique } })
+      .session(session)
+      .exec();
+    return count === unique.length;
   }
 
   async list(

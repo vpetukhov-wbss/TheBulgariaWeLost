@@ -27,6 +27,7 @@ async function bootstrap(): Promise<void> {
   app.use(helmet());
   app.enableCors({
     origin: config.getOrThrow('app.corsOrigins', { infer: true }),
+    exposedHeaders: ['ETag'],
   });
   app.enableShutdownHooks();
   app.setGlobalPrefix('api', {

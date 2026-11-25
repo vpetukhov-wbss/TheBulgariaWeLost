@@ -5,6 +5,7 @@ import { MaterialDraft } from '../models/material-draft';
 export interface MaterialDetail {
   allowedActions: Array<string>;
   authorId: string;
+  correctionNote?: string;
   draft: MaterialDraft;
   id: string;
   language: string;

@@ -34,11 +34,24 @@ export interface MaterialRights {
   statement: string;
 }
 
+export enum MaterialBlockType {
+  Heading = 'Heading',
+  Paragraph = 'Paragraph',
+  Quote = 'Quote',
+}
+
+export interface MaterialBlock {
+  id: string;
+  type: MaterialBlockType;
+  text: string;
+}
+
 export interface MaterialDraft {
   title: string;
   subtitle?: string;
   summary?: string;
   body?: string;
+  blocks?: MaterialBlock[];
   categoryIds: string[];
   topicIds: string[];
   sourceIds: string[];
@@ -93,6 +106,9 @@ export class Material {
 
   @Prop({ type: String, enum: WorkingStatus })
   archivedFromWorkingStatus?: WorkingStatus;
+
+  @Prop({ type: String, maxlength: 500 })
+  correctionNote?: string;
 
   @Prop({ default: 1, required: true })
   version: number;

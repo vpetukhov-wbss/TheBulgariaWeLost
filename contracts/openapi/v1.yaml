@@ -10,6 +10,7 @@ tags:
   - name: Auth
   - name: Back office
   - name: Publishing
+  - name: Authoring
   - name: Catalog
   - name: Media
   - name: Internal media
@@ -510,6 +511,192 @@ paths:
                 $ref: "#/components/schemas/MaterialDetail"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/author/materials:
+    get:
+      tags: [Authoring]
+      operationId: listAuthorMaterials
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Own materials, newest first.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      tags: [Authoring]
+      operationId: createAuthorMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateMaterialRequest"
+      responses:
+        "201":
+          description: New private draft.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/author/materials/{id}:
+    get:
+      tags: [Authoring]
+      operationId: getAuthorMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "200":
+          description: The current revision of an owned material.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Authoring]
+      operationId: updateAuthorDraft
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateMaterialDraftRequest"
+      responses:
+        "200":
+          description: A new revision of an owned draft. Media references are managed by the editorial API.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/author/materials/{id}/submissions:
+    post:
+      tags: [Authoring]
+      operationId: submitAuthorMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SubmitAuthorMaterialRequest"
+      responses:
+        "200":
+          description: Material placed in the editorial queue.
+          headers:
+            ETag:
+              $ref: "#/components/headers/MaterialEtag"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MaterialDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/author/catalog-options/{field}:
+    get:
+      tags: [Authoring]
+      operationId: getAuthorCatalogOptions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AuthorCatalogField"
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: selected
+          in: query
+          description: Comma-separated IDs of current selections to resolve alongside search results.
+          schema: { type: string, maxLength: 3700 }
+      responses:
+        "200":
+          description: Searchable catalog entries available to authors.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthorCatalogOptions"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/account/saved-materials:
+    get:
+      tags: [Authoring]
+      operationId: listSavedMaterials
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Saved materials which are currently public.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SavedMaterialPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/account/saved-materials/{id}:
+    put:
+      tags: [Authoring]
+      operationId: saveMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
+    delete:
+      tags: [Authoring]
+      operationId: removeSavedMaterial
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialId"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/materials/{slug}:
     get:
       tags: [Publishing]
@@ -986,6 +1173,13 @@ components:
       scheme: bearer
       description: Private, rotated service credential.
   parameters:
+    AuthorCatalogField:
+      name: field
+      in: path
+      required: true
+      schema:
+        type: string
+        enum: [categoryIds, topicIds, sourceIds]
     CorrelationId:
       name: X-Correlation-ID
       in: header
@@ -1485,6 +1679,16 @@ components:
           type: string
           minLength: 3
           maxLength: 2000
+    MaterialBlock:
+      type: object
+      additionalProperties: false
+      required: [id, type, text]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          enum: [Heading, Paragraph, Quote]
+        text: { type: string, maxLength: 6000 }
     MaterialDraft:
       type: object
       additionalProperties: false
@@ -1504,6 +1708,11 @@ components:
         body:
           type: string
           maxLength: 100000
+        blocks:
+          type: array
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/MaterialBlock"
         categoryIds:
           type: array
           maxItems: 100
@@ -1564,6 +1773,11 @@ components:
         body:
           type: string
           maxLength: 100000
+        blocks:
+          type: array
+          maxItems: 40
+          items:
+            $ref: "#/components/schemas/MaterialBlock"
         categoryIds:
           type: array
           maxItems: 100
@@ -1763,12 +1977,49 @@ components:
           type: array
           items:
             type: string
+        correctionNote: { type: string, maxLength: 500 }
         version:
           type: integer
           minimum: 1
         updatedAtUtc:
           type: string
           format: date-time
+    SubmitAuthorMaterialRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+    AuthorCatalogOption:
+      type: object
+      required: [id, label]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+    AuthorCatalogOptions:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuthorCatalogOption"
+    SavedMaterial:
+      type: object
+      required: [id, slug, title, savedAtUtc]
+      properties:
+        id: { type: string, format: uuid }
+        slug: { type: string }
+        title: { type: string }
+        savedAtUtc: { type: string, format: date-time }
+    SavedMaterialPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/SavedMaterial"
     PublicMaterial:
       type: object
       additionalProperties: false

@@ -1,0 +1,60 @@
+:host {
+  display: block;
+  max-width: 58rem;
+  margin-inline: auto;
+}
+.page-header,
+.workspace-nav,
+.material-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.25rem;
+}
+.page-header,
+.material-row {
+  justify-content: space-between;
+}
+h1 {
+  font-size: clamp(1.55rem, 4vw, 2.25rem);
+}
+h2 {
+  font-size: 1rem;
+  line-height: 1.4;
+  margin: 0 0 0.35rem;
+  overflow-wrap: anywhere;
+}
+.workspace-nav {
+  margin: 0 0 1.25rem;
+}
+.workspace-nav a {
+  padding-block: 0.4rem;
+}
+.workspace-nav a[aria-current='page'] {
+  text-decoration-thickness: 0.15rem;
+  font-weight: 700;
+}
+.rows {
+  display: grid;
+  gap: 0.75rem;
+}
+nb-card {
+  margin-bottom: 0;
+}
+.material-row > div {
+  min-width: 0;
+}
+time {
+  color: var(--text-hint-color);
+  font-size: 0.85rem;
+}
+.status {
+  background: var(--background-basic-color-3);
+  border-radius: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  font-weight: 600;
+}
+.corrections {
+  background: var(--color-warning-transparent-100);
+  color: var(--color-warning-900);
+}

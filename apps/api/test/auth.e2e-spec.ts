@@ -1285,6 +1285,205 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.equal(outboxCount, finalMaterial.version);
   });
 
+  void it('should let users resume owned drafts, receive corrections and bookmark public materials', async () => {
+    const email = `${randomUUID()}@example.test`;
+    await register(email);
+    await confirm(email);
+    const author = await login(email);
+    const reviewer = await createEditor();
+    const root = '/api/v1/author/materials';
+    const saved = '/api/v1/account/saved-materials';
+    await api.get(root).expect(401);
+    await api
+      .get('/api/admin/v1/materials')
+      .auth(author.token, { type: 'bearer' })
+      .expect(403);
+    const initial = await api
+      .get(root)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(initial.body.items, []);
+
+    const created = await api
+      .post(root)
+      .auth(author.token, { type: 'bearer' })
+      .send({ type: 'Story', language: 'bg', title: 'Спомен от фабриката' })
+      .expect(201);
+    const id = (created.body as MaterialResponse).id;
+    const detail = `${root}/${id}`;
+    const editorTransition = (
+      action: string,
+      expectedVersion: number,
+      reason?: string,
+    ) =>
+      api
+        .post(`/api/admin/v1/materials/${id}/transitions`)
+        .auth(reviewer.token, { type: 'bearer' })
+        .send({ action, expectedVersion, reason });
+    const submit = (expectedVersion: number) =>
+      api
+        .post(`${detail}/submissions`)
+        .auth(author.token, { type: 'bearer' })
+        .send({ expectedVersion });
+    await api.get(detail).auth(reviewer.token, { type: 'bearer' }).expect(404);
+    await api
+      .put(`${saved}/${id}`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(404);
+    const incomplete = await submit(1).expect(422);
+    assert.equal(incomplete.body.code, 'submission_incomplete');
+
+    const categoryId = randomUUID();
+    const topicId = randomUUID();
+    const sourceId = randomUUID();
+    for (const item of [
+      {
+        kind: 'categories',
+        _id: categoryId,
+        name: 'Индустрия',
+        status: 'Approved',
+        isVisible: true,
+      },
+      {
+        kind: 'categories',
+        _id: randomUUID(),
+        name: 'Индустрия - скрито',
+        status: 'Hidden',
+        isVisible: false,
+      },
+      { kind: 'topics', _id: topicId, name: 'Фабрики', status: 'Published' },
+      {
+        kind: 'sources',
+        _id: sourceId,
+        title: 'Личен архив',
+        status: 'Active',
+      },
+    ]) {
+      await db
+        .db()
+        .collection<typeof item & { slug: string }>(item.kind)
+        .insertOne({ ...item, slug: `author-test-${item._id}` });
+    }
+    const available = await api
+      .get('/api/v1/author/catalog-options/categoryIds')
+      .query({ q: 'Индустрия' })
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(available.body.items, [
+      { id: categoryId, label: 'Индустрия' },
+    ]);
+
+    const blocks = [
+      {
+        id: randomUUID(),
+        type: 'Paragraph',
+        text: 'Работихме заедно през 1978 година.',
+      },
+    ];
+    const draft = {
+      blocks,
+      categoryIds: [categoryId],
+      topicIds: [topicId],
+      sourceIds: [sourceId],
+      rights: {
+        publicDisplayAllowed: true,
+        statement: 'Авторски спомен с право за публично показване.',
+      },
+    };
+    const update = () =>
+      api
+        .patch(detail)
+        .auth(author.token, { type: 'bearer' })
+        .set('If-Match', String(created.headers.etag))
+        .send(draft);
+    assert.deepEqual(
+      (await Promise.all([update(), update()]))
+        .map(({ status }) => status)
+        .sort(),
+      [200, 412],
+    );
+    const reloaded = await api
+      .get(detail)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(reloaded.body.draft.blocks, blocks);
+    await submit(2).expect(200);
+    await api.get(detail).auth(reviewer.token, { type: 'bearer' }).expect(404);
+    await api
+      .patch(detail)
+      .auth(author.token, { type: 'bearer' })
+      .set('If-Match', `"material-${id}-v3"`)
+      .send(draft)
+      .expect(409);
+    await editorTransition('StartReview', 3).expect(200);
+    await editorTransition(
+      'RequestChanges',
+      4,
+      'Уточни името на фабриката.',
+    ).expect(200);
+    const feedback = await api
+      .get(detail)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(feedback.body.workingStatus, 'ChangesRequested');
+    assert.equal(feedback.body.correctionNote, 'Уточни името на фабриката.');
+    const corrected = await api
+      .patch(detail)
+      .auth(author.token, { type: 'bearer' })
+      .set('If-Match', String(feedback.headers.etag))
+      .send({ title: 'Спомен от фабрика Берое' })
+      .expect(200);
+    const resubmitted = await submit(
+      (corrected.body as MaterialResponse).version,
+    ).expect(200);
+    assert.equal(resubmitted.body.correctionNote, undefined);
+    await editorTransition('StartReview', 7).expect(200);
+    await editorTransition('Publish', 8).expect(200);
+    const publicMaterial = await api
+      .get(`/api/v1/materials/${created.body.slug}`)
+      .expect(200);
+    assert.deepEqual(publicMaterial.body.content.blocks, blocks);
+
+    const bookmark = () =>
+      api
+        .put(`${saved}/${id}`)
+        .auth(author.token, { type: 'bearer' })
+        .expect(204);
+    await Promise.all([bookmark(), bookmark()]);
+    const bookmarks = await api
+      .get(saved)
+      .auth(author.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(bookmarks.body.items.length, 1);
+    assert.equal(bookmarks.body.items[0].title, 'Спомен от фабрика Берое');
+    const otherBookmarks = await api
+      .get(saved)
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(otherBookmarks.body.items, []);
+    await editorTransition(
+      'Withdraw',
+      9,
+      'Допълнителна редакционна проверка.',
+    ).expect(200);
+    assert.deepEqual(
+      (await api.get(saved).auth(author.token, { type: 'bearer' }).expect(200))
+        .body.items,
+      [],
+    );
+    await api
+      .delete(`${saved}/${id}`)
+      .auth(author.token, { type: 'bearer' })
+      .expect(204);
+    assert.equal(
+      await db
+        .db()
+        .collection('savedMaterials')
+        .countDocuments({ materialId: id }),
+      0,
+    );
+  });
+
   void it(
     'should govern catalog proposals, hierarchies and canonical merges',
     { timeout: 60_000 },

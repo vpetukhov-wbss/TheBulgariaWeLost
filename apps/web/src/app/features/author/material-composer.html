@@ -1,0 +1,296 @@
+<header class="page-header">
+  <div>
+    <h1>{{ id ? material()?.draft?.title || 'Материал' : 'Нов материал' }}</h1>
+    @if (material(); as current) {
+      <p>{{ status(current) }} · Версия {{ current.version }}</p>
+    }
+  </div>
+  <a nbButton outline routerLink="/account/materials">Към моите материали</a>
+</header>
+
+@if (error()) {
+  <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+}
+@if (success()) {
+  <nb-alert status="success" role="status">{{ success() }}</nb-alert>
+}
+@if (conflict()) {
+  <div class="conflict-action">
+    <button nbButton status="warning" outline type="button" [disabled]="loading()" (click)="load()">
+      Зареди актуалната версия
+    </button>
+  </div>
+}
+
+@if (!id) {
+  <nb-card class="create-card">
+    <nb-card-body>
+      <form [formGroup]="createForm" (ngSubmit)="create()">
+        <fieldset [disabled]="busy()">
+          <label class="field"
+            >Заглавие <input nbInput fullWidth formControlName="title" maxlength="200"
+          /></label>
+          <label class="field"
+            >Тип
+            <select formControlName="type">
+              <option value="Story">Разказ</option>
+              <option value="Document">Документ</option>
+              <option value="PhotoEssay">Фотоистория</option>
+              <option value="Episode">Епизод</option>
+            </select>
+          </label>
+          <button nbButton status="primary" type="submit">Създай чернова</button>
+        </fieldset>
+      </form>
+    </nb-card-body>
+  </nb-card>
+} @else if (material(); as current) {
+  @if (current.workingStatus === 'ChangesRequested') {
+    <nb-alert status="warning" role="status">
+      <strong>Редакторски корекции</strong>
+      <p class="correction">
+        {{ current.correctionNote || 'Редакцията върна материала за корекция.' }}
+      </p>
+    </nb-alert>
+  }
+  @if (loading()) {
+    <p role="status">Зареждане на актуалната версия…</p>
+  }
+  <form [formGroup]="form" (ngSubmit)="save()">
+    <fieldset [disabled]="busy() || loading()" class="composer-grid">
+      <div>
+        <nb-card>
+          <nb-card-header>Основни данни</nb-card-header>
+          <nb-card-body>
+            <label class="field"
+              >Заглавие
+              <input
+                nbInput
+                fullWidth
+                formControlName="title"
+                maxlength="200"
+                [readOnly]="!canEdit()"
+            /></label>
+            <label class="field"
+              >Подзаглавие
+              <input
+                nbInput
+                fullWidth
+                formControlName="subtitle"
+                maxlength="300"
+                [readOnly]="!canEdit()"
+            /></label>
+            <label class="field"
+              >Резюме
+              <textarea
+                nbInput
+                fullWidth
+                rows="3"
+                formControlName="summary"
+                maxlength="1000"
+                [readOnly]="!canEdit()"
+              ></textarea>
+            </label>
+          </nb-card-body>
+        </nb-card>
+        <nb-card>
+          <nb-card-header>Съдържание</nb-card-header>
+          <nb-card-body>
+            @if (current.draft.body !== undefined) {
+              <label class="field"
+                >Основен текст
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="6"
+                  formControlName="body"
+                  maxlength="100000"
+                  [readOnly]="!canEdit()"
+                ></textarea>
+              </label>
+            }
+            @for (block of blocks(); track block.id; let index = $index) {
+              <section class="block" [attr.aria-labelledby]="'block-' + block.id">
+                <div class="block-header">
+                  <strong [id]="'block-' + block.id"
+                    >{{ labels[block.type] }} {{ index + 1 }}</strong
+                  >
+                  @if (canEdit()) {
+                    <div class="block-actions">
+                      <button
+                        nbButton
+                        ghost
+                        size="small"
+                        type="button"
+                        [disabled]="index === 0"
+                        [attr.aria-label]="'Премести блок ' + (index + 1) + ' нагоре'"
+                        (click)="move(index, -1)"
+                      >
+                        ↑
+                      </button>
+                      <button
+                        nbButton
+                        ghost
+                        size="small"
+                        type="button"
+                        [disabled]="index === blocks().length - 1"
+                        [attr.aria-label]="'Премести блок ' + (index + 1) + ' надолу'"
+                        (click)="move(index, 1)"
+                      >
+                        ↓
+                      </button>
+                      <button
+                        nbButton
+                        ghost
+                        size="small"
+                        status="danger"
+                        type="button"
+                        [attr.aria-label]="'Изтрий блок ' + (index + 1)"
+                        (click)="remove(block.id)"
+                      >
+                        Изтрий
+                      </button>
+                    </div>
+                  }
+                </div>
+                <textarea
+                  nbInput
+                  fullWidth
+                  [rows]="block.type === 'Paragraph' ? 5 : 2"
+                  [attr.aria-label]="'Текст на блок ' + (index + 1)"
+                  maxlength="6000"
+                  [value]="block.text"
+                  [readOnly]="!canEdit()"
+                  (input)="edit(block.id, $event)"
+                ></textarea>
+              </section>
+            } @empty {
+              @if (!current.draft.body) {
+                <p class="hint">Все още няма добавени блокове.</p>
+              }
+            }
+            @if (canEdit()) {
+              <div class="block-actions">
+                <button
+                  nbButton
+                  outline
+                  size="small"
+                  type="button"
+                  [disabled]="blocks().length >= 40"
+                  (click)="add('Heading')"
+                >
+                  Добави заглавие
+                </button>
+                <button
+                  nbButton
+                  outline
+                  size="small"
+                  type="button"
+                  [disabled]="blocks().length >= 40"
+                  (click)="add('Paragraph')"
+                >
+                  Добави абзац
+                </button>
+                <button
+                  nbButton
+                  outline
+                  size="small"
+                  type="button"
+                  [disabled]="blocks().length >= 40"
+                  (click)="add('Quote')"
+                >
+                  Добави цитат
+                </button>
+              </div>
+            }
+          </nb-card-body>
+        </nb-card>
+      </div>
+      <aside>
+        <nb-card>
+          <nb-card-header>Класификация и права</nb-card-header>
+          <nb-card-body>
+            @for (field of catalogFields; track field) {
+              <app-author-catalog-picker
+                [field]="field"
+                [label]="catalogLabels[field]"
+                [selected]="form.controls[field].value"
+                [disabled]="!canEdit() || busy() || loading()"
+                (selectionChange)="form.controls[field].setValue($event)"
+              />
+            }
+            <label class="field"
+              >Произход
+              <textarea
+                nbInput
+                fullWidth
+                rows="2"
+                formControlName="provenance"
+                maxlength="2000"
+                [readOnly]="!canEdit()"
+              ></textarea>
+            </label>
+            <label class="rights-check">
+              @if (canEdit()) {
+                <input type="checkbox" formControlName="publicDisplayAllowed" />
+                Имам право на публично показване
+              } @else {
+                {{
+                  current.draft.rights.publicDisplayAllowed
+                    ? 'Потвърдени права'
+                    : 'Непотвърдени права'
+                }}
+              }
+            </label>
+            <label class="field"
+              >Основание за правата
+              <textarea
+                nbInput
+                fullWidth
+                rows="3"
+                formControlName="rightsStatement"
+                maxlength="2000"
+                [readOnly]="!canEdit()"
+              ></textarea>
+            </label>
+          </nb-card-body>
+        </nb-card>
+        <nb-card>
+          <nb-card-header>Редакционен преглед</nb-card-header>
+          <nb-card-body>
+            @if (canEdit()) {
+              @if (blockers().length) {
+                <p class="hint">Условия за подаване според последния запис</p>
+                <ul>
+                  @for (blocker of blockers(); track blocker) {
+                    <li>{{ describeBlocker(blocker) }}</li>
+                  }
+                </ul>
+              }
+              <div class="submit-actions">
+                <button nbButton outline type="submit" [disabled]="conflict()">
+                  Запази чернова
+                </button>
+                <button
+                  nbButton
+                  status="primary"
+                  type="button"
+                  [disabled]="conflict()"
+                  (click)="save(true)"
+                >
+                  Изпрати за преглед
+                </button>
+              </div>
+            } @else {
+              <p class="hint">Тази версия е достъпна за преглед.</p>
+            }
+          </nb-card-body>
+        </nb-card>
+      </aside>
+    </fieldset>
+  </form>
+} @else if (loading()) {
+  <p role="status">Зареждане на черновата…</p>
+} @else {
+  <button nbButton type="button" (click)="load()">Опитай отново</button>
+}
