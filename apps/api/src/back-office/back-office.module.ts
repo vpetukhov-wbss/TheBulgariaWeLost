@@ -21,6 +21,7 @@ import {
   PublishingOutboxEvent,
   PublishingOutboxEventSchema,
 } from '../publishing/persistence/publishing-event.schema';
+import { PublishingModule } from '../publishing/publishing.module';
 import { AdminUserActionsService } from './admin-user-actions.service';
 import {
   AdminUsersController,
@@ -55,10 +56,22 @@ import {
   PasswordResetOperationSchema,
 } from './persistence/password-reset-operation.schema';
 
+import {
+  AdminSiteSettingsController,
+  PublicSiteSettingsController,
+} from './site-settings/site-settings.controller';
+import {
+  SiteSettings,
+  SiteSettingsSchema,
+} from './site-settings/site-settings.schema';
+import { SiteSettingsService } from './site-settings/site-settings.service';
+
 @Module({
   imports: [
     AuthModule,
+    PublishingModule,
     MongooseModule.forFeature([
+      { name: SiteSettings.name, schema: SiteSettingsSchema },
       { name: Account.name, schema: AccountSchema },
       { name: Session.name, schema: SessionSchema },
       { name: AuditAccessEvent.name, schema: AuditAccessEventSchema },
@@ -80,6 +93,8 @@ import {
     BackOfficeController,
     AuditController,
     DashboardController,
+    AdminSiteSettingsController,
+    PublicSiteSettingsController,
     AdminUsersController,
     PasswordResetOperationsController,
   ],
@@ -87,6 +102,7 @@ import {
     BackOfficeGuard,
     AuditService,
     DashboardService,
+    SiteSettingsService,
     AdministratorGuard,
     AdminUsersService,
     AdminUserActionsService,

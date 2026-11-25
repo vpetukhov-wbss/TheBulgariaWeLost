@@ -41,6 +41,12 @@ export type { ListAuditEvents$Params as ListAuditEvents$Params } from './fn/audi
 export { listAuditEvents as listAuditEvents } from './fn/audit/list-audit-events';
 export type { GetAuditEvent$Params as GetAuditEvent$Params } from './fn/audit/get-audit-event';
 export { getAuditEvent as getAuditEvent } from './fn/audit/get-audit-event';
+export type { GetAdminSiteSettings$Params as GetAdminSiteSettings$Params } from './fn/admin-site-settings/get-admin-site-settings';
+export { getAdminSiteSettings as getAdminSiteSettings } from './fn/admin-site-settings/get-admin-site-settings';
+export type { ReplaceAdminSiteSettings$Params as ReplaceAdminSiteSettings$Params } from './fn/admin-site-settings/replace-admin-site-settings';
+export { replaceAdminSiteSettings as replaceAdminSiteSettings } from './fn/admin-site-settings/replace-admin-site-settings';
+export type { GetPublicSiteSettings$Params as GetPublicSiteSettings$Params } from './fn/public-site-settings/get-public-site-settings';
+export { getPublicSiteSettings as getPublicSiteSettings } from './fn/public-site-settings/get-public-site-settings';
 export type { ListAdminUsers$Params as ListAdminUsers$Params } from './fn/admin-users/list-admin-users';
 export { listAdminUsers as listAdminUsers } from './fn/admin-users/list-admin-users';
 export type { GetAdminUser$Params as GetAdminUser$Params } from './fn/admin-users/get-admin-user';

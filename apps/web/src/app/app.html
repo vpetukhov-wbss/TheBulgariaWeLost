@@ -3,7 +3,7 @@
     <div class="header">
       <a class="brand" routerLink="/">
         <nb-icon icon="archive-outline" aria-hidden="true"></nb-icon>
-        <span>България, която изгубихме</span>
+        <span>{{ presentation().siteName }}</span>
       </a>
       <div class="header-actions">
         <a
@@ -29,7 +29,13 @@
 
   <nb-layout-column>
     <main>
+      @if (!inBackOffice() && presentation().banners.length) {
+        <app-site-notices [banners]="presentation().banners" />
+      }
       <router-outlet />
     </main>
   </nb-layout-column>
+  @if (!inBackOffice() && hasFooter()) {
+    <nb-layout-footer><app-site-footer [settings]="presentation()" /></nb-layout-footer>
+  }
 </nb-layout>

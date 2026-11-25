@@ -6,6 +6,8 @@ export { AuthService } from './services/auth.service';
 export { BackOfficeService } from './services/back-office.service';
 export { DashboardService } from './services/dashboard.service';
 export { AuditService } from './services/audit.service';
+export { AdminSiteSettingsService } from './services/admin-site-settings.service';
+export { PublicSiteSettingsService } from './services/public-site-settings.service';
 export { AdminUsersService } from './services/admin-users.service';
 export { PublishingService } from './services/publishing.service';
 export { AuthoringService } from './services/authoring.service';

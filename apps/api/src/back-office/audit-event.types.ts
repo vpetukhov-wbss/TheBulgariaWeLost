@@ -4,6 +4,7 @@ export enum AuditTargetType {
   Material = 'Material',
   Moderation = 'Moderation',
   Other = 'Other',
+  SiteSettings = 'SiteSettings',
 }
 
 export enum AuditOutcome {

@@ -1,0 +1,384 @@
+<header class="page-heading">
+  <div>
+    <a class="breadcrumb" routerLink="/admin">Работен панел</a>
+    <h1>Настройки на сайта</h1>
+  </div>
+  @if (store.current(); as current) {
+    <p class="muted">
+      Версия {{ current.document.version }}
+      @if (current.document.updatedAtUtc; as updated) {
+        · {{ updated | date: 'dd.MM.yyyy, HH:mm' }}
+      }
+    </p>
+  }
+</header>
+
+@if (store.error()) {
+  <nb-alert status="danger" role="alert">{{ store.error() }}</nb-alert>
+}
+@if (formError()) {
+  <nb-alert status="warning" role="alert">{{ formError() }}</nb-alert>
+}
+@if (notice()) {
+  <nb-alert status="success" role="status">{{ notice() }}</nb-alert>
+}
+@if (store.conflict()) {
+  <nb-alert status="warning" role="alert">
+    <strong>Има по-нова версия на настройките.</strong>
+    <p>
+      Твоите промени са запазени във формата. Можеш да ги прегледаш преди зареждане на актуалната
+      версия.
+    </p>
+    <button nbButton outline [disabled]="store.busy()" (click)="reload()">
+      Зареди актуалната версия и замени черновата
+    </button>
+  </nb-alert>
+}
+
+@if (store.current()) {
+  @if (previewing()) {
+    <nb-card>
+      <nb-card-header><h2>Преглед на промените</h2></nb-card-header>
+      <nb-card-body>
+        <h3>{{ draft().siteName }}</h3>
+        <app-site-notices [banners]="draft().banners" [preview]="true" />
+        @if (draft().featuredMaterialIds.length) {
+          <h3>Избрано от архива</h3>
+          <ol>
+            @for (id of draft().featuredMaterialIds; track id) {
+              <li class="wrap">{{ materialTitles().get(id) ?? id }}</li>
+            }
+          </ol>
+        }
+        <app-site-footer [settings]="draft()" [preview]="true" />
+        <form class="divider" (ngSubmit)="save()">
+          <label class="field">
+            Причина за промяната
+            <textarea
+              nbInput
+              fullWidth
+              rows="3"
+              maxlength="500"
+              name="reason"
+              [ngModel]="reason()"
+              (ngModelChange)="reason.set($event)"
+              [disabled]="store.busy()"
+            ></textarea>
+          </label>
+          <div class="actions">
+            <button
+              nbButton
+              status="primary"
+              type="submit"
+              [disabled]="store.busy() || store.conflict() || !reason().trim()"
+            >
+              Запази промените
+            </button>
+            <button
+              nbButton
+              outline
+              type="button"
+              [disabled]="store.busy()"
+              (click)="previewing.set(false); store.clearError()"
+            >
+              Назад към редакцията
+            </button>
+          </div>
+        </form>
+      </nb-card-body>
+    </nb-card>
+  } @else {
+    <nav class="section-nav" aria-label="Раздели на настройките">
+      <button
+        type="button"
+        nbButton
+        ghost
+        [attr.aria-current]="tab() === 'general' ? 'page' : null"
+        (click)="tab.set('general')"
+      >
+        Общи
+      </button>
+      <button
+        type="button"
+        nbButton
+        ghost
+        [attr.aria-current]="tab() === 'social' ? 'page' : null"
+        (click)="tab.set('social')"
+      >
+        Социални канали
+      </button>
+      <button
+        type="button"
+        nbButton
+        ghost
+        [attr.aria-current]="tab() === 'home' ? 'page' : null"
+        (click)="openHome()"
+      >
+        Начална страница
+      </button>
+    </nav>
+    @switch (tab()) {
+      @case ('general') {
+        <nb-card>
+          <nb-card-header><h2>Общи настройки</h2></nb-card-header>
+          <nb-card-body>
+            <label class="field"
+              >Име на сайта
+              <input
+                nbInput
+                fullWidth
+                maxlength="80"
+                [ngModel]="draft().siteName"
+                (ngModelChange)="change('siteName', $event)"
+              />
+            </label>
+            <label class="field"
+              >Публичен имейл за контакт
+              <input
+                nbInput
+                fullWidth
+                type="email"
+                maxlength="254"
+                [ngModel]="draft().supportContact ?? ''"
+                (ngModelChange)="change('supportContact', $event)"
+              />
+            </label>
+          </nb-card-body>
+        </nb-card>
+        <nb-card>
+          <nb-card-header><h2>Връзки в долната част</h2></nb-card-header>
+          <nb-card-body>
+            @for (link of draft().footerLinks; track $index) {
+              <fieldset class="editable-row">
+                <legend>Връзка {{ $index + 1 }}</legend>
+                <div class="fields">
+                  <label class="field"
+                    >Етикет
+                    <input
+                      nbInput
+                      fullWidth
+                      maxlength="80"
+                      [ngModel]="link.label"
+                      (ngModelChange)="changeFooterLink($index, 'label', $event)"
+                    />
+                  </label>
+                  <label class="field"
+                    >Адрес
+                    <input
+                      nbInput
+                      fullWidth
+                      maxlength="500"
+                      [ngModel]="link.url"
+                      (ngModelChange)="changeFooterLink($index, 'url', $event)"
+                    />
+                  </label>
+                  <button
+                    nbButton
+                    ghost
+                    status="danger"
+                    type="button"
+                    (click)="removeFooterLink($index)"
+                  >
+                    Премахни връзката
+                  </button>
+                </div>
+              </fieldset>
+            }
+            <button
+              nbButton
+              outline
+              type="button"
+              [disabled]="draft().footerLinks.length >= 8"
+              (click)="addFooterLink()"
+            >
+              Добави връзка
+            </button>
+          </nb-card-body>
+        </nb-card>
+      }
+      @case ('social') {
+        <nb-card>
+          <nb-card-header><h2>Социални канали</h2></nb-card-header>
+          <nb-card-body>
+            @for (platform of platforms; track platform) {
+              <label class="field"
+                >{{ platform }}
+                <input
+                  nbInput
+                  fullWidth
+                  inputmode="url"
+                  maxlength="500"
+                  [ngModel]="socialUrl(platform)"
+                  (ngModelChange)="setSocial(platform, $event)"
+                />
+              </label>
+            }
+          </nb-card-body>
+        </nb-card>
+      }
+      @case ('home') {
+        <nb-card>
+          <nb-card-header><h2>Информационни ленти</h2></nb-card-header>
+          <nb-card-body>
+            @for (banner of draft().banners; track $index) {
+              <fieldset class="editable-row">
+                <legend>Лента {{ $index + 1 }}</legend>
+                <label class="field"
+                  >Текст на лентата
+                  <textarea
+                    nbInput
+                    fullWidth
+                    maxlength="240"
+                    rows="2"
+                    [ngModel]="banner.text"
+                    (ngModelChange)="changeBanner($index, { text: $event })"
+                  ></textarea>
+                </label>
+                <div class="fields">
+                  <label class="field"
+                    >Етикет на бутона (по избор)
+                    <input
+                      nbInput
+                      fullWidth
+                      maxlength="80"
+                      [ngModel]="banner.link?.label ?? ''"
+                      (ngModelChange)="changeBannerLink($index, 'label', $event)"
+                    />
+                  </label>
+                  <label class="field"
+                    >Адрес на бутона (по избор)
+                    <input
+                      nbInput
+                      fullWidth
+                      maxlength="500"
+                      [ngModel]="banner.link?.url ?? ''"
+                      (ngModelChange)="changeBannerLink($index, 'url', $event)"
+                    />
+                  </label>
+                </div>
+                <div class="actions">
+                  <label
+                    ><input
+                      type="checkbox"
+                      [ngModel]="banner.enabled"
+                      (ngModelChange)="changeBanner($index, { enabled: $event })"
+                    />
+                    Покажи лентата</label
+                  >
+                  <button
+                    nbButton
+                    ghost
+                    status="danger"
+                    type="button"
+                    (click)="removeBanner($index)"
+                  >
+                    Премахни лентата
+                  </button>
+                </div>
+              </fieldset>
+            }
+            <button
+              nbButton
+              outline
+              type="button"
+              [disabled]="draft().banners.length >= 3"
+              (click)="addBanner()"
+            >
+              Добави лента
+            </button>
+          </nb-card-body>
+        </nb-card>
+
+        <nb-card>
+          <nb-card-header><h2>Избрани материали</h2></nb-card-header>
+          <nb-card-body>
+            <form class="fields" (ngSubmit)="addFeatured()">
+              <label class="field">
+                Публикуван материал (заглавие или ID)
+                <input
+                  nbInput
+                  fullWidth
+                  name="materialId"
+                  list="published-materials"
+                  [ngModel]="materialId()"
+                  (ngModelChange)="materialId.set($event)"
+                  [disabled]="draft().featuredMaterialIds.length >= 6"
+                />
+                <datalist id="published-materials">
+                  @for (material of materialTitles(); track material[0]) {
+                    <option [value]="material[0]">{{ material[1] }}</option>
+                  }
+                </datalist>
+              </label>
+              <button
+                nbButton
+                outline
+                type="submit"
+                [disabled]="!materialId().trim() || draft().featuredMaterialIds.length >= 6"
+              >
+                Добави материал
+              </button>
+            </form>
+            @if (materials.isLoading()) {
+              <p role="status">Зареждане на публикуваните материали…</p>
+            } @else if (materials.error()) {
+              <p role="status">Списъкът е временно недостъпен. Можеш да въведеш ID.</p>
+            }
+            <ol>
+              @for (id of draft().featuredMaterialIds; track id) {
+                <li class="editable-row">
+                  <span class="wrap">{{ materialTitles().get(id) ?? id }}</span>
+                  <div class="actions">
+                    <button
+                      nbButton
+                      ghost
+                      size="small"
+                      type="button"
+                      [disabled]="$first"
+                      (click)="moveFeatured($index, -1)"
+                    >
+                      Нагоре
+                    </button>
+                    <button
+                      nbButton
+                      ghost
+                      size="small"
+                      type="button"
+                      [disabled]="$last"
+                      (click)="moveFeatured($index, 1)"
+                    >
+                      Надолу
+                    </button>
+                    <button
+                      nbButton
+                      ghost
+                      size="small"
+                      status="danger"
+                      type="button"
+                      (click)="removeFeatured($index)"
+                    >
+                      Премахни материала
+                    </button>
+                  </div>
+                </li>
+              }
+            </ol>
+          </nb-card-body>
+        </nb-card>
+      }
+    }
+    <button
+      nbButton
+      status="primary"
+      type="button"
+      [disabled]="store.busy()"
+      (click)="openPreview()"
+    >
+      Преглед на промените
+    </button>
+  }
+} @else if (store.busy()) {
+  <p role="status">Зареждане на настройките…</p>
+} @else {
+  <button nbButton outline (click)="reload()">Опитай отново</button>
+}

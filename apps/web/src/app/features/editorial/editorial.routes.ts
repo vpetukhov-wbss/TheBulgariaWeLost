@@ -61,6 +61,13 @@ export const editorialRoutes: Routes = [
     ],
   },
   {
+    path: 'settings',
+    title: 'Настройки на сайта',
+    data: { requiredPermission: 'SiteSettings.Manage' },
+    loadComponent: () =>
+      import('../site-settings/site-settings-page').then((m) => m.SiteSettingsPage),
+  },
+  {
     path: 'moderation',
     providers: [ModerationStore],
     children: [

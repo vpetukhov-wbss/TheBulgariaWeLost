@@ -1695,6 +1695,204 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     }
   });
 
+  void it('should edit public site settings with MFA, a strong ETag and one audit for competing writes', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const settingsPath = '/api/admin/v1/site-settings';
+    const publicPath = '/api/v1/site-settings';
+    const adminGet = () =>
+      api.get(settingsPath).auth(admin.token, { type: 'bearer' });
+    const adminPut = (body: Record<string, unknown>, etag?: string) => {
+      const request = api
+        .put(settingsPath)
+        .auth(admin.token, { type: 'bearer' });
+      if (etag) request.set('If-Match', etag);
+      return request.send(body);
+    };
+    const publicDefaults = await api.get(publicPath).expect(200);
+    assert.equal(publicDefaults.body.siteName, 'България, която изгубихме');
+    assert.deepEqual(publicDefaults.body.banners, []);
+    assert.equal(publicDefaults.body.version, undefined);
+
+    const initial = await adminGet().expect(200);
+    const etag = initial.headers.etag as string;
+    const body = {
+      siteName: 'Обновен обществен архив',
+      supportContact: 'archive@example.test',
+      footerLinks: [{ label: 'Начало', url: '/' }],
+      socialLinks: [
+        { platform: 'YouTube', url: 'https://www.youtube.com/@archive' },
+      ],
+      banners: [
+        {
+          text: 'Изложба на архива',
+          enabled: true,
+          link: { label: 'Начало', url: '/' },
+        },
+        { text: 'Скрито съобщение', enabled: false },
+      ],
+      featuredMaterialIds: [] as string[],
+      reason: 'Обновено е публичното представяне.',
+    };
+
+    await api.get(settingsPath).expect(401);
+    await api
+      .get(settingsPath)
+      .auth(editor.token, { type: 'bearer' })
+      .expect(403);
+    await api
+      .put(settingsPath)
+      .auth(editor.token, { type: 'bearer' })
+      .set('If-Match', etag)
+      .send(body)
+      .expect(403);
+    const sessions = db.db().collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    assert.equal(
+      (await adminPut(body, etag).expect(403)).body.code,
+      'mfa_required',
+    );
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+    await adminPut(body).expect(428);
+    await adminPut(body, '*').expect(412);
+    const invalidLink = await adminPut(
+      {
+        ...body,
+        footerLinks: [{ label: 'Връзка', url: '//elsewhere.example' }],
+      },
+      etag,
+    ).expect(422);
+    assert.equal(invalidLink.body.code, 'site_link_invalid');
+    await adminPut(
+      { ...body, footerLinks: [[{ label: 'Връзка', url: '/' }]] },
+      etag,
+    ).expect(422);
+    const invalidSocial = await adminPut(
+      {
+        ...body,
+        socialLinks: [
+          {
+            platform: 'YouTube',
+            url: 'https://youtube.com.elsewhere.example/@archive',
+          },
+        ],
+      },
+      etag,
+    ).expect(422);
+    assert.equal(invalidSocial.body.code, 'site_social_link_invalid');
+    const unavailable = await adminPut(
+      { ...body, featuredMaterialIds: [uuidv7()] },
+      etag,
+    ).expect(422);
+    assert.equal(unavailable.body.code, 'featured_material_unavailable');
+
+    const materialCall = (method: 'post' | 'patch', path: string) =>
+      api[method]('/api/admin/v1/materials' + path).auth(editor.token, {
+        type: 'bearer',
+      });
+    const material = await materialCall('post', '')
+      .send({ type: 'Story', language: 'bg', title: 'Акцент от архива' })
+      .expect(201);
+    const identity = material.body as MaterialResponse;
+    await materialCall('patch', '/' + identity.id)
+      .set('If-Match', material.headers.etag as string)
+      .send({
+        body: 'Запис за публичния архив.',
+        categoryIds: [randomUUID()],
+        topicIds: [randomUUID()],
+        sourceIds: [randomUUID()],
+        rights: {
+          publicDisplayAllowed: true,
+          statement: 'Правата са проверени.',
+        },
+        changeSummary: 'Проверени данни и права.',
+      })
+      .expect(200);
+    const transition = (
+      action: string,
+      expectedVersion: number,
+      reason?: string,
+    ) =>
+      materialCall('post', '/' + identity.id + '/transitions').send({
+        action,
+        expectedVersion,
+        ...(reason ? { reason } : {}),
+      });
+    await transition('SubmitForReview', 2).expect(200);
+    await transition('StartReview', 3).expect(200);
+    await transition('Publish', 4).expect(200);
+
+    body.featuredMaterialIds = [identity.id];
+    const requests = await Promise.all([
+      adminPut({ ...body, version: 9999 }, etag).set(
+        'X-Correlation-ID',
+        'site-settings-write-a',
+      ),
+      adminPut({ ...body, version: 9999 }, etag).set(
+        'X-Correlation-ID',
+        'site-settings-write-b',
+      ),
+    ]);
+    assert.deepEqual(
+      requests.map((response) => response.status).sort(),
+      [200, 412],
+    );
+    const [updated] = requests.filter((response) => response.status === 200);
+    const nextEtag = updated.headers.etag as string;
+    assert.notEqual(nextEtag, etag);
+    assert.equal(updated.body.version, Number(initial.body.version) + 1);
+    await adminPut(body, nextEtag).expect(200).expect('ETag', nextEtag);
+
+    const publicSettings = await api.get(publicPath).expect(200);
+    assert.equal(publicSettings.body.siteName, body.siteName);
+    assert.equal(publicSettings.body.supportContact, body.supportContact);
+    assert.deepEqual(publicSettings.body.banners, [body.banners[0]]);
+    assert.deepEqual(publicSettings.body.featuredMaterials, [
+      { id: identity.id, title: 'Акцент от архива', slug: identity.slug },
+    ]);
+    assert.equal(publicSettings.body.updatedAtUtc, undefined);
+    assert.equal(publicSettings.body.reason, undefined);
+
+    await transition(
+      'Withdraw',
+      5,
+      'Материалът се оттегля за редакция.',
+    ).expect(200);
+    const withdrawn = await api.get(publicPath).expect(200);
+    assert.deepEqual(withdrawn.body.featuredMaterials, []);
+    assert.deepEqual((await adminGet().expect(200)).body.featuredMaterialIds, [
+      identity.id,
+    ]);
+
+    const auditLog = await api
+      .get('/api/admin/v1/audit-events')
+      .auth(admin.token, { type: 'bearer' })
+      .query({ targetType: 'SiteSettings' })
+      .expect(200);
+    assert.equal(auditLog.body.items.length, 1);
+    const audit = auditLog.body.items[0] as {
+      id: string;
+      actorId: string;
+      action: string;
+    };
+    assert.equal(audit.actorId, admin.id);
+    assert.equal(audit.action, 'SiteSettingsUpdated');
+    const auditDetail = await api
+      .get('/api/admin/v1/audit-events/' + audit.id)
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(auditDetail.body.traceId, updated.headers['x-correlation-id']);
+    assert.equal(auditDetail.body.reason, body.reason);
+    assert.match(auditDetail.body.changeSummary[0].value as string, /siteName/);
+    assert(!auditDetail.text.includes(body.supportContact));
+  });
+
   void it('should restrict the account directory and mask verified contact details', async () => {
     const admin = await createAdministrator();
     const editor = await createEditor();

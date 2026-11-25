@@ -8,6 +8,7 @@ import { authorBookmarksMigration } from './007-author-bookmarks.mjs';
 import { materialModerationMigration } from './008-material-moderation.mjs';
 import { adminUserActionsMigration } from './009-admin-user-actions.mjs';
 import { auditJournalMigration } from './010-audit-journal.mjs';
+import { siteSettingsMigration } from './011-site-settings.mjs';
 
 export const migrations = [
   authFoundationMigration,
@@ -20,4 +21,5 @@ export const migrations = [
   materialModerationMigration,
   adminUserActionsMigration,
   auditJournalMigration,
+  siteSettingsMigration,
 ];

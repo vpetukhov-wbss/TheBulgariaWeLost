@@ -11,5 +11,6 @@ export const AUDIT_TARGET_TYPE: AuditTargetType[] = [
   'Catalog',
   'Material',
   'Moderation',
-  'Other'
+  'Other',
+  'SiteSettings'
 ];
