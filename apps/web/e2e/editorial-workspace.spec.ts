@@ -244,7 +244,8 @@ test('keeps queue filters across an author correction, compares revisions and pu
   await mockApi(page, 'Editor', state);
   await page.goto('/admin');
   await page.getByRole('link', { name: 'Редакторска опашка' }).click();
-  await page.getByLabel('Тип', { exact: true }).selectOption('Story');
+  await expect(page.getByRole('heading', { name: 'Редакторска опашка' })).toBeVisible();
+  await page.getByRole('combobox', { name: 'Тип', exact: true }).selectOption('Story');
   await expect(page).toHaveURL(/stage=Submitted&type=Story$/);
   await page.getByRole('link', { name: originalTitle }).click();
   await confirmAction(page, 'Започни преглед');

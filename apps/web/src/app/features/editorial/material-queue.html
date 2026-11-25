@@ -8,9 +8,13 @@
 <nb-card>
   <nb-card-body>
     <div class="filters">
-      <label class="field"
-        >Статус
-        <select [ngModel]="filters().stage" (ngModelChange)="apply($event, filters().type)">
+      <div class="field">
+        <label for="queue-stage">Статус</label>
+        <select
+          id="queue-stage"
+          [ngModel]="filters().stage"
+          (ngModelChange)="apply($event, filters().type)"
+        >
           <option value="">Всички статуси</option>
           <optgroup label="Редакционен статус">
             @for (item of working | keyvalue; track item.key) {
@@ -23,16 +27,20 @@
             }
           </optgroup>
         </select>
-      </label>
-      <label class="field"
-        >Тип
-        <select [ngModel]="filters().type" (ngModelChange)="apply(filters().stage, $event)">
+      </div>
+      <div class="field">
+        <label for="queue-type">Тип</label>
+        <select
+          id="queue-type"
+          [ngModel]="filters().type"
+          (ngModelChange)="apply(filters().stage, $event)"
+        >
           <option value="">Всички типове</option>
           @for (item of types | keyvalue; track item.key) {
             <option [value]="item.key">{{ item.value }}</option>
           }
         </select>
-      </label>
+      </div>
       @if (filters().stage || filters().type) {
         <button nbButton outline type="button" (click)="apply('', '')">Изчисти филтрите</button>
       }
