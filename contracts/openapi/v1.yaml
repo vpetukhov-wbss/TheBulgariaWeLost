@@ -9,6 +9,7 @@ tags:
   - name: Health
   - name: Auth
   - name: Back office
+  - name: Admin users
   - name: Publishing
   - name: Moderation
   - name: Authoring
@@ -329,6 +330,283 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BackOfficePrincipal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users:
+    get:
+      tags: [Admin users]
+      operationId: listAdminUsers
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 254 }
+        - name: role
+          in: query
+          schema: { type: string, enum: [User, Editor, Administrator] }
+        - name: status
+          in: query
+          schema: { type: string, enum: [Pending, Active, Disabled, Banned] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: Account directory with masked contact data on the detail route.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}:
+    get:
+      tags: [Admin users]
+      operationId: getAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Account profile with masked verified contact.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Admin users]
+      operationId: editAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditAdminUserRequest"
+      responses:
+        "200":
+          description: Updated managed profile.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/role-changes:
+    post:
+      tags: [Admin users]
+      operationId: changeAdminUserRole
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeAdminUserRoleRequest"
+      responses:
+        "200":
+          description: Updated role. Prior sessions were revoked.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/sanctions:
+    get:
+      tags: [Admin users]
+      operationId: listAccountSanctions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: Account sanction history.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSanctionPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      tags: [Admin users]
+      operationId: banAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAccountSanctionRequest"
+      responses:
+        "201":
+          description: New active sanction.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSanction"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/sanctions/{sanctionId}:
+    get:
+      tags: [Admin users]
+      operationId: getAccountSanction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AccountSanctionId"
+      responses:
+        "200":
+          description: Sanction for this account.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountSanction"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/sanctions/{sanctionId}/revoke:
+    post:
+      tags: [Admin users]
+      operationId: unbanAdminUser
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AccountSanctionId"
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserDecisionRequest"
+      responses:
+        "200":
+          description: The sanction was revoked.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminUserDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/session-revocations:
+    post:
+      tags: [Admin users]
+      operationId: revokeAdminUserSessions
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserDecisionRequest"
+      responses:
+        "204":
+          $ref: "#/components/responses/NoContent"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/users/{id}/password-reset-requests:
+    post:
+      tags: [Admin users]
+      operationId: requestAdminPasswordReset
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserDecisionRequest"
+      responses:
+        "202":
+          description: Accepted reset operation.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPasswordResetAccepted"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/operations/{id}:
+    get:
+      tags: [Admin users]
+      operationId: getPasswordResetOperation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/AdminUserId"
+      responses:
+        "200":
+          description: Current delivery status visible to the requesting administrator.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminPasswordResetOperation"
         default:
           $ref: "#/components/responses/Problem"
   /api/admin/v1/materials:
@@ -1302,6 +1580,22 @@ components:
       scheme: bearer
       description: Private, rotated service credential.
   parameters:
+    AdminUserId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AccountSanctionId:
+      name: sanctionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    AdminUserCommandKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4 for replaying the same command.
+      schema: { type: string, format: uuid }
     ModerationCaseId:
       name: id
       in: path
@@ -2408,6 +2702,10 @@ components:
           type: string
         lastName:
           type: string
+        displayName:
+          type: string
+        bio:
+          type: string
         role:
           $ref: "#/components/schemas/Role"
         mfaEnabled:
@@ -2441,6 +2739,102 @@ components:
           format: int64
         user:
           $ref: "#/components/schemas/Profile"
+    EditAdminUserRequest:
+      type: object
+      minProperties: 1
+      properties:
+        displayName: { type: string, minLength: 1, maxLength: 120 }
+        bio: { type: string, maxLength: 2000 }
+    AdminUserDecisionRequest:
+      type: object
+      required: [expectedVersion, reason]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 3, maxLength: 500 }
+    ChangeAdminUserRoleRequest:
+      allOf:
+        - $ref: "#/components/schemas/AdminUserDecisionRequest"
+        - type: object
+          required: [role]
+          properties:
+            role: { type: string, enum: [User, Editor, Administrator] }
+    CreateAccountSanctionRequest:
+      allOf:
+        - $ref: "#/components/schemas/AdminUserDecisionRequest"
+        - type: object
+          required: [expiresAtUtc]
+          properties:
+            expiresAtUtc: { type: string, format: date-time, nullable: true }
+    AccountSanction:
+      type: object
+      required: [id, userId, issuedByUserId, reason, startsAtUtc, expiresAtUtc]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        issuedByUserId: { type: string, format: uuid }
+        reason: { type: string }
+        startsAtUtc: { type: string, format: date-time }
+        expiresAtUtc: { type: string, format: date-time, nullable: true }
+        revokedAtUtc: { type: string, format: date-time }
+        revokedByUserId: { type: string, format: uuid }
+        revokeReason: { type: string }
+    AccountSanctionPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AccountSanction"
+        nextCursor: { type: string }
+    AdminPasswordResetAccepted:
+      type: object
+      required: [operationId, statusUrl]
+      properties:
+        operationId: { type: string, format: uuid }
+        statusUrl: { type: string }
+    AdminPasswordResetOperation:
+      type: object
+      required: [id, kind, status, requestedByUserId, targetId, requestedAtUtc, traceId]
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [AccountPasswordReset] }
+        status: { type: string, enum: [Queued, Running, Succeeded, Failed] }
+        requestedByUserId: { type: string, format: uuid }
+        targetId: { type: string, format: uuid }
+        requestedAtUtc: { type: string, format: date-time }
+        finishedAtUtc: { type: string, format: date-time }
+        traceId: { type: string }
+    AdminUserSummary:
+      type: object
+      required: [id, displayName, role, status]
+      properties:
+        id: { type: string, format: uuid }
+        displayName: { type: string }
+        role: { type: string, enum: [User, Editor, Administrator] }
+        status: { type: string, enum: [Pending, Active, Disabled, Banned] }
+        createdAtUtc: { type: string, format: date-time }
+    AdminUserDetail:
+      allOf:
+        - $ref: "#/components/schemas/AdminUserSummary"
+        - type: object
+          required: [mfaEnabled, version]
+          properties:
+            mfaEnabled: { type: boolean }
+            verifiedContactMasked: { type: string }
+            version: { type: integer, minimum: 1 }
+            bio: { type: string, maxLength: 2000 }
+            activeSanction:
+              $ref: "#/components/schemas/AccountSanction"
+    AdminUserPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminUserSummary"
+        nextCursor: { type: string }
     BackOfficePrincipal:
       type: object
       additionalProperties: false

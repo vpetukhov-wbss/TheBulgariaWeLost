@@ -3,6 +3,8 @@
 
 import { Role } from '../models/role';
 export interface Profile {
+  bio?: string;
+  displayName?: string;
   email: string;
   firstName: string;
   id: string;

@@ -4,6 +4,7 @@
 export { HealthService } from './services/health.service';
 export { AuthService } from './services/auth.service';
 export { BackOfficeService } from './services/back-office.service';
+export { AdminUsersService } from './services/admin-users.service';
 export { PublishingService } from './services/publishing.service';
 export { AuthoringService } from './services/authoring.service';
 export { ModerationService } from './services/moderation.service';

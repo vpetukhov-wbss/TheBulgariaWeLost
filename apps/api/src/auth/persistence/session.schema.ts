@@ -23,6 +23,9 @@ export class Session {
 
   @Prop()
   mfaVerifiedAt?: Date;
+
+  @Prop({ select: false })
+  administrationAccessVersion?: number;
 }
 
 export const SessionSchema = SchemaFactory.createForClass(Session);

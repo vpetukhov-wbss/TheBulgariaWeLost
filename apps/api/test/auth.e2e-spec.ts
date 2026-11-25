@@ -1509,6 +1509,392 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     );
   });
 
+  void it('should restrict the account directory and mask verified contact details', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const another = await createEditor();
+    const root = '/api/admin/v1/users';
+    await api.get(root).expect(401);
+    await api.get(root).auth(editor.token, { type: 'bearer' }).expect(403);
+    await api
+      .get(root + '/' + editor.id)
+      .auth(editor.token, { type: 'bearer' })
+      .expect(403);
+
+    const sessions = db.db().collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    const denied = await api
+      .get(root)
+      .query({ q: editor.email })
+      .auth(admin.token, { type: 'bearer' })
+      .expect(403);
+    assert.equal(denied.body.code, 'mfa_required');
+    assert.equal(denied.body.instance, root);
+    assert(!denied.text.includes(editor.email));
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+
+    const find = (query: Record<string, string | number>) =>
+      api.get(root).query(query).auth(admin.token, { type: 'bearer' });
+    const exact = await find({
+      q: editor.email.toUpperCase(),
+      role: 'Editor',
+      status: 'Active',
+    }).expect(200);
+    assert.equal(exact.body.items.length, 1);
+    assert.equal(exact.body.items[0].id, editor.id);
+    assert(!exact.text.includes(editor.email));
+    await find({ q: 'example.test' }).expect(400);
+
+    const detail = await api
+      .get(root + '/' + editor.id)
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(detail.body.mfaEnabled, false);
+    assert.equal(
+      detail.body.verifiedContactMasked,
+      editor.email[0] + '***@e***',
+    );
+    assert.match(String(detail.headers['cache-control']), /no-store/);
+    assert.doesNotMatch(
+      detail.text,
+      /passwordHash|mfaSecret|authVersion|example\.test/,
+    );
+
+    const filters = { role: 'Editor', status: 'Active', limit: 1 };
+    const page = await find(filters).expect(200);
+    const cursor = page.body.nextCursor as string;
+    assert(cursor);
+    const next = await find({ ...filters, cursor }).expect(200);
+    assert.equal(page.body.items[0].id, another.id);
+    assert.equal(next.body.items[0].id, editor.id);
+    await find({ ...filters, status: 'Pending', cursor }).expect(400);
+    const altered = cursor.slice(0, -1) + (cursor.endsWith('A') ? 'B' : 'A');
+    await find({ ...filters, cursor: altered }).expect(400);
+  });
+
+  void it('should manage profiles and sanctions, revoke live sessions and send a traceable password reset', async () => {
+    const admin = await createAdministrator();
+    const otherAdmin = await createAdministrator();
+    const email = randomUUID() + '@example.test';
+    await register(email);
+    await confirm(email);
+    const first = await login(email);
+    const me = await api
+      .get(auth + '/me')
+      .auth(first.token, { type: 'bearer' })
+      .expect(200);
+    const id = me.body.id as string;
+    const root = '/api/admin/v1/users';
+    const profile = root + '/' + id;
+    const get = (url = profile, token = admin.token) =>
+      api.get(url).auth(token, { type: 'bearer' });
+    const post = (suffix: string, data: object, key = randomUUID()) =>
+      api
+        .post(profile + suffix)
+        .auth(admin.token, { type: 'bearer' })
+        .set('Idempotency-Key', key)
+        .send(data);
+    const rejects = async (tokens: Tokens) => {
+      await get(auth + '/me', tokens.token).expect(401);
+      await api
+        .post(auth + '/refresh')
+        .auth(tokens.refreshToken, { type: 'bearer' })
+        .expect(401);
+    };
+    const version = async () =>
+      (await get().expect(200)).body.version as number;
+    const initial = await get().expect(200);
+    const patch = () =>
+      api.patch(profile).auth(admin.token, { type: 'bearer' }).send({
+        displayName: 'Архивен редактор',
+        bio: 'Поддържа архивни материали.',
+      });
+    await patch().expect(428);
+    const edited = await patch()
+      .set('If-Match', String(initial.headers.etag))
+      .expect(200);
+    assert.equal(edited.body.version, 2);
+    assert.equal(edited.body.displayName, 'Архивен редактор');
+    assert.equal(edited.body.bio, 'Поддържа архивни материали.');
+    const own = await get(auth + '/me', first.token).expect(200);
+    assert.equal(own.body.displayName, edited.body.displayName);
+    assert.equal(own.body.bio, edited.body.bio);
+    await patch().set('If-Match', String(initial.headers.etag)).expect(412);
+
+    await post('/role-changes', {
+      role: 'Editor',
+      expectedVersion: 2,
+      reason: '   ',
+    }).expect(422);
+    const role = {
+      role: 'Editor',
+      expectedVersion: 2,
+      reason: 'Одобрена редакторска роля.',
+    };
+    await api
+      .post(profile + '/role-changes')
+      .auth(admin.token, { type: 'bearer' })
+      .send(role)
+      .expect(400);
+    const roleKey = randomUUID();
+    const changed = await post('/role-changes', role, roleKey).expect(200);
+    assert.equal(changed.body.role, 'Editor');
+    assert.deepEqual(
+      (await post('/role-changes', role, roleKey).expect(200)).body,
+      changed.body,
+    );
+    assert.equal(
+      (
+        await post(
+          '/role-changes',
+          { ...role, reason: 'Друга причина.' },
+          roleKey,
+        ).expect(409)
+      ).body.code,
+      'idempotency_key_reused',
+    );
+    await rejects(first);
+    const editor = await login(email);
+    const timedVersion = await version();
+    const reason = 'Временна санкция при проверка.';
+    await post('/sanctions', {
+      expectedVersion: timedVersion,
+      reason,
+      expiresAtUtc: '2020-01-01T00:00:00Z',
+    }).expect(422);
+    await post('/sanctions', { expectedVersion: timedVersion, reason }).expect(
+      422,
+    );
+    const timed = {
+      expectedVersion: timedVersion,
+      reason,
+      expiresAtUtc: new Date(Date.now() + 60_000).toISOString(),
+    };
+    const banKey = randomUUID();
+    const [issued, repeated] = await Promise.all([
+      post('/sanctions', timed, banKey).expect(201),
+      post('/sanctions', timed, banKey).expect(201),
+    ]);
+    assert.deepEqual(issued.body, repeated.body);
+    const sanctionId = issued.body.id as string;
+    assert.equal(issued.headers.location, profile + '/sanctions/' + sanctionId);
+    assert.equal((await get().expect(200)).body.status, 'Banned');
+    const filtered = await api
+      .get(root)
+      .query({ status: 'Banned', q: email })
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(filtered.body.items[0].id, id);
+    await rejects(editor);
+    await api
+      .post(auth + '/email/login')
+      .set('X-Forwarded-For', authClientIp(email))
+      .send({ email, password: details.password })
+      .expect(422);
+
+    // Move just this synthetic fixture past its expiry without waiting on CI clocks.
+    const past = new Date('2020-01-01T00:00:00Z');
+    await db
+      .db()
+      .collection<{ _id: string }>('users')
+      .updateOne({ _id: id }, { $set: { 'activeSanction.expiresAt': past } });
+    await db
+      .db()
+      .collection<{ _id: string }>('accountSanctions')
+      .updateOne({ _id: sanctionId }, { $set: { expiresAt: past } });
+    const afterExpiry = await get().expect(200);
+    assert.equal(afterExpiry.body.status, 'Active');
+    assert.equal(afterExpiry.body.activeSanction, undefined);
+    await rejects(editor);
+    const afterExpiryTokens = await login(email);
+    const permanent = await post('/sanctions', {
+      expectedVersion: afterExpiry.body.version as number,
+      reason: 'Наложена е безсрочна санкция.',
+      expiresAtUtc: null,
+    }).expect(201);
+    assert.equal(permanent.body.expiresAtUtc, null);
+    await rejects(afterExpiryTokens);
+    const revokeUrl = '/sanctions/' + (permanent.body.id as string) + '/revoke';
+    const revokedBan = await post(revokeUrl, {
+      expectedVersion: await version(),
+      reason: 'Проверката приключи.',
+    }).expect(200);
+    assert.equal(revokedBan.body.status, 'Active');
+    const history = await api
+      .get(profile + '/sanctions')
+      .query({ limit: 1 })
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(history.body.items[0].revokeReason, 'Проверката приключи.');
+    const historyCursor = history.body.nextCursor as string;
+    assert(historyCursor);
+    const older = await api
+      .get(profile + '/sanctions')
+      .query({ cursor: historyCursor })
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(older.body.items[0].id, sanctionId);
+    await get(root + '/' + admin.id + '/sanctions/' + sanctionId).expect(404);
+
+    const active = await login(email);
+    const revoke = {
+      expectedVersion: await version(),
+      reason: 'Принудителен край на сесиите.',
+    };
+    await post('/session-revocations', revoke).expect(204);
+    await rejects(active);
+    await post('/session-revocations', revoke).expect(409);
+
+    const reset = {
+      expectedVersion: await version(),
+      reason: 'Заявено възстановяване на достъп.',
+    };
+    const resetKey = randomUUID();
+    const response = await post('/password-reset-requests', reset, resetKey)
+      .set('X-Correlation-ID', 'admin-reset-acceptance')
+      .expect(202);
+    const operationId = response.body.operationId as string;
+    const operationUrl = response.body.statusUrl as string;
+    assert.equal(response.headers.location, operationUrl);
+    assert.deepEqual(
+      (await post('/password-reset-requests', reset, resetKey).expect(202))
+        .body,
+      response.body,
+    );
+    const operation = await get(operationUrl).expect(200);
+    assert.equal(operation.body.status, 'Succeeded');
+    assert.equal(operation.body.traceId, 'admin-reset-acceptance');
+    await get(operationUrl, otherAdmin.token).expect(404);
+    const hash = await mailHash(email, '/password-change');
+    const audit = db.db().collection('auditEvents');
+    const events = await audit
+      .find({ targetId: id, 'metadata.operationId': operationId })
+      .toArray();
+    assert.deepEqual(events.map((event) => event.action).sort(), [
+      'AccountPasswordResetDispatched',
+      'AccountPasswordResetRequested',
+    ]);
+    const outbox = await db
+      .db()
+      .collection('outboxEvents')
+      .findOne({ 'payload.operationId': operationId });
+    assert(outbox);
+    const persisted = JSON.stringify([
+      events,
+      outbox,
+      response.body,
+      operation.body,
+    ]);
+    assert(!persisted.includes(hash));
+    assert(!persisted.includes(email));
+    assert.equal(
+      await audit.countDocuments({
+        targetId: id,
+        action: 'AccountSanctionIssued',
+      }),
+      2,
+    );
+    const password = randomCredential('ManagedReset');
+    for (let attempt = 0; attempt < 2; attempt++) {
+      await post('/password-reset-requests', {
+        ...reset,
+        expectedVersion: await version(),
+      }).expect(202);
+    }
+    const limited = await post('/password-reset-requests', {
+      ...reset,
+      expectedVersion: await version(),
+    }).expect(429);
+    assert.equal(limited.body.code, 'password_reset_rate_limited');
+    assert.equal(limited.headers['retry-after'], '3600');
+    sensitiveSamples.push(password, hash);
+    await api
+      .post(auth + '/reset/password')
+      .send({ hash, password })
+      .expect(204);
+    await api
+      .post(auth + '/reset/password')
+      .send({ hash, password })
+      .expect(422);
+    await login(email, password);
+  });
+
+  void it('should keep an active administrator under concurrent sanctions and role changes', async () => {
+    const first = await createAdministrator();
+    const second = await createAdministrator();
+    const users = db
+      .db()
+      .collection<{ _id: string; role: string; status: string }>('users');
+    const excluded = {
+      role: 'Administrator',
+      _id: { $nin: [first.id, second.id] },
+    };
+    const existing = await users.find(excluded).toArray();
+    await users.updateMany(excluded, { $set: { status: 'Disabled' } });
+    const root = '/api/admin/v1/users/';
+    const run = (token: string, path: string, action: object) =>
+      api
+        .post(root + path)
+        .auth(token, { type: 'bearer' })
+        .set('Idempotency-Key', randomUUID())
+        .send({
+          ...action,
+          expectedVersion: 1,
+          reason: 'Проверка на администраторския достъп.',
+        });
+    try {
+      const sessions = db.db().collection('sessions');
+      await sessions.updateOne(
+        { accountId: first.id },
+        { $set: { mfaVerifiedAt: new Date('2020-01-01T00:00:00Z') } },
+      );
+      const expired = await run(first.token, second.id + '/sanctions', {
+        expiresAtUtc: null,
+      }).expect(403);
+      assert.equal(expired.body.code, 'mfa_required');
+      await sessions.updateOne(
+        { accountId: first.id },
+        { $set: { mfaVerifiedAt: new Date() } },
+      );
+      const [ban, demotion] = await Promise.all([
+        run(first.token, second.id + '/sanctions', { expiresAtUtc: null }),
+        run(second.token, first.id + '/role-changes', { role: 'User' }),
+      ]);
+      const firstWon = ban.status === 201;
+      assert.equal(firstWon || demotion.status === 200, true);
+      assert([401, 403].includes(firstWon ? demotion.status : ban.status));
+      const stillActive = firstWon ? first : second;
+      await api
+        .get('/api/admin/v1/me')
+        .auth(stillActive.token, { type: 'bearer' })
+        .expect(200);
+      for (const [suffix, command] of [
+        ['/sanctions', { expiresAtUtc: null }],
+        ['/role-changes', { role: 'User' }],
+      ] as const) {
+        const denied = await run(
+          stillActive.token,
+          stillActive.id + suffix,
+          command,
+        ).expect(409);
+        assert.equal(denied.body.code, 'last_active_admin');
+      }
+    } finally {
+      for (const account of existing) {
+        await users.updateOne(
+          { _id: account._id },
+          { $set: { status: account.status } },
+        );
+      }
+    }
+  });
+
   void it('should deduplicate anonymous reports and require an authorized decision to restore a material', async () => {
     const editor = await createEditor();
     const admin = await createAdministrator();

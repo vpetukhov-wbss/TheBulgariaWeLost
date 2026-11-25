@@ -42,6 +42,11 @@ function hasBackOfficeAccess(
                 <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
                 <a nbButton outline routerLink="/admin/moderation">Сигнали за съдържание</a>
               </nav>
+              @if (state.principal.permissions.includes('Users.Manage')) {
+                <nav aria-label="Управление">
+                  <a nbButton outline routerLink="/admin/users">Потребители</a>
+                </nav>
+              }
               <h2>Активни права</h2>
               <ul>
                 @for (permission of state.principal.permissions; track permission) {

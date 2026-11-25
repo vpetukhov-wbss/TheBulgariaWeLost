@@ -52,7 +52,8 @@ export class BackOfficeController {
       profile.role === Role.Administrator ? Role.Administrator : Role.Editor;
     const principal: BackOfficePrincipalDto = {
       id: profile.id,
-      displayName: `${profile.firstName} ${profile.lastName}`,
+      displayName:
+        profile.displayName ?? `${profile.firstName} ${profile.lastName}`,
       role,
       permissions:
         role === Role.Administrator

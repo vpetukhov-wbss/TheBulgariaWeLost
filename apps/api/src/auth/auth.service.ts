@@ -13,6 +13,7 @@ import { Model, mongo } from 'mongoose';
 import ms from 'ms';
 import { AllConfigType } from '../config/config.type';
 import { MailService } from '../mail/mail.service';
+import { availableAccount, isSanctioned } from './account-access';
 import { AuthEmailLoginDto } from './dto/auth-email-login.dto';
 import { AuthRegisterLoginDto } from './dto/auth-register-login.dto';
 import { AuthUpdateDto } from './dto/auth-update.dto';
@@ -53,7 +54,12 @@ export class AuthService {
       dto.password,
       account?.passwordHash ?? dummyPasswordHash,
     );
-    if (!account || !valid || account.status !== AccountStatus.Active) {
+    if (
+      !account ||
+      !valid ||
+      account.status !== AccountStatus.Active ||
+      isSanctioned(account, new Date())
+    ) {
       throw this.invalid('password', 'incorrectEmailOrPassword');
     }
 
@@ -125,7 +131,7 @@ export class AuthService {
           _id: link.sub,
           email: link.email,
           authVersion: link.authVersion,
-          status: AccountStatus.Active,
+          ...availableAccount(),
         },
         { $set: { email: link.newEmail }, $inc: { authVersion: 1 } },
       );
@@ -139,11 +145,27 @@ export class AuthService {
 
   async forgotPassword(email: string): Promise<void> {
     const account = await this.accounts
-      .findOne({ email, status: AccountStatus.Active })
+      .findOne({ email, ...availableAccount() })
       .select('+passwordHash')
       .exec();
-    if (!account) return;
+    if (account) await this.sendPasswordReset(account);
+  }
 
+  async requestPasswordResetForAccount(
+    id: string,
+    authVersion: number,
+  ): Promise<boolean> {
+    const account = await this.accounts
+      .findOne({ _id: id, authVersion, ...availableAccount() })
+      .select('+passwordHash')
+      .exec();
+    if (!account) return false;
+
+    await this.sendPasswordReset(account);
+    return true;
+  }
+
+  private async sendPasswordReset(account: Account): Promise<void> {
     const expiresIn = this.configService.getOrThrow('auth.forgotExpires', {
       infer: true,
     });
@@ -152,7 +174,7 @@ export class AuthService {
       { secret: this.forgotSecret(account), expiresIn },
     );
     await this.mail.forgotPassword({
-      to: email,
+      to: account.email,
       data: { hash, tokenExpires: Date.now() + ms(expiresIn) },
     });
   }
@@ -162,7 +184,7 @@ export class AuthService {
     if (!claims?.sub || !isUUID(claims.sub, '7'))
       throw this.invalid('hash', 'invalidHash');
     const account = await this.accounts
-      .findOne({ _id: claims.sub, status: AccountStatus.Active })
+      .findOne({ _id: claims.sub, ...availableAccount() })
       .select('+passwordHash')
       .exec();
     if (!account) throw this.invalid('hash', 'invalidHash');
@@ -180,7 +202,7 @@ export class AuthService {
       {
         _id: account._id,
         authVersion: account.authVersion,
-        status: AccountStatus.Active,
+        ...availableAccount(),
       },
       {
         $set: { passwordHash: await bcrypt.hash(password, 10) },
@@ -210,7 +232,7 @@ export class AuthService {
 
   async update(id: string, dto: AuthUpdateDto): Promise<ProfileDto> {
     const account = await this.accounts
-      .findOne({ _id: id, status: AccountStatus.Active })
+      .findOne({ _id: id, ...availableAccount() })
       .select('+passwordHash')
       .exec();
     if (!account) throw new UnauthorizedException();
@@ -247,7 +269,7 @@ export class AuthService {
           {
             _id: id,
             authVersion: account.authVersion,
-            status: AccountStatus.Active,
+            ...availableAccount(),
           },
           change,
           { new: true },
@@ -298,7 +320,7 @@ export class AuthService {
 
   async logoutAll(accountId: string): Promise<void> {
     const revoked = await this.accounts.updateOne(
-      { _id: accountId, status: AccountStatus.Active },
+      { _id: accountId, ...availableAccount() },
       { $inc: { authVersion: 1 } },
     );
     if (!revoked.modifiedCount) throw new UnauthorizedException();
@@ -310,7 +332,7 @@ export class AuthService {
       .findOne({
         _id: session.accountId,
         authVersion: session.authVersion,
-        status: AccountStatus.Active,
+        ...availableAccount(),
       })
       .exec();
     if (!account) throw new UnauthorizedException();
