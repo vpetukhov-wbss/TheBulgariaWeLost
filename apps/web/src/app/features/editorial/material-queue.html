@@ -1,0 +1,86 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb"><a routerLink="/admin">Работен панел</a> / Редакция</p>
+    <h1>Редакторска опашка</h1>
+  </div>
+  <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
+</header>
+<nb-card>
+  <nb-card-body>
+    <div class="filters">
+      <label class="field"
+        >Статус
+        <select [ngModel]="filters().stage" (ngModelChange)="apply($event, filters().type)">
+          <option value="">Всички статуси</option>
+          <optgroup label="Редакционен статус">
+            @for (item of working | keyvalue; track item.key) {
+              <option [value]="item.key">{{ item.value }}</option>
+            }
+          </optgroup>
+          <optgroup label="Публичен статус">
+            @for (item of visibility | keyvalue; track item.key) {
+              <option [value]="item.key">{{ item.value }}</option>
+            }
+          </optgroup>
+        </select>
+      </label>
+      <label class="field"
+        >Тип
+        <select [ngModel]="filters().type" (ngModelChange)="apply(filters().stage, $event)">
+          <option value="">Всички типове</option>
+          @for (item of types | keyvalue; track item.key) {
+            <option [value]="item.key">{{ item.value }}</option>
+          }
+        </select>
+      </label>
+      @if (filters().stage || filters().type) {
+        <button nbButton outline type="button" (click)="apply('', '')">Изчисти филтрите</button>
+      }
+    </div>
+  </nb-card-body>
+</nb-card>
+@if (results.isLoading()) {
+  <p role="status">Зареждане на материалите…</p>
+} @else if (results.hasValue()) {
+  @let items = results.value().items;
+  <nb-card>
+    <nb-card-body class="records">
+      @for (item of items; track item.id) {
+        <article class="record">
+          <div>
+            <h2>
+              <a [routerLink]="['/admin/materials', item.id]" queryParamsHandling="preserve">{{
+                item.title
+              }}</a>
+            </h2>
+            <p class="muted">
+              @if (item.type) {
+                {{ types[item.type] }} ·
+              }
+              <time [attr.datetime]="item.updatedAtUtc">{{
+                item.updatedAtUtc | date: 'dd.MM.yyyy, HH:mm'
+              }}</time>
+            </p>
+          </div>
+          <div class="actions">
+            @if (item.workingStatus) {
+              <span class="badge">{{ working[item.workingStatus] }}</span>
+            }
+            <span class="badge secondary">{{ visibility[item.status] }}</span>
+          </div>
+        </article>
+      } @empty {
+        <p>Няма материали за избраните филтри.</p>
+      }
+      @if (items.length === 100) {
+        <p class="muted">
+          Показани са до 100 от най-скоро променените материали. Използвай филтрите, за да стесниш
+          списъка.
+        </p>
+      }
+    </nb-card-body>
+  </nb-card>
+} @else {
+  <nb-alert status="danger" role="alert">Опашката не можа да се зареди.</nb-alert>
+  <button nbButton outline type="button" (click)="results.reload()">Опитай отново</button>
+}

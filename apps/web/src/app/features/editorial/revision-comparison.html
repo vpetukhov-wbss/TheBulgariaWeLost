@@ -1,0 +1,132 @@
+<nb-card>
+  <nb-card-header>История на ревизиите</nb-card-header>
+  <nb-card-body>
+    @if (revisions.isLoading()) {
+      <p role="status">Зареждане на ревизиите…</p>
+    } @else if (revisions.hasValue()) {
+      @let items = revisions.value().items;
+      @let currentFirst = first() ?? items[1]?.revisionNumber;
+      @let currentSecond = second() ?? items[0]?.revisionNumber;
+      @if (items.length >= 2) {
+        <div class="filters">
+          <label class="field"
+            >Първа ревизия
+            <select
+              [ngModel]="currentFirst"
+              [disabled]="busy()"
+              (ngModelChange)="first.set($event)"
+            >
+              @for (revision of items; track revision.revisionNumber) {
+                <option [ngValue]="revision.revisionNumber">
+                  №{{ revision.revisionNumber }} ·
+                  {{ revision.createdAtUtc | date: 'dd.MM.yyyy, HH:mm' }}
+                </option>
+              }
+            </select>
+          </label>
+          <label class="field"
+            >Втора ревизия
+            <select
+              [ngModel]="currentSecond"
+              [disabled]="busy()"
+              (ngModelChange)="second.set($event)"
+            >
+              @for (revision of items; track revision.revisionNumber) {
+                <option [ngValue]="revision.revisionNumber">
+                  №{{ revision.revisionNumber }} ·
+                  {{ revision.createdAtUtc | date: 'dd.MM.yyyy, HH:mm' }}
+                </option>
+              }
+            </select>
+          </label>
+          @if (currentFirst && currentSecond) {
+            <button
+              nbButton
+              status="primary"
+              type="button"
+              [disabled]="busy() || currentFirst === currentSecond"
+              (click)="compare(currentFirst, currentSecond)"
+            >
+              Сравни ревизиите
+            </button>
+          }
+        </div>
+      } @else {
+        <p>За сравнение са нужни поне две ревизии.</p>
+      }
+      @if (error()) {
+        <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+      }
+      @if (result(); as comparison) {
+        <div aria-live="polite">
+          <h2>Ревизия №{{ comparison.first }} спрямо №{{ comparison.second }}</h2>
+          @for (field of comparison.fields; track field.label) {
+            <section class="divider">
+              <h3>
+                {{ field.label }}
+                @if (field.changed) {
+                  <span class="badge">Променено</span>
+                }
+              </h3>
+              <div class="versions">
+                <div>
+                  <strong>№{{ comparison.first }}</strong>
+                  <p class="wrap">{{ field.before || 'Няма стойност' }}</p>
+                </div>
+                <div>
+                  <strong>№{{ comparison.second }}</strong>
+                  <p class="wrap">{{ field.after || 'Няма стойност' }}</p>
+                </div>
+              </div>
+            </section>
+          }
+        </div>
+      }
+      @if (canRestore() && items.length) {
+        <form class="divider" (ngSubmit)="restore()">
+          <h2>Възстановяване</h2>
+          <p class="muted">Създава нова работна ревизия. Публичната версия се запазва.</p>
+          <label class="field"
+            >Ревизия за възстановяване
+            <select
+              name="restore"
+              [ngModel]="restoreNumber()"
+              (ngModelChange)="restoreNumber.set($event)"
+            >
+              <option [ngValue]="null">Избери ревизия</option>
+              @for (revision of items; track revision.revisionNumber) {
+                <option [ngValue]="revision.revisionNumber">
+                  №{{ revision.revisionNumber }} ·
+                  {{ revision.createdAtUtc | date: 'dd.MM.yyyy, HH:mm' }}
+                </option>
+              }
+            </select>
+          </label>
+          <label class="field"
+            >Причина за възстановяване
+            <textarea
+              nbInput
+              fullWidth
+              rows="2"
+              name="reason"
+              maxlength="500"
+              [ngModel]="reason()"
+              (ngModelChange)="reason.set($event)"
+            ></textarea>
+          </label>
+          <button
+            nbButton
+            outline
+            type="submit"
+            [disabled]="!restoreNumber() || reason().trim().length < 3"
+          >
+            Възстанови като работна ревизия
+          </button>
+        </form>
+      }
+    } @else {
+      <nb-alert status="danger" role="alert">Историята не можа да се зареди.</nb-alert>
+      <button nbButton outline type="button" (click)="revisions.reload()">Опитай отново</button>
+    }
+  </nb-card-body>
+</nb-card>

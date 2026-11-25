@@ -1408,6 +1408,31 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .expect(200);
     assert.deepEqual(reloaded.body.draft.blocks, blocks);
     await submit(2).expect(200);
+    const queue = await api
+      .get('/api/admin/v1/materials')
+      .query({ workingStatus: 'Submitted', type: 'Story' })
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(200);
+    const queued = (
+      queue.body.items as Array<{
+        id: string;
+        workingStatus: string;
+        type: string;
+      }>
+    ).find((item) => item.id === id);
+    assert.equal(queued?.workingStatus, 'Submitted');
+    assert.equal(queued?.type, 'Story');
+    const differentStage = await api
+      .get('/api/admin/v1/materials')
+      .query({ workingStatus: 'ChangesRequested' })
+      .auth(reviewer.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(
+      (differentStage.body.items as { id: string }[]).some(
+        (item) => item.id === id,
+      ),
+      false,
+    );
     await api.get(detail).auth(reviewer.token, { type: 'bearer' }).expect(404);
     await api
       .patch(detail)

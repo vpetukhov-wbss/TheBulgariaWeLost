@@ -15,12 +15,18 @@ export interface ListMaterials$Params {
  * Optional caller correlation ID. The server echoes it or creates a safe value.
  */
   'X-Correlation-ID'?: string;
+  status?: 'Unpublished' | 'Published' | 'Withdrawn' | 'Archived';
+  workingStatus?: 'Draft' | 'Submitted' | 'InReview' | 'ChangesRequested';
+  type?: 'Story' | 'Document' | 'PhotoEssay' | 'Episode';
 }
 
 export function listMaterials(http: HttpClient, rootUrl: string, params?: ListMaterials$Params, context?: HttpContext): Observable<StrictHttpResponse<MaterialPage>> {
   const rb = new RequestBuilder(rootUrl, listMaterials.PATH, 'get');
   if (params) {
     rb.header('X-Correlation-ID', params['X-Correlation-ID'], {});
+    rb.query('status', params.status, {});
+    rb.query('workingStatus', params.workingStatus, {});
+    rb.query('type', params.type, {});
   }
 
   return http.request(

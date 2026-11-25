@@ -6,6 +6,7 @@ export interface MaterialSummary {
   slug: string;
   status: 'Unpublished' | 'Published' | 'Withdrawn' | 'Archived';
   title: string;
+  type?: 'Story' | 'Document' | 'PhotoEssay' | 'Episode';
   updatedAtUtc: string;
   version: number;
   workingStatus?: 'Draft' | 'Submitted' | 'InReview' | 'ChangesRequested';

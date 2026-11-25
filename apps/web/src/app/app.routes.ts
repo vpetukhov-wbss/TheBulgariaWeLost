@@ -42,8 +42,9 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    canActivate: [signedInGuard, backOfficeGuard],
-    loadComponent: () => import('./features/back-office/back-office').then((m) => m.BackOffice),
+    canActivateChild: [backOfficeGuard],
+    loadChildren: () =>
+      import('./features/editorial/editorial.routes').then((m) => m.editorialRoutes),
   },
   {
     path: 'mfa',

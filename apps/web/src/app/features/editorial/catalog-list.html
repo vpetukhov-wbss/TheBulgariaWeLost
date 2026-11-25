@@ -1,0 +1,89 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb"><a routerLink="/admin">Работен панел</a> / Редакция</p>
+    <h1>Архивен каталог</h1>
+  </div>
+  <a nbButton outline routerLink="/admin/materials">Редакторска опашка</a>
+</header>
+<nav class="section-nav" aria-label="Видове записи">
+  @for (item of kindEntries; track item[0]) {
+    <a
+      [routerLink]="['/admin/catalog', item[0]]"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+      >{{ item[1] }}</a
+    >
+  }
+</nav>
+@if (kind(); as current) {
+  <nb-card>
+    <nb-card-body>
+      <form class="filters" (ngSubmit)="apply(search.value, filter.value)">
+        <label class="field"
+          >Търси в „{{ kinds[current] }}“
+          <input nbInput fullWidth #search maxlength="100" [value]="query()" />
+        </label>
+        <label class="field"
+          >Статус
+          <select #filter [value]="status()">
+            <option value="">Всички статуси</option>
+            @for (item of statuses | keyvalue; track item.key) {
+              <option [value]="item.key">{{ item.value }}</option>
+            }
+          </select>
+        </label>
+        <button nbButton outline type="submit">Филтрирай</button>
+        <a
+          nbButton
+          status="primary"
+          [routerLink]="['/admin/catalog', current, 'new']"
+          queryParamsHandling="preserve"
+          >Нов запис</a
+        >
+      </form>
+      @if (parent()) {
+        <p class="actions divider">
+          Показани са дъщерните категории.
+          <button nbButton ghost type="button" (click)="apply(query(), status(), null)">
+            Покажи всички категории
+          </button>
+        </p>
+      }
+    </nb-card-body>
+  </nb-card>
+  @if (entries.isLoading()) {
+    <p role="status">Зареждане на каталога…</p>
+  } @else if (entries.hasValue()) {
+    <nb-card>
+      <nb-card-body class="records">
+        @for (entry of entries.value().items; track entry.id) {
+          <article class="record">
+            <div>
+              <h2>
+                <a
+                  [routerLink]="['/admin/catalog', current, entry.id]"
+                  queryParamsHandling="preserve"
+                  >{{ entry.name }}</a
+                >
+              </h2>
+              <p class="muted wrap">
+                {{ entry.slug }} ·
+                <time [attr.datetime]="entry.updatedAtUtc">{{
+                  entry.updatedAtUtc | date: 'dd.MM.yyyy, HH:mm'
+                }}</time>
+              </p>
+            </div>
+            <span class="badge">{{ statuses[entry.status] }}</span>
+          </article>
+        } @empty {
+          <p>Няма записи за избраните филтри.</p>
+        }
+      </nb-card-body>
+    </nb-card>
+  } @else {
+    <nb-alert status="danger" role="alert">Каталогът не можа да се зареди.</nb-alert>
+    <button nbButton outline type="button" (click)="entries.reload()">Опитай отново</button>
+  }
+} @else {
+  <nb-alert status="warning" role="alert">Непозната секция на каталога.</nb-alert>
+}
