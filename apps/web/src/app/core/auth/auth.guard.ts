@@ -34,11 +34,11 @@ export const backOfficeGuard: CanActivateFn = (route, state) => {
       if (!authenticated) return of(loginRoute(router, state.url));
 
       return backOffice.getBackOfficePrincipal().pipe(
-        map((principal) =>
-          typeof requiredPermission !== 'string' ||
-          principal.permissions.includes(requiredPermission) ||
-          router.createUrlTree(['/forbidden']),
-        ),
+        map((principal) => {
+          if (typeof requiredPermission !== 'string') return true;
+          if (principal.permissions.includes(requiredPermission)) return true;
+          return router.createUrlTree(['/forbidden']);
+        }),
         catchError((error: unknown) => {
           if (error instanceof HttpErrorResponse && error.status === 401) {
             return tokens.clear().pipe(map(() => loginRoute(router, state.url)));
