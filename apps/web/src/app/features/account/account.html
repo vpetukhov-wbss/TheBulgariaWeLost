@@ -28,6 +28,10 @@
         <button nbButton status="primary" type="button" (click)="load()">Опитай отново</button>
       }
       @case ('ready') {
+        <nav class="account-links" aria-label="Авторско пространство">
+          <a nbButton outline routerLink="/account/materials">Моите материали</a>
+          <a nbButton outline routerLink="/account/saved">Запазени материали</a>
+        </nav>
         @if (success()) {
           <nb-alert status="success" role="status">{{ success() }}</nb-alert>
         }

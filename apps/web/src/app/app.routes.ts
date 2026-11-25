@@ -2,6 +2,10 @@ import type { Routes } from '@angular/router';
 import { backOfficeGuard, signedInGuard } from './core/auth/auth.guard';
 
 const authPage = () => import('./features/auth/auth-page').then((m) => m.AuthPage);
+const authorWorkspace = () =>
+  import('./features/author/author-workspace').then((m) => m.AuthorWorkspace);
+const materialComposer = () =>
+  import('./features/author/material-composer').then((m) => m.MaterialComposer);
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', loadComponent: () => import('./home').then((m) => m.Home) },
@@ -11,6 +15,20 @@ export const routes: Routes = [
   { path: 'password-change', data: { action: 'reset' }, loadComponent: authPage },
   { path: 'confirm-email', data: { action: 'confirm' }, loadComponent: authPage },
   { path: 'confirm-new-email', data: { action: 'confirm-new' }, loadComponent: authPage },
+  { path: 'account/materials/new', canActivate: [signedInGuard], loadComponent: materialComposer },
+  { path: 'account/materials/:id', canActivate: [signedInGuard], loadComponent: materialComposer },
+  { path: 'account/materials', canActivate: [signedInGuard], loadComponent: authorWorkspace },
+  {
+    path: 'account/saved',
+    canActivate: [signedInGuard],
+    data: { saved: true },
+    loadComponent: authorWorkspace,
+  },
+  {
+    path: 'materials/:slug',
+    loadComponent: () =>
+      import('./features/author/published-material-page').then((m) => m.PublishedMaterialPage),
+  },
   {
     path: 'account',
     canActivate: [signedInGuard],

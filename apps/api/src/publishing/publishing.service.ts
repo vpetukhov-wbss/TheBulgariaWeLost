@@ -12,6 +12,10 @@ import { uuidv7 } from 'uuidv7';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
 import {
+  CatalogService,
+  type AuthorCatalogField,
+} from '../catalog/catalog.service';
+import {
   MediaAccessStatus,
   MediaUpload,
   ProcessingStatus,
@@ -44,6 +48,11 @@ import {
 } from './persistence/publishing-event.schema';
 
 type Principal = SignedInAccount;
+const authorCatalogFields: AuthorCatalogField[] = [
+  'categoryIds',
+  'topicIds',
+  'sourceIds',
+];
 
 @Injectable()
 export class PublishingService {
@@ -58,6 +67,7 @@ export class PublishingService {
     @InjectModel(MediaUpload.name)
     private readonly mediaUploads: Model<MediaUpload>,
     @InjectConnection() private readonly connection: Connection,
+    private readonly catalog: CatalogService,
   ) {}
 
   static etag(material: MaterialDetailDto): string {
@@ -88,9 +98,10 @@ export class PublishingService {
     return Number(versionText);
   }
 
-  async list(principal: Principal): Promise<MaterialPageDto> {
-    const filter =
-      principal.profile.role === Role.Administrator
+  async list(principal: Principal, author = false): Promise<MaterialPageDto> {
+    const filter = author
+      ? { authorId: principal.profile.id }
+      : principal.profile.role === Role.Administrator
         ? {}
         : {
             $or: [
@@ -116,11 +127,18 @@ export class PublishingService {
     principal: Principal,
     dto: CreateMaterialDto,
     correlationId: string,
+    author = false,
   ): Promise<MaterialDetailDto> {
+    const title = dto.title.trim();
+    if (title.length < 3) {
+      throw new UnprocessableEntityException({
+        code: 'material_title_required',
+      });
+    }
     const materialId = uuidv7();
     const now = new Date();
     const content: MaterialDraft = {
-      title: dto.title.trim(),
+      title,
       categoryIds: [],
       topicIds: [],
       sourceIds: [],
@@ -167,13 +185,17 @@ export class PublishingService {
         session,
       );
     });
-    return this.get(principal, materialId);
+    return this.get(principal, materialId, author);
   }
 
-  async get(principal: Principal, id: string): Promise<MaterialDetailDto> {
+  async get(
+    principal: Principal,
+    id: string,
+    author = false,
+  ): Promise<MaterialDetailDto> {
     const material = await this.materials.findById(id).exec();
-    this.requireAccess(material, principal);
-    return this.detail(material!);
+    this.requireAccess(material, principal, author);
+    return this.detail(material!, author);
   }
 
   async updateDraft(
@@ -182,22 +204,31 @@ export class PublishingService {
     expectedVersion: number,
     dto: UpdateMaterialDraftDto,
     correlationId: string,
+    author = false,
   ): Promise<MaterialDetailDto> {
     await this.withTransaction(async (session) => {
       const material = await this.materials
         .findById(id)
         .session(session)
         .exec();
-      this.requireAccess(material, principal);
+      this.requireAccess(material, principal, author);
+      this.requireVersion(material!, expectedVersion, true);
+      if (author && !this.authorCanEdit(material!)) {
+        throw new ConflictException({ code: 'material_locked_for_review' });
+      }
       if (material!.status === MaterialStatus.Archived) {
         throw new ConflictException({
           code: 'material_archived',
           message: 'Restore the material from the archive before editing.',
         });
       }
-      this.requireVersion(material!, expectedVersion, true);
       const current = await this.currentRevision(material!, session);
       const content = this.mergeDraft(current.content, dto);
+      if (content.title.length < 3) {
+        throw new UnprocessableEntityException({
+          code: 'material_title_required',
+        });
+      }
       const revisionNumber = material!.lastRevisionNumber + 1;
       const nextVersion = material!.version + 1;
       const result = await this.materials.updateOne(
@@ -233,7 +264,7 @@ export class PublishingService {
         session,
       );
     });
-    return this.get(principal, id);
+    return this.get(principal, id, author);
   }
 
   async transition(
@@ -241,14 +272,27 @@ export class PublishingService {
     id: string,
     dto: TransitionMaterialDto,
     correlationId: string,
+    author = false,
   ): Promise<MaterialDetailDto> {
     await this.withTransaction(async (session) => {
       const material = await this.materials
         .findById(id)
         .session(session)
         .exec();
-      this.requireAccess(material, principal);
+      this.requireAccess(material, principal, author);
       this.requireVersion(material!, dto.expectedVersion, false);
+      if (author) {
+        if (dto.action !== MaterialTransition.SubmitForReview)
+          this.invalidTransition();
+        const revision = await this.currentRevision(material!, session);
+        const blockers = await this.authorBlockers(revision.content, session);
+        if (blockers.length) {
+          throw new UnprocessableEntityException({
+            code: 'submission_incomplete',
+            message: blockers,
+          });
+        }
+      }
       this.requireReason(dto);
       const updates = await this.transitionUpdates(material!, dto, session);
       const nextVersion = material!.version + 1;
@@ -285,7 +329,7 @@ export class PublishingService {
         dto.reason,
       );
     });
-    return this.get(principal, id);
+    return this.get(principal, id, author);
   }
 
   async revisionsFor(
@@ -384,9 +428,19 @@ export class PublishingService {
   }
 
   async publicBySlug(slug: string): Promise<PublicMaterialDto> {
+    return this.publicMaterial({ slug });
+  }
+
+  async publicById(id: string): Promise<PublicMaterialDto> {
+    return this.publicMaterial({ _id: id });
+  }
+
+  private async publicMaterial(
+    identity: { slug: string } | { _id: string },
+  ): Promise<PublicMaterialDto> {
     const material = await this.materials
       .findOne({
-        slug,
+        ...identity,
         status: MaterialStatus.Published,
         publicVisibility: true,
       })
@@ -434,13 +488,19 @@ export class PublishingService {
             workingStatus: WorkingStatus.Submitted,
             hasBeenSubmitted: true,
           },
+          unset: { correctionNote: 1 },
         };
       case MaterialTransition.StartReview:
         this.requireWorkingStatus(material, [WorkingStatus.Submitted]);
         return { set: { workingStatus: WorkingStatus.InReview } };
       case MaterialTransition.RequestChanges:
         this.requireWorkingStatus(material, [WorkingStatus.InReview]);
-        return { set: { workingStatus: WorkingStatus.ChangesRequested } };
+        return {
+          set: {
+            workingStatus: WorkingStatus.ChangesRequested,
+            correctionNote: dto.reason,
+          },
+        };
       case MaterialTransition.Publish: {
         this.requireWorkingStatus(material, [WorkingStatus.InReview]);
         const revision = await this.currentRevision(material, session);
@@ -512,7 +572,10 @@ export class PublishingService {
     }
   }
 
-  private async detail(material: Material): Promise<MaterialDetailDto> {
+  private async detail(
+    material: Material,
+    author = false,
+  ): Promise<MaterialDetailDto> {
     const revision = await this.currentRevision(material);
     return {
       id: material._id,
@@ -532,8 +595,18 @@ export class PublishingService {
         : {}),
       publicVisibility: material.publicVisibility,
       draft: revision.content,
-      allowedActions: this.allowedActions(material),
-      publicationBlockers: await this.publicationBlockers(revision.content),
+      allowedActions: author
+        ? this.authorCanEdit(material)
+          ? [MaterialTransition.SubmitForReview]
+          : []
+        : this.allowedActions(material),
+      publicationBlockers: author
+        ? await this.authorBlockers(revision.content)
+        : await this.publicationBlockers(revision.content),
+      ...(material.workingStatus === WorkingStatus.ChangesRequested &&
+      material.correctionNote
+        ? { correctionNote: material.correctionNote }
+        : {}),
       version: material.version,
       updatedAtUtc: material.updatedAt.toISOString(),
     };
@@ -597,6 +670,7 @@ export class PublishingService {
       ...structuredClone(current),
       ...changes,
       title: (update.title ?? current.title).trim(),
+      blocks: update.blocks ?? current.blocks,
       rights: update.rights ?? current.rights,
       mediaRefs: update.mediaRefs ?? current.mediaRefs,
       categoryIds: update.categoryIds ?? current.categoryIds,
@@ -617,6 +691,51 @@ export class PublishingService {
       blockers.push('material_rights_missing');
     blockers.push(...(await this.mediaBlockers(draft, session)));
     return blockers;
+  }
+
+  private async authorBlockers(
+    draft: MaterialDraft,
+    session?: ClientSession,
+  ): Promise<string[]> {
+    const blockers = await this.publicationBlockers(draft, session);
+    if (draft.title.trim().length < 3) blockers.push('material_title_required');
+    const blocks = draft.blocks ?? [];
+    if (!draft.body?.trim() && !blocks.some((block) => block.text.trim())) {
+      blockers.push('content_required');
+    } else if (blocks.some((block) => !block.text.trim())) {
+      blockers.push('empty_block');
+    }
+    const rightsStatement = draft.rights.statement.trim();
+    if (
+      draft.rights.publicDisplayAllowed &&
+      (rightsStatement.length < 3 ||
+        rightsStatement === 'Not reviewed.' ||
+        rightsStatement === 'Не са потвърдени.')
+    )
+      blockers.push('rights_statement_required');
+    if (session) {
+      for (const field of authorCatalogFields) {
+        if (
+          draft[field].length &&
+          !(await this.catalog.authorSelectionValid(
+            field,
+            draft[field],
+            session,
+          ))
+        ) {
+          blockers.push(`catalog_selection_unavailable:${field}`);
+        }
+      }
+    }
+    return blockers;
+  }
+
+  private authorCanEdit(material: Material): boolean {
+    return (
+      material.status !== MaterialStatus.Archived &&
+      (material.workingStatus === WorkingStatus.Draft ||
+        material.workingStatus === WorkingStatus.ChangesRequested)
+    );
   }
 
   private async mediaBlockers(
@@ -672,9 +791,14 @@ export class PublishingService {
     return actions;
   }
 
-  private requireAccess(material: Material | null, principal: Principal): void {
+  private requireAccess(
+    material: Material | null,
+    principal: Principal,
+    author = false,
+  ): void {
     if (
       !material ||
+      (author && material.authorId !== principal.profile.id) ||
       (principal.profile.role !== Role.Administrator &&
         material.authorId !== principal.profile.id &&
         !material.hasBeenSubmitted)

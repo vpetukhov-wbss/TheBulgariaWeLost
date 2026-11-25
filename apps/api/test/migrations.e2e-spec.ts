@@ -87,6 +87,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '004-media-correlation',
           '005-publishing-foundation',
           '006-catalog-taxonomy',
+          '007-author-bookmarks',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
@@ -95,6 +96,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '004-media-correlation',
           '005-publishing-foundation',
           '006-catalog-taxonomy',
+          '007-author-bookmarks',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -103,7 +105,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            6,
+            7,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');

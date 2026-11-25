@@ -77,3 +77,9 @@ form,
     grid-template-columns: 1fr;
   }
 }
+.account-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-bottom: 1rem;
+}

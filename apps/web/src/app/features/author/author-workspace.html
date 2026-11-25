@@ -1,0 +1,82 @@
+<header class="page-header">
+  <h1>{{ savedView ? 'Запазени материали' : 'Моите материали' }}</h1>
+  @if (!savedView) {
+    <a nbButton status="primary" routerLink="/account/materials/new">Нов материал</a>
+  }
+</header>
+<nav class="workspace-nav" aria-label="Авторско пространство">
+  <a routerLink="/account">Профил</a>
+  <a routerLink="/account/materials" [attr.aria-current]="savedView ? null : 'page'"
+    >Моите материали</a
+  >
+  <a routerLink="/account/saved" [attr.aria-current]="savedView ? 'page' : null">Запазени</a>
+</nav>
+@if (actionError()) {
+  <nb-alert status="danger" role="alert">{{ actionError() }}</nb-alert>
+}
+@if (loading()) {
+  <p role="status">Зареждане…</p>
+} @else if (loadError()) {
+  <nb-alert status="danger" role="alert">{{ loadError() }}</nb-alert>
+  <button nbButton type="button" (click)="load()">Опитай отново</button>
+} @else if (savedView) {
+  <div class="rows">
+    @for (item of saved(); track item.id) {
+      <nb-card>
+        <nb-card-body class="material-row">
+          <div>
+            <h2>
+              <a [routerLink]="['/materials', item.slug]">{{ item.title }}</a>
+            </h2>
+            <time [attr.datetime]="item.savedAtUtc"
+              >Запазен на {{ item.savedAtUtc | date: 'dd.MM.yyyy' }}</time
+            >
+          </div>
+          <button
+            nbButton
+            outline
+            status="danger"
+            type="button"
+            [disabled]="!!removing()"
+            (click)="remove(item.id)"
+            [attr.aria-label]="'Премахни ' + item.title"
+          >
+            Премахни
+          </button>
+        </nb-card-body>
+      </nb-card>
+    } @empty {
+      <nb-card
+        ><nb-card-body
+          >Няма запазени материали. Можеш да запазиш материал от страницата му.</nb-card-body
+        ></nb-card
+      >
+    }
+  </div>
+} @else {
+  <div class="rows">
+    @for (item of materials(); track item.id) {
+      <nb-card>
+        <nb-card-body class="material-row">
+          <div>
+            <h2>
+              <a [routerLink]="['/account/materials', item.id]">{{ item.title }}</a>
+            </h2>
+            <time [attr.datetime]="item.updatedAtUtc">{{
+              item.updatedAtUtc | date: 'dd.MM.yyyy, HH:mm'
+            }}</time>
+          </div>
+          <span class="status" [class.corrections]="item.workingStatus === 'ChangesRequested'">{{
+            status(item)
+          }}</span>
+        </nb-card-body>
+      </nb-card>
+    } @empty {
+      <nb-card
+        ><nb-card-body
+          >Все още нямаш материали. Избери „Нов материал“, за да започнеш чернова.</nb-card-body
+        ></nb-card
+      >
+    }
+  </div>
+}
