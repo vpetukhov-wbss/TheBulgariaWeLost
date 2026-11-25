@@ -6,10 +6,12 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  ParseEnumPipe,
   ParseIntPipe,
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   Res,
   UseGuards,
@@ -21,6 +23,7 @@ import {
   ApiCreatedResponse,
   ApiHeader,
   ApiOkResponse,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import type { Response } from 'express';
@@ -38,6 +41,11 @@ import {
   TransitionMaterialDto,
   UpdateMaterialDraftDto,
 } from './dto/material.dto';
+import {
+  MaterialStatus,
+  MaterialType,
+  WorkingStatus,
+} from './persistence/material.schema';
 import { PublishingService } from './publishing.service';
 
 @ApiTags('Publishing')
@@ -49,10 +57,26 @@ export class PublishingController {
 
   @Get()
   @ApiOkResponse({ type: MaterialPageDto })
+  @ApiQuery({ name: 'status', enum: MaterialStatus, required: false })
+  @ApiQuery({ name: 'workingStatus', enum: WorkingStatus, required: false })
+  @ApiQuery({ name: 'type', enum: MaterialType, required: false })
   list(
     @Req() request: RequestWithUser<SignedInAccount>,
+    @Query('status', new ParseEnumPipe(MaterialStatus, { optional: true }))
+    status?: MaterialStatus,
+    @Query(
+      'workingStatus',
+      new ParseEnumPipe(WorkingStatus, { optional: true }),
+    )
+    workingStatus?: WorkingStatus,
+    @Query('type', new ParseEnumPipe(MaterialType, { optional: true }))
+    type?: MaterialType,
   ): Promise<MaterialPageDto> {
-    return this.publishing.list(request.user);
+    return this.publishing.list(request.user, false, {
+      status,
+      workingStatus,
+      type,
+    });
   }
 
   @Post()

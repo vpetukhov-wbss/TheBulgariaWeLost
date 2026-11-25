@@ -1,0 +1,357 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb">
+      <a routerLink="/admin/materials" queryParamsHandling="preserve">Редакторска опашка</a> /
+      Материал
+    </p>
+    <h1>{{ current()?.draft?.title || 'Редакторски преглед' }}</h1>
+  </div>
+  @if (current(); as material) {
+    @if (material.publicVisibility) {
+      <a nbButton outline [routerLink]="['/materials', material.slug]">Виж публикацията</a>
+    }
+  }
+</header>
+@if (error()) {
+  <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+}
+@if (notice()) {
+  <nb-alert status="success" role="status">{{ notice() }}</nb-alert>
+}
+@if (stale()) {
+  <div class="conflict">
+    <button nbButton outline status="warning" type="button" [disabled]="loading()" (click)="load()">
+      Зареди актуалната версия
+    </button>
+  </div>
+}
+@if (current(); as material) {
+  @if (draft(); as editDraft) {
+    <p class="actions">
+      <span class="badge">{{ types[material.type] }}</span>
+      @if (material.workingStatus) {
+        <span class="badge">{{ working[material.workingStatus] }}</span>
+      }
+      <span class="badge secondary">{{ visibility[material.status] }}</span>
+    </p>
+    <p class="muted wrap">
+      Автор {{ material.authorId }} · Версия {{ material.version }}
+      @if (material.workingRevisionNumber) {
+        · Работна ревизия №{{ material.workingRevisionNumber }}
+      }
+      @if (material.publishedRevisionNumber) {
+        · Публична ревизия №{{ material.publishedRevisionNumber }}
+      }
+    </p>
+    @if (material.correctionNote) {
+      <nb-alert status="warning" class="wrap"
+        ><strong>Причина за корекция</strong>
+        <p>{{ material.correctionNote }}</p></nb-alert
+      >
+    }
+    <div class="actions divider">
+      <button
+        nbButton
+        outline
+        type="button"
+        [attr.aria-pressed]="!comparing()"
+        (click)="comparing.set(false)"
+      >
+        Съдържание и права
+      </button>
+      <button
+        nbButton
+        outline
+        type="button"
+        [attr.aria-pressed]="comparing()"
+        (click)="comparing.set(true)"
+      >
+        Ревизии
+      </button>
+    </div>
+    @if (comparing()) {
+      <app-revision-comparison
+        [id]="material.id"
+        [version]="material.version"
+        [canRestore]="editable() && !busy() && !loading() && !stale() && !dirty()"
+        (restoration)="restore($event)"
+      />
+    } @else {
+      <fieldset class="split" [disabled]="busy() || loading() || !editable()">
+        <nb-card>
+          <nb-card-header>Работно съдържание</nb-card-header>
+          <nb-card-body>
+            <label class="field"
+              >Заглавие
+              <input
+                nbInput
+                fullWidth
+                maxlength="200"
+                [ngModel]="editDraft.title"
+                (ngModelChange)="edit({ title: $event })"
+            /></label>
+            <label class="field"
+              >Подзаглавие
+              <input
+                nbInput
+                fullWidth
+                maxlength="300"
+                [ngModel]="editDraft.subtitle ?? ''"
+                (ngModelChange)="edit({ subtitle: $event })"
+            /></label>
+            <label class="field"
+              >Резюме
+              <textarea
+                nbInput
+                fullWidth
+                rows="3"
+                maxlength="1000"
+                [ngModel]="editDraft.summary ?? ''"
+                (ngModelChange)="edit({ summary: $event })"
+              ></textarea>
+            </label>
+            @if (editDraft.body !== undefined) {
+              <label class="field"
+                >Основен текст
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="6"
+                  maxlength="100000"
+                  [ngModel]="editDraft.body"
+                  (ngModelChange)="edit({ body: $event })"
+                ></textarea>
+              </label>
+            }
+            @for (block of editDraft.blocks ?? []; track block.id; let index = $index) {
+              <div class="divider">
+                <label class="field"
+                  >{{ blockNames[block.type] }} {{ index + 1 }}
+                  <textarea
+                    nbInput
+                    fullWidth
+                    rows="4"
+                    maxlength="6000"
+                    [ngModel]="block.text"
+                    (ngModelChange)="editBlock(block.id, $event)"
+                  ></textarea>
+                </label>
+                <button
+                  nbButton
+                  ghost
+                  size="small"
+                  status="danger"
+                  type="button"
+                  [attr.aria-label]="'Премахни блок ' + (index + 1)"
+                  (click)="removeBlock(block.id)"
+                >
+                  Премахни
+                </button>
+              </div>
+            }
+            @if (editable()) {
+              <div class="actions">
+                <button
+                  nbButton
+                  size="small"
+                  outline
+                  type="button"
+                  [disabled]="(editDraft.blocks?.length ?? 0) >= 40"
+                  (click)="addBlock('Heading')"
+                >
+                  Добави заглавие
+                </button>
+                <button
+                  nbButton
+                  size="small"
+                  outline
+                  type="button"
+                  [disabled]="(editDraft.blocks?.length ?? 0) >= 40"
+                  (click)="addBlock('Paragraph')"
+                >
+                  Добави абзац
+                </button>
+                <button
+                  nbButton
+                  size="small"
+                  outline
+                  type="button"
+                  [disabled]="(editDraft.blocks?.length ?? 0) >= 40"
+                  (click)="addBlock('Quote')"
+                >
+                  Добави цитат
+                </button>
+              </div>
+            }
+          </nb-card-body>
+        </nb-card>
+        <nb-card>
+          <nb-card-header>Източници и права</nb-card-header>
+          <nb-card-body>
+            @for (field of catalogFields; track field) {
+              <app-author-catalog-picker
+                [field]="field"
+                [label]="catalogLabels[field]"
+                [selected]="editDraft[field]"
+                [disabled]="busy() || loading() || !editable()"
+                (selectionChange)="selectCatalog(field, $event)"
+              />
+            }
+            @if (editDraft.sourceIds.length) {
+              <ul>
+                @for (source of editDraft.sourceIds; track source; let index = $index) {
+                  <li>
+                    <a
+                      [routerLink]="['/admin/catalog/sources', source]"
+                      target="_blank"
+                      rel="noopener"
+                      >Отвори източник {{ index + 1 }}</a
+                    >
+                  </li>
+                }
+              </ul>
+            }
+            <label class="field"
+              >Произход
+              <textarea
+                nbInput
+                fullWidth
+                rows="2"
+                maxlength="2000"
+                [ngModel]="editDraft.provenance ?? ''"
+                (ngModelChange)="edit({ provenance: $event })"
+              ></textarea>
+            </label>
+            <label
+              ><input
+                type="checkbox"
+                [ngModel]="editDraft.rights.publicDisplayAllowed"
+                (ngModelChange)="setRights({ publicDisplayAllowed: $event })"
+              />
+              Разрешено публично показване</label
+            >
+            <label class="field divider"
+              >Основание за правата
+              <textarea
+                nbInput
+                fullWidth
+                rows="3"
+                maxlength="2000"
+                [ngModel]="editDraft.rights.statement"
+                (ngModelChange)="setRights({ statement: $event })"
+              ></textarea>
+            </label>
+            @if (editDraft.mediaRefs.length) {
+              <h2>Свързани файлове</h2>
+              <ul class="wrap">
+                @for (file of editDraft.mediaRefs; track $index) {
+                  <li>
+                    {{ file.role }} · {{ file.mediaId }}
+                    @if (file.credit) {
+                      · {{ file.credit }}
+                    }
+                  </li>
+                }
+              </ul>
+            }
+            <h2>Проверка за публикуване</h2>
+            @if (dirty()) {
+              <p class="muted">Проверката ще се обнови след запис на работната версия.</p>
+            }
+            @if (material.publicationBlockers.length) {
+              <ul class="wrap">
+                @for (blocker of material.publicationBlockers; track blocker) {
+                  <li>{{ describeBlocker(blocker) }}</li>
+                }
+              </ul>
+            } @else {
+              <p>Няма блокиращи условия.</p>
+            }
+          </nb-card-body>
+        </nb-card>
+      </fieldset>
+      <nb-card>
+        <nb-card-header>Редакционни действия</nb-card-header>
+        <nb-card-body>
+          @if (dirty()) {
+            <p class="muted">Запази редакцията преди промяна на статуса.</p>
+          }
+          <div class="actions">
+            @if (editable()) {
+              <button
+                nbButton
+                outline
+                type="button"
+                [disabled]="!dirty() || busy() || stale() || !canSave()"
+                (click)="save()"
+              >
+                Запази редакцията
+              </button>
+            }
+            @for (item of actions(); track item.action) {
+              <button
+                nbButton
+                [outline]="item.action !== 'Publish'"
+                [status]="item.action === 'Publish' ? 'primary' : 'basic'"
+                type="button"
+                [disabled]="
+                  dirty() ||
+                  busy() ||
+                  stale() ||
+                  (item.action === 'Publish' && material.publicationBlockers.length > 0)
+                "
+                (click)="pick(item.action)"
+              >
+                {{ item.label }}
+              </button>
+            }
+          </div>
+          @if (requested(); as selected) {
+            <form class="divider" (ngSubmit)="transition()">
+              <p>
+                <strong>{{ operation[selected].label }}</strong>
+              </p>
+              @if (operation[selected].reason) {
+                <label class="field"
+                  >Причина
+                  <textarea
+                    nbInput
+                    fullWidth
+                    rows="3"
+                    name="reason"
+                    maxlength="500"
+                    [ngModel]="reason()"
+                    (ngModelChange)="reason.set($event)"
+                  ></textarea>
+                </label>
+              }
+              <div class="actions">
+                <button
+                  nbButton
+                  status="primary"
+                  type="submit"
+                  [disabled]="busy() || stale() || dirty()"
+                >
+                  Потвърди действието
+                </button>
+                <button
+                  nbButton
+                  ghost
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="requested.set(null)"
+                >
+                  Отказ
+                </button>
+              </div>
+            </form>
+          }
+        </nb-card-body>
+      </nb-card>
+    }
+  }
+} @else if (loading()) {
+  <p role="status">Зареждане на материала…</p>
+} @else {
+  <button nbButton outline type="button" (click)="load()">Опитай отново</button>
+}

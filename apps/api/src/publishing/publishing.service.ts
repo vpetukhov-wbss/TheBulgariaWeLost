@@ -40,6 +40,7 @@ import {
   type MaterialDraft,
   MaterialRevision,
   MaterialStatus,
+  type MaterialType,
   WorkingStatus,
 } from './persistence/material.schema';
 import {
@@ -98,7 +99,15 @@ export class PublishingService {
     return Number(versionText);
   }
 
-  async list(principal: Principal, author = false): Promise<MaterialPageDto> {
+  async list(
+    principal: Principal,
+    author = false,
+    filters: {
+      status?: MaterialStatus;
+      workingStatus?: WorkingStatus;
+      type?: MaterialType;
+    } = {},
+  ): Promise<MaterialPageDto> {
     const filter = author
       ? { authorId: principal.profile.id }
       : principal.profile.role === Role.Administrator
@@ -110,7 +119,14 @@ export class PublishingService {
             ],
           };
     const materials = await this.materials
-      .find(filter)
+      .find({
+        ...filter,
+        ...(filters.status ? { status: filters.status } : {}),
+        ...(filters.workingStatus
+          ? { workingStatus: filters.workingStatus }
+          : {}),
+        ...(filters.type ? { type: filters.type } : {}),
+      })
       .sort({ updatedAt: -1, _id: -1 })
       .limit(100)
       .exec();
@@ -617,6 +633,7 @@ export class PublishingService {
       id: material._id,
       slug: material.slug,
       title,
+      type: material.type,
       status: material.status,
       ...(material.workingStatus
         ? { workingStatus: material.workingStatus }

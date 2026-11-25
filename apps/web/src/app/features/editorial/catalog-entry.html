@@ -1,0 +1,355 @@
+@if (kind(); as current) {
+  <header class="page-heading">
+    <div>
+      <p class="breadcrumb">
+        <a [routerLink]="['/admin/catalog', current]" queryParamsHandling="preserve">{{
+          kinds[current]
+        }}</a>
+        / Каталог
+      </p>
+      <h1>{{ entry()?.name || (id() ? 'Каталожен запис' : 'Нов каталожен запис') }}</h1>
+    </div>
+    @if (entry(); as item) {
+      <span class="badge">{{ statuses[item.status] }} · Версия {{ item.version }}</span>
+    }
+  </header>
+  @if (error()) {
+    <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+  }
+  @if (notice()) {
+    <nb-alert status="success" role="status">{{ notice() }}</nb-alert>
+  }
+  @if (stale()) {
+    <div class="conflict">
+      <button
+        nbButton
+        outline
+        status="warning"
+        type="button"
+        [disabled]="loading()"
+        (click)="load()"
+      >
+        Зареди актуалната версия
+      </button>
+    </div>
+  }
+  @if (loading() && !entry()) {
+    <p role="status">Зареждане на записа…</p>
+  } @else if (id() && !entry()) {
+    <button nbButton outline type="button" (click)="load()">Опитай отново</button>
+  } @else {
+    @if (entry(); as item) {
+      @if (item.canonicalId) {
+        <nb-alert status="info">
+          <a
+            [routerLink]="['/admin/catalog', current, item.canonicalId]"
+            queryParamsHandling="preserve"
+            >Отвори каноничния запис</a
+          >
+        </nb-alert>
+      }
+      @if (current === 'categories' && item.status !== 'Merged') {
+        <p>
+          <a routerLink="/admin/catalog/categories" [queryParams]="{ parentId: item.id }"
+            >Виж дъщерните категории</a
+          >
+        </p>
+      }
+    }
+    <form [formGroup]="form" (ngSubmit)="save()">
+      <fieldset [disabled]="busy() || loading() || entry()?.status === 'Merged'">
+        <nb-card>
+          <nb-card-header>Данни за записа</nb-card-header>
+          <nb-card-body>
+            <div class="split">
+              <label class="field"
+                >{{ current === 'sources' ? 'Заглавие' : 'Име' }}
+                <input
+                  nbInput
+                  fullWidth
+                  formControlName="label"
+                  [maxlength]="current === 'sources' ? 500 : 300"
+                />
+              </label>
+              <label class="field"
+                >URL идентификатор
+                <input
+                  nbInput
+                  fullWidth
+                  formControlName="slug"
+                  maxlength="180"
+                  placeholder="primer-zapis"
+                />
+              </label>
+            </div>
+            @if (current === 'topics' || current === 'categories' || current === 'entities') {
+              <label class="field"
+                >Описание
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="3"
+                  formControlName="description"
+                  [maxlength]="current === 'categories' ? 10000 : 5000"
+                ></textarea>
+              </label>
+            }
+            @if (current !== 'sources') {
+              <label class="field"
+                >Други имена <span class="muted">По едно име на ред.</span>
+                <textarea nbInput fullWidth rows="2" formControlName="aliases"></textarea>
+              </label>
+            }
+            @if (current === 'entities' || current === 'places' || current === 'sources') {
+              <label class="field"
+                >Вид <input nbInput fullWidth formControlName="subtype" maxlength="100"
+              /></label>
+            }
+            @if (current === 'categories' || current === 'places' || current === 'sources') {
+              <label class="field"
+                >{{ current === 'sources' ? 'Архивна институция' : 'Родителски запис' }}
+                <select formControlName="relationId">
+                  <option value="">Избери запис</option>
+                  @if (
+                    form.controls.relationId.value && !relatedOptions().some(matchesCurrentRelation)
+                  ) {
+                    <option [value]="form.controls.relationId.value">Текущ свързан запис</option>
+                  }
+                  @for (option of relatedOptions(); track option.id) {
+                    <option [value]="option.id">{{ option.name }}</option>
+                  }
+                </select>
+              </label>
+              @if (relatedFailure()) {
+                <p class="muted">Свързаните записи не можаха да се заредят.</p>
+              }
+            }
+            @if (current === 'categories') {
+              <label
+                ><input type="checkbox" formControlName="isVisible" /> Видима в публичния каталог
+                след одобрение</label
+              >
+            }
+            @if (current === 'sources' || current === 'archive-institutions') {
+              <label class="field"
+                >Уеб адрес
+                <input nbInput fullWidth type="url" formControlName="url" maxlength="2000"
+              /></label>
+            }
+            @if (current === 'sources') {
+              <label class="field"
+                >Оригинално име на институцията
+                <input nbInput fullWidth formControlName="institution" maxlength="500" />
+              </label>
+              <h2>Архивна сигнатура</h2>
+              <div class="split">
+                <label class="field"
+                  >Фонд <input nbInput fullWidth formControlName="fund" maxlength="200"
+                /></label>
+                <label class="field"
+                  >Опис <input nbInput fullWidth formControlName="inventory" maxlength="200"
+                /></label>
+                <label class="field"
+                  >Архивна единица
+                  <input nbInput fullWidth formControlName="archiveUnit" maxlength="200"
+                /></label>
+                <label class="field"
+                  >Страница или кадър
+                  <input nbInput fullWidth formControlName="pageOrFrame" maxlength="200"
+                /></label>
+              </div>
+              <h2>Права и проверка</h2>
+              <label
+                ><input type="checkbox" formControlName="allowed" /> Разрешено публично
+                показване</label
+              >
+              <label class="field divider"
+                >Основание за правата
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="3"
+                  formControlName="rights"
+                  maxlength="2000"
+                ></textarea>
+              </label>
+              <label class="field"
+                >Проверка
+                <select formControlName="verification">
+                  <option value="Unverified">Непроверен</option>
+                  <option value="Verified">Проверен</option>
+                  <option value="Disputed">Оспорен</option>
+                </select>
+              </label>
+              <label class="field"
+                >Бележка от проверката
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="2"
+                  formControlName="verificationNote"
+                  maxlength="2000"
+                ></textarea>
+              </label>
+            }
+            @if (entry()?.status !== 'Merged') {
+              <button
+                nbButton
+                status="primary"
+                type="submit"
+                [disabled]="stale() || (!!id() && (!form.dirty || !canSave()))"
+              >
+                {{ id() ? 'Запази промените' : 'Създай запис' }}
+              </button>
+            }
+          </nb-card-body>
+        </nb-card>
+      </fieldset>
+    </form>
+    @if (entry() && (actions().length || canMerge())) {
+      <nb-card>
+        <nb-card-header>Действия за записа</nb-card-header>
+        <nb-card-body>
+          @if (form.dirty) {
+            <p class="muted">Запази промените, преди да промениш статуса.</p>
+          }
+          <div class="actions">
+            @for (item of actions(); track item.action) {
+              <button
+                nbButton
+                outline
+                type="button"
+                [disabled]="busy() || stale() || form.dirty"
+                (click)="pick(item.action)"
+              >
+                {{ item.label }}
+              </button>
+            }
+            @if (canMerge()) {
+              <button
+                nbButton
+                outline
+                status="warning"
+                type="button"
+                [disabled]="busy() || stale() || form.dirty"
+                (click)="findTargets()"
+              >
+                Обедини дубликат
+              </button>
+            }
+          </div>
+          @if (requested(); as selected) {
+            <form class="divider" (ngSubmit)="transition()">
+              <p>
+                <strong>{{ operation[selected].label }}</strong>
+              </p>
+              @if (operation[selected].reason) {
+                <label class="field"
+                  >Причина
+                  <textarea
+                    nbInput
+                    fullWidth
+                    rows="2"
+                    name="reason"
+                    maxlength="500"
+                    [ngModel]="reason()"
+                    (ngModelChange)="reason.set($event)"
+                  ></textarea>
+                </label>
+              }
+              <div class="actions">
+                <button
+                  nbButton
+                  status="primary"
+                  type="submit"
+                  [disabled]="busy() || stale() || form.dirty"
+                >
+                  Потвърди действието
+                </button>
+                <button
+                  nbButton
+                  ghost
+                  type="button"
+                  [disabled]="busy()"
+                  (click)="requested.set(null)"
+                >
+                  Отказ
+                </button>
+              </div>
+            </form>
+          }
+          @if (merging() && canMerge()) {
+            <div class="divider">
+              <h2>Каноничен запис</h2>
+              <form class="filters" (ngSubmit)="findTargets()">
+                <label class="field"
+                  >Търси по име
+                  <input
+                    nbInput
+                    fullWidth
+                    maxlength="100"
+                    name="targetQuery"
+                    [ngModel]="targetQuery()"
+                    (ngModelChange)="targetQuery.set($event)"
+                /></label>
+                <button nbButton outline type="submit" [disabled]="busy() || stale() || form.dirty">
+                  Търси каноничен запис
+                </button>
+              </form>
+              @if (!targets().length && !busy()) {
+                <p>Няма достъпни цели за сливане.</p>
+              }
+              <form (ngSubmit)="merge()">
+                <label class="field"
+                  >Канонична цел
+                  <select
+                    name="target"
+                    [ngModel]="target()?.id ?? ''"
+                    (ngModelChange)="chooseTarget($event)"
+                    [disabled]="busy()"
+                  >
+                    <option value="">Избери запис</option>
+                    @for (candidate of targets(); track candidate.id) {
+                      <option [value]="candidate.id">
+                        {{ candidate.name }} · {{ statuses[candidate.status] }}
+                      </option>
+                    }
+                  </select>
+                </label>
+                @if (target(); as chosen) {
+                  <p class="wrap">
+                    {{ chosen.name }} · {{ chosen.slug }} · Версия {{ chosen.version }}
+                  </p>
+                }
+                <label class="field"
+                  >Причина за сливане
+                  <textarea
+                    nbInput
+                    fullWidth
+                    rows="2"
+                    name="mergeReason"
+                    maxlength="500"
+                    [ngModel]="mergeReason()"
+                    (ngModelChange)="mergeReason.set($event)"
+                  ></textarea>
+                </label>
+                <button
+                  nbButton
+                  status="warning"
+                  type="submit"
+                  [disabled]="
+                    busy() || stale() || form.dirty || !target() || mergeReason().trim().length < 3
+                  "
+                >
+                  Потвърди сливането
+                </button>
+              </form>
+            </div>
+          }
+        </nb-card-body>
+      </nb-card>
+    }
+  }
+} @else {
+  <nb-alert status="warning" role="alert">Непозната секция на каталога.</nb-alert>
+}

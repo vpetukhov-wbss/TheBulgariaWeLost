@@ -320,6 +320,9 @@ export class MaterialSummaryDto {
   @ApiProperty()
   title: string;
 
+  @ApiPropertyOptional({ enum: MaterialType })
+  type?: MaterialType;
+
   @ApiProperty({ enum: MaterialStatus })
   status: MaterialStatus;
 

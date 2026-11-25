@@ -31,6 +31,16 @@ function hasBackOfficeAccess(
           @switch (state.kind) {
             @case ('allowed') {
               <p>{{ state.principal.displayName }} · {{ roles[state.principal.role] }}</p>
+              <nav aria-label="Редакция">
+                <a
+                  nbButton
+                  status="primary"
+                  routerLink="/admin/materials"
+                  [queryParams]="{ stage: 'Submitted' }"
+                  >Редакторска опашка</a
+                >
+                <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
+              </nav>
               <h2>Активни права</h2>
               <ul>
                 @for (permission of state.principal.permissions; track permission) {
@@ -76,7 +86,7 @@ function hasBackOfficeAccess(
     </nb-card>
   `,
   styles: [
-    'nb-card { max-width: 48rem; margin: 1rem auto; } h1 { margin: 0; font-size: 1.5rem; } h2 { font-size: 1rem; }',
+    'nb-card { max-width: 48rem; margin: 1rem auto; } h1 { margin: 0; font-size: 1.5rem; } h2 { font-size: 1rem; } nav { display: flex; flex-wrap: wrap; gap: .65rem; margin-block: 1rem; }',
   ],
 })
 export class BackOffice {
