@@ -90,6 +90,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '007-author-bookmarks',
           '008-material-moderation',
           '009-admin-user-actions',
+          '010-audit-journal',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
@@ -101,6 +102,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '007-author-bookmarks',
           '008-material-moderation',
           '009-admin-user-actions',
+          '010-audit-journal',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -109,7 +111,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            9,
+            10,
           );
           const indexes = await database.collection('sessions').indexes();
           const ttl = indexes.find((index) => index.name === 'expiresAt_1');
@@ -128,6 +130,40 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
       }
     },
   );
+
+  void it('should classify historical audit events without attributing a role', async () => {
+    const url = databaseUrl('mig_audit');
+    const client = new mongo.MongoClient(url);
+    await client.connect();
+    try {
+      const audit = client.db().collection('auditEvents');
+      const failed = await audit.insertOne({
+        action: 'AccountPasswordResetFailed',
+        schemaVersion: 1,
+      });
+      const explicit = await audit.insertOne({
+        action: 'MaterialCreated',
+        outcome: 'Denied',
+        schemaVersion: 1,
+      });
+      await runMigrations({ databaseUrl: url, logger: () => {} });
+      const record = await audit.findOne({ _id: failed.insertedId });
+      assert.equal(record?.targetType, 'Account');
+      assert.equal(record?.outcome, 'Failed');
+      assert.equal(record?.actorRole, undefined);
+      const preserved = await audit.findOne({ _id: explicit.insertedId });
+      assert.equal(preserved?.targetType, 'Material');
+      assert.equal(preserved?.outcome, 'Denied');
+      assert(
+        (await audit.indexes()).some(
+          (index) => index.name === 'actorId_1_occurredAt_-1__id_-1',
+        ),
+      );
+    } finally {
+      await client.close();
+      await dropDatabase(url);
+    }
+  });
 
   void it(
     'should migrate populated collections and preserve unique and filtered lookups',

@@ -11,6 +11,7 @@ import { promisify } from 'node:util';
 import { mongo } from 'mongoose';
 import request from 'supertest';
 import { parse } from 'yaml';
+import { uuidv7 } from 'uuidv7';
 
 const databaseUrl = new URL(
   process.env.API_TEST_DATABASE_URL ??
@@ -1507,6 +1508,191 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         .countDocuments({ materialId: id }),
       0,
     );
+  });
+
+  void it('should show live dashboard counts by role and protect audit journal reads', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const database = db.db();
+    const dashboard = '/api/admin/v1/dashboard';
+    const journal = '/api/admin/v1/audit-events';
+    const getAdmin = (path: string) =>
+      api.get(path).auth(admin.token, { type: 'bearer' });
+    await api.get(dashboard).expect(401);
+    await api.get(journal).expect(401);
+    await api.get(journal).auth(editor.token, { type: 'bearer' }).expect(403);
+
+    const editorResponse = await api
+      .get(dashboard)
+      .auth(editor.token, { type: 'bearer' })
+      .expect(200);
+    assert(!('administrative' in editorResponse.body));
+    assert.equal(
+      editorResponse.body.submittedMaterials,
+      await database
+        .collection('materials')
+        .countDocuments({ workingStatus: 'Submitted' }),
+    );
+    assert.equal(
+      editorResponse.body.openModerationCases,
+      await database
+        .collection('moderationCases')
+        .countDocuments({ status: 'Open' }),
+    );
+    assert.equal(
+      editorResponse.body.restrictedMedia,
+      await database
+        .collection('mediaUploads')
+        .countDocuments({ accessStatus: 'Restricted' }),
+    );
+
+    const sessions = database.collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    assert.equal(
+      (await getAdmin(journal).expect(403)).body.code,
+      'mfa_required',
+    );
+    assert.equal(
+      (await getAdmin(dashboard).expect(403)).body.code,
+      'mfa_required',
+    );
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+
+    const eventIds = [uuidv7(), uuidv7()];
+    const targetId = uuidv7();
+    const operationId = uuidv7();
+    const occurredAt = new Date();
+    const events = database.collection<{ _id: string; [key: string]: unknown }>(
+      'auditEvents',
+    );
+    const fromUtc = occurredAt.toISOString();
+    const toUtc = new Date(occurredAt.getTime() + 1_000).toISOString();
+    const contact = randomUUID() + '@example.test';
+    const privateValue = randomUUID();
+    await events.insertMany(
+      eventIds.map((_id) => ({
+        _id,
+        occurredAt,
+        action: 'AccountRoleChanged',
+        actorId: admin.id,
+        actorRole: 'Administrator',
+        targetId,
+        targetType: 'Account',
+        targetVersion: 1,
+        outcome: 'Succeeded',
+        reason: 'Подкрепено от ' + contact,
+        correlationId: 'audit-source-check',
+        metadata: {
+          operationId,
+          role: 'Editor',
+          previousRole: 'User',
+          email: contact,
+          nested: { privateValue },
+        },
+      })),
+    );
+
+    try {
+      const dashboardResponse = await getAdmin(dashboard).expect(200);
+      assert(dashboardResponse.body.administrative.auditEventsLast24Hours >= 2);
+      assert.equal(
+        typeof dashboardResponse.body.administrative.bannedAccounts,
+        'number',
+      );
+      assert.equal(
+        typeof dashboardResponse.body.administrative
+          .failedPasswordResetsLast24Hours,
+        'number',
+      );
+      const filters = {
+        actorId: admin.id,
+        targetId,
+        action: 'AccountRoleChanged',
+        targetType: 'Account',
+        outcome: 'Succeeded',
+        fromUtc,
+        toUtc,
+        limit: 1,
+      };
+      const first = await getAdmin(journal)
+        .query(filters)
+        .set('X-Correlation-ID', 'audit-list-check')
+        .expect(200);
+      assert.deepEqual(first.body.items, [
+        {
+          action: 'AccountRoleChanged',
+          actorId: admin.id,
+          actorRole: 'Administrator',
+          id: eventIds[1],
+          occurredAtUtc: fromUtc,
+          outcome: 'Succeeded',
+          targetId,
+          targetType: 'Account',
+        },
+      ]);
+      const cursor = first.body.nextCursor as string;
+      assert.equal(typeof cursor, 'string');
+      const second = await getAdmin(journal)
+        .query({ ...filters, cursor })
+        .expect(200);
+      assert.equal(second.body.items[0].id, eventIds[0]);
+      assert.equal(second.body.nextCursor, undefined);
+      await getAdmin(journal)
+        .query({ ...filters, cursor: cursor + 'a' })
+        .expect(400);
+      await getAdmin(journal)
+        .query({ ...filters, outcome: 'Failed', cursor })
+        .expect(400);
+      await getAdmin(journal)
+        .query({ ...filters, toUtc: fromUtc })
+        .expect(400);
+      await getAdmin(journal)
+        .query({ fromUtc: '2026-02-31T00:00:00Z' })
+        .expect(422);
+
+      const path = journal + '/' + eventIds[0];
+      await api.get(path).auth(editor.token, { type: 'bearer' }).expect(403);
+      await getAdmin(journal + '/' + uuidv7()).expect(404);
+      const detail = await getAdmin(path)
+        .set('X-Correlation-ID', 'audit-detail-check')
+        .expect('Cache-Control', 'private, no-store')
+        .expect(200);
+      assert.equal(detail.body.traceId, 'audit-source-check');
+      assert.equal(detail.body.operationId, operationId);
+      assert.equal(detail.body.reason, 'Подкрепено от [имейл]');
+      assert.deepEqual(detail.body.changeSummary, [
+        { field: 'previousRole', value: 'User' },
+        { field: 'role', value: 'Editor' },
+      ]);
+      assert(!detail.text.includes(contact));
+      assert(!detail.text.includes(privateValue));
+      assert(!('metadata' in detail.body));
+      const reads = database.collection('auditAccessEvents');
+      assert(
+        await reads.findOne({
+          actorId: admin.id,
+          action: 'Listed',
+          traceId: 'audit-list-check',
+        }),
+      );
+      assert(
+        await reads.findOne({
+          actorId: admin.id,
+          action: 'Viewed',
+          auditEventId: eventIds[0],
+          traceId: 'audit-detail-check',
+        }),
+      );
+      assert.equal(await reads.countDocuments({ actorId: editor.id }), 0);
+    } finally {
+      await events.deleteMany({ _id: { $in: eventIds } });
+    }
   });
 
   void it('should restrict the account directory and mask verified contact details', async () => {

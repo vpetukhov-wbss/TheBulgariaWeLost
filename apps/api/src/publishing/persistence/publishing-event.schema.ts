@@ -1,5 +1,10 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { uuidv7 } from 'uuidv7';
+import { Role } from '../../auth/persistence/account.schema';
+import {
+  AuditOutcome,
+  AuditTargetType,
+} from '../../back-office/audit-event.types';
 
 @Schema({ collection: 'auditEvents', timestamps: false })
 export class PublishingAuditEvent {
@@ -11,6 +16,20 @@ export class PublishingAuditEvent {
 
   @Prop({ required: true })
   actorId: string;
+
+  @Prop({ type: String, enum: Role })
+  actorRole?: Role;
+
+  @Prop({ type: String, enum: AuditTargetType, required: true })
+  targetType: AuditTargetType;
+
+  @Prop({
+    type: String,
+    enum: AuditOutcome,
+    default: AuditOutcome.Succeeded,
+    required: true,
+  })
+  outcome: AuditOutcome;
 
   @Prop({ required: true, maxlength: 100 })
   action: string;
@@ -37,6 +56,9 @@ export class PublishingAuditEvent {
 export const PublishingAuditEventSchema =
   SchemaFactory.createForClass(PublishingAuditEvent);
 
+PublishingAuditEventSchema.index({ occurredAt: -1, _id: -1 });
+PublishingAuditEventSchema.index({ actorId: 1, occurredAt: -1, _id: -1 });
+PublishingAuditEventSchema.index({ targetType: 1, occurredAt: -1, _id: -1 });
 PublishingAuditEventSchema.index({ targetId: 1, occurredAt: -1, _id: -1 });
 PublishingAuditEventSchema.index({ correlationId: 1, _id: 1 });
 PublishingAuditEventSchema.index({ action: 1, actorId: 1, occurredAt: -1 });

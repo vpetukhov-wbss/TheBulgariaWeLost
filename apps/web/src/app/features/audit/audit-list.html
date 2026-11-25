@@ -1,0 +1,168 @@
+<header class="page-heading">
+  <div>
+    <a class="breadcrumb" routerLink="/admin">Работен панел</a>
+    <h1>Одитен журнал</h1>
+  </div>
+</header>
+
+<nb-card>
+  <nb-card-body>
+    <form class="filters" (ngSubmit)="apply()" aria-label="Филтри на журнала">
+      <label class="field">
+        Оператор (ID)
+        <input
+          nbInput
+          fullWidth
+          name="actorId"
+          maxlength="36"
+          [ngModel]="draft().actorId"
+          (ngModelChange)="change('actorId', $event)"
+        />
+      </label>
+      <label class="field">
+        Действие (код)
+        <input
+          nbInput
+          fullWidth
+          name="action"
+          maxlength="100"
+          [ngModel]="draft().action"
+          (ngModelChange)="change('action', $event)"
+        />
+      </label>
+      <label class="field">
+        Вид на записа
+        <select
+          name="targetType"
+          [ngModel]="draft().targetType"
+          (ngModelChange)="change('targetType', $event)"
+        >
+          <option value="">Всички</option>
+          @for (target of targets | keyvalue; track target.key) {
+            <option [value]="target.key">{{ target.value }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        Запис (ID)
+        <input
+          nbInput
+          fullWidth
+          name="targetId"
+          maxlength="36"
+          [ngModel]="draft().targetId"
+          (ngModelChange)="change('targetId', $event)"
+        />
+      </label>
+      <label class="field">
+        Резултат
+        <select
+          name="outcome"
+          [ngModel]="draft().outcome"
+          (ngModelChange)="change('outcome', $event)"
+        >
+          <option value="">Всички</option>
+          @for (outcome of outcomes | keyvalue; track outcome.key) {
+            <option [value]="outcome.key">{{ outcome.value }}</option>
+          }
+        </select>
+      </label>
+      <label class="field">
+        От (местно време)
+        <input
+          nbInput
+          fullWidth
+          name="fromUtc"
+          type="datetime-local"
+          step="1"
+          [ngModel]="draft().fromUtc"
+          (ngModelChange)="change('fromUtc', $event)"
+        />
+      </label>
+      <label class="field">
+        До (местно време)
+        <input
+          nbInput
+          fullWidth
+          name="toUtc"
+          type="datetime-local"
+          step="1"
+          [ngModel]="draft().toUtc"
+          (ngModelChange)="change('toUtc', $event)"
+        />
+      </label>
+      <div class="actions">
+        <button nbButton status="primary" type="submit">Филтрирай</button>
+        <button nbButton outline type="button" (click)="clear()">Изчисти</button>
+      </div>
+    </form>
+    @if (filterError()) {
+      <p role="alert">{{ filterError() }}</p>
+    }
+  </nb-card-body>
+</nb-card>
+
+<nb-card>
+  <nb-card-header>Събития</nb-card-header>
+  <nb-card-body aria-live="polite">
+    @let page = store.page();
+    @switch (page.kind) {
+      @case ('loading') {
+        <p role="status">Зареждане на събитията…</p>
+      }
+      @case ('error') {
+        <nb-alert status="danger" role="alert">{{ page.message }}</nb-alert>
+        @if (!request().cursor) {
+          <button nbButton outline (click)="store.loadPage(request())">Опитай отново</button>
+        }
+      }
+      @case ('loaded') {
+        <div class="records">
+          @for (event of page.value.items; track event.id) {
+            <article class="record">
+              <div>
+                <h2>
+                  <a [routerLink]="[event.id]" queryParamsHandling="preserve">{{
+                    actionLabel(event.action)
+                  }}</a>
+                </h2>
+                <p class="muted">
+                  {{ targets[event.targetType] }} ·
+                  {{ event.occurredAtUtc | date: 'dd.MM.yyyy, HH:mm:ss' }}
+                </p>
+                <p class="muted wrap">
+                  {{ event.actorRole ? roles[event.actorRole] : 'Оператор' }} · {{ event.actorId }}
+                </p>
+              </div>
+              <span class="badge" [class.secondary]="event.outcome === 'Succeeded'">{{
+                outcomes[event.outcome]
+              }}</span>
+            </article>
+          } @empty {
+            <p>Няма събития за избраните филтри.</p>
+          }
+        </div>
+        @if (page.value.nextCursor) {
+          <a
+            nbButton
+            outline
+            [routerLink]="[]"
+            queryParamsHandling="merge"
+            [queryParams]="{ cursor: page.value.nextCursor }"
+            >Следващи събития</a
+          >
+        }
+      }
+    }
+    @if (request().cursor) {
+      <a
+        nbButton
+        ghost
+        [routerLink]="[]"
+        queryParamsHandling="merge"
+        [queryParams]="{ cursor: null }"
+        >Първа страница</a
+      >
+    }
+  </nb-card-body>
+</nb-card>

@@ -7,6 +7,7 @@ import { catchError, map, of } from 'rxjs';
 import type { BackOfficePrincipal } from '../../api/generated/models/back-office-principal';
 import { BackOfficeService } from '../../api/generated/services/back-office.service';
 import { problemCode } from '../../core/auth/auth-errors';
+import { DashboardOverview } from './dashboard-overview';
 
 const roleNames = { Editor: 'Редактор', Administrator: 'Администратор' };
 
@@ -22,7 +23,15 @@ function hasBackOfficeAccess(
 }
 
 @Component({
-  imports: [AsyncPipe, RouterLink, NbAlertModule, NbButtonModule, NbCardModule, NbSpinnerModule],
+  imports: [
+    AsyncPipe,
+    RouterLink,
+    NbAlertModule,
+    NbButtonModule,
+    NbCardModule,
+    NbSpinnerModule,
+    DashboardOverview,
+  ],
   template: `
     <nb-card>
       <nb-card-header><h1>Работен панел</h1></nb-card-header>
@@ -42,17 +51,20 @@ function hasBackOfficeAccess(
                 <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
                 <a nbButton outline routerLink="/admin/moderation">Сигнали за съдържание</a>
               </nav>
-              @if (state.principal.permissions.includes('Users.Manage')) {
+              @if (
+                state.principal.permissions.includes('Users.Manage') ||
+                state.principal.permissions.includes('Audit.Read')
+              ) {
                 <nav aria-label="Управление">
-                  <a nbButton outline routerLink="/admin/users">Потребители</a>
+                  @if (state.principal.permissions.includes('Users.Manage')) {
+                    <a nbButton outline routerLink="/admin/users">Потребители</a>
+                  }
+                  @if (state.principal.permissions.includes('Audit.Read')) {
+                    <a nbButton outline routerLink="/admin/audit">Одитен журнал</a>
+                  }
                 </nav>
               }
-              <h2>Активни права</h2>
-              <ul>
-                @for (permission of state.principal.permissions; track permission) {
-                  <li>{{ permission }}</li>
-                }
-              </ul>
+              <app-dashboard-overview />
             }
             @case ('signed-out') {
               <nb-alert status="warning" role="alert">Сесията е изтекла. Влез отново.</nb-alert>
@@ -92,7 +104,7 @@ function hasBackOfficeAccess(
     </nb-card>
   `,
   styles: [
-    'nb-card { max-width: 48rem; margin: 1rem auto; } h1 { margin: 0; font-size: 1.5rem; } h2 { font-size: 1rem; } nav { display: flex; flex-wrap: wrap; gap: .65rem; margin-block: 1rem; }',
+    'nb-card { max-width: 68rem; margin: 1rem auto; } h1 { margin: 0; font-size: 1.5rem; } nav { display: flex; flex-wrap: wrap; gap: .65rem; margin-block: 1rem; }',
   ],
 })
 export class BackOffice {

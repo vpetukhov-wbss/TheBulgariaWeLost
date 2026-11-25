@@ -1,0 +1,40 @@
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+h2 {
+  margin: 0.75rem 0;
+  font-size: 1.05rem;
+}
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+
+  div {
+    display: grid;
+    align-content: space-between;
+    gap: 0.6rem;
+    padding: 0.8rem;
+    border: 1px solid var(--border-basic-color-3);
+    border-radius: var(--border-radius);
+  }
+
+  dd {
+    margin: 0;
+    font-size: 1.45rem;
+    font-weight: 700;
+    line-height: 1;
+  }
+}
+
+.updated {
+  color: var(--text-hint-color);
+  font-size: 0.85rem;
+}

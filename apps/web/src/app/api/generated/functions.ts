@@ -35,6 +35,12 @@ export type { RecoverMfa$Params as RecoverMfa$Params } from './fn/auth/recover-m
 export { recoverMfa as recoverMfa } from './fn/auth/recover-mfa';
 export type { GetBackOfficePrincipal$Params as GetBackOfficePrincipal$Params } from './fn/back-office/get-back-office-principal';
 export { getBackOfficePrincipal as getBackOfficePrincipal } from './fn/back-office/get-back-office-principal';
+export type { GetDashboardSummary$Params as GetDashboardSummary$Params } from './fn/dashboard/get-dashboard-summary';
+export { getDashboardSummary as getDashboardSummary } from './fn/dashboard/get-dashboard-summary';
+export type { ListAuditEvents$Params as ListAuditEvents$Params } from './fn/audit/list-audit-events';
+export { listAuditEvents as listAuditEvents } from './fn/audit/list-audit-events';
+export type { GetAuditEvent$Params as GetAuditEvent$Params } from './fn/audit/get-audit-event';
+export { getAuditEvent as getAuditEvent } from './fn/audit/get-audit-event';
 export type { ListAdminUsers$Params as ListAdminUsers$Params } from './fn/admin-users/list-admin-users';
 export { listAdminUsers as listAdminUsers } from './fn/admin-users/list-admin-users';
 export type { GetAdminUser$Params as GetAdminUser$Params } from './fn/admin-users/get-admin-user';
