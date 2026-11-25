@@ -1,0 +1,77 @@
+<header class="page-heading">
+  <div>
+    <a class="breadcrumb" routerLink="/admin/audit" queryParamsHandling="preserve">Одитен журнал</a>
+    <h1>Одитно събитие</h1>
+  </div>
+</header>
+
+@let detail = store.detail();
+@switch (detail.kind) {
+  @case ('loading') {
+    <p role="status">Зареждане на събитието…</p>
+  }
+  @case ('error') {
+    <nb-alert status="danger" role="alert">{{ detail.message }}</nb-alert>
+    <button nbButton outline (click)="store.loadDetail(id())">Опитай отново</button>
+  }
+  @case ('loaded') {
+    @let event = detail.value;
+    <div class="split">
+      <nb-card>
+        <nb-card-header>{{ actionLabel(event.action) }}</nb-card-header>
+        <nb-card-body>
+          <dl class="wrap">
+            <dt>Действие</dt>
+            <dd>{{ event.action }}</dd>
+            <dt>Резултат</dt>
+            <dd>{{ outcomes[event.outcome] }}</dd>
+            <dt>Време</dt>
+            <dd>{{ event.occurredAtUtc | date: 'dd.MM.yyyy, HH:mm:ss' }}</dd>
+            <dt>Оператор</dt>
+            <dd>
+              @if (event.actorRole) {
+                {{ roles[event.actorRole] }} ·
+              }
+              <a routerLink="/admin/audit" [queryParams]="{ actorId: event.actorId }">{{
+                event.actorId
+              }}</a>
+            </dd>
+            <dt>Запис</dt>
+            <dd>
+              {{ targets[event.targetType] }} ·
+              <a
+                routerLink="/admin/audit"
+                [queryParams]="{ targetType: event.targetType, targetId: event.targetId }"
+                >{{ event.targetId }}</a
+              >
+            </dd>
+            <dt>Correlation ID</dt>
+            <dd>
+              <code>{{ event.traceId }}</code>
+            </dd>
+            @if (event.operationId) {
+              <dt>Операция (ID)</dt>
+              <dd>
+                <code>{{ event.operationId }}</code>
+              </dd>
+            }
+          </dl>
+        </nb-card-body>
+      </nb-card>
+      <nb-card>
+        <nb-card-header>Причина и промени</nb-card-header>
+        <nb-card-body>
+          <p class="wrap">{{ event.reason || 'Няма записана причина.' }}</p>
+          @if (event.changeSummary?.length) {
+            <dl class="wrap">
+              @for (change of event.changeSummary; track change.field) {
+                <dt>{{ fields[change.field] || change.field }}</dt>
+                <dd>{{ change.value }}</dd>
+              }
+            </dl>
+          }
+        </nb-card-body>
+      </nb-card>
+    </div>
+  }
+}

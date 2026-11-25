@@ -1,0 +1,59 @@
+<section aria-labelledby="editorial-overview">
+  <div class="section-heading">
+    <h2 id="editorial-overview">Обзор на редакцията</h2>
+    <button nbButton ghost size="small" [disabled]="summary.isLoading()" (click)="summary.reload()">
+      Обнови
+    </button>
+  </div>
+  @if (summary.isLoading()) {
+    <p role="status">Зареждане на показателите…</p>
+  } @else if (summary.error()) {
+    <nb-alert status="warning" role="alert">Показателите са временно недостъпни.</nb-alert>
+  } @else if (summary.hasValue()) {
+    @let data = summary.value();
+    <dl class="metrics">
+      <div>
+        <dt>
+          <a routerLink="/admin/materials" [queryParams]="{ stage: 'Submitted' }">Чакат преглед</a>
+        </dt>
+        <dd>{{ data.submittedMaterials }}</dd>
+      </div>
+      <div>
+        <dt>
+          <a routerLink="/admin/materials" [queryParams]="{ stage: 'InReview' }">В преглед</a>
+        </dt>
+        <dd>{{ data.materialsInReview }}</dd>
+      </div>
+      <div>
+        <dt>
+          <a routerLink="/admin/moderation" [queryParams]="{ status: 'Open' }">Отворени сигнали</a>
+        </dt>
+        <dd>{{ data.openModerationCases }}</dd>
+      </div>
+      <div>
+        <dt>Ограничени файлове</dt>
+        <dd>{{ data.restrictedMedia }}</dd>
+      </div>
+    </dl>
+    @if (data.administrative; as admin) {
+      <h2>Административен обзор</h2>
+      <dl class="metrics">
+        <div>
+          <dt>
+            <a routerLink="/admin/users" [queryParams]="{ status: 'Banned' }">Блокирани профили</a>
+          </dt>
+          <dd>{{ admin.bannedAccounts }}</dd>
+        </div>
+        <div>
+          <dt>Неуспешни линкове за парола · 24 ч.</dt>
+          <dd>{{ admin.failedPasswordResetsLast24Hours }}</dd>
+        </div>
+        <div>
+          <dt><a routerLink="/admin/audit">Одитни събития</a> · 24 ч.</dt>
+          <dd>{{ admin.auditEventsLast24Hours }}</dd>
+        </div>
+      </dl>
+    }
+    <p class="updated">Към {{ data.asOfUtc | date: 'dd.MM.yyyy, HH:mm:ss' }}</p>
+  }
+</section>

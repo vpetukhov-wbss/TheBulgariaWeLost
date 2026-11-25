@@ -1,5 +1,6 @@
 import type { Routes } from '@angular/router';
 import { AdminUsersStore } from '../admin-users/admin-users.store';
+import { AuditStore } from '../audit/audit.store';
 import { ModerationStore } from '../moderation/moderation.store';
 
 const catalogEntry = () => import('./catalog-entry').then((m) => m.CatalogEntry);
@@ -40,6 +41,22 @@ export const editorialRoutes: Routes = [
         data: { requiredPermission: 'Users.Manage' },
         loadComponent: () =>
           import('../admin-users/admin-user-detail').then((m) => m.AdminUserDetail),
+      },
+    ],
+  },
+  {
+    path: 'audit',
+    providers: [AuditStore],
+    data: { requiredPermission: 'Audit.Read' },
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () => import('../audit/audit-list').then((m) => m.AuditList),
+      },
+      {
+        path: ':id',
+        loadComponent: () => import('../audit/audit-detail').then((m) => m.AuditDetail),
       },
     ],
   },

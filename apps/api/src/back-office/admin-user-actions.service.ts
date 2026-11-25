@@ -20,6 +20,7 @@ import {
 } from 'mongoose';
 import { createHash } from 'node:crypto';
 import { uuidv7 } from 'uuidv7';
+import { AuditOutcome, AuditTargetType } from './audit-event.types';
 import { availableAccount, isSanctioned } from '../auth/account-access';
 import { AuthService } from '../auth/auth.service';
 import {
@@ -410,6 +411,9 @@ export class AdminUserActionsService {
               ? 'AccountPasswordResetDispatched'
               : 'AccountPasswordResetFailed',
             actorId: operation.requestedByUserId,
+            actorRole: Role.Administrator,
+            targetType: AuditTargetType.Account,
+            outcome: dispatched ? AuditOutcome.Succeeded : AuditOutcome.Failed,
             targetId: operation.targetId,
             targetVersion: operation.targetVersion,
             occurredAt: finishedAt,
@@ -485,6 +489,8 @@ export class AdminUserActionsService {
             [
               {
                 actorId: actor.profile.id,
+                actorRole: actor.profile.role,
+                targetType: AuditTargetType.Account,
                 targetId: id,
                 targetVersion: account.adminVersion,
                 action: change.action,

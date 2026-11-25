@@ -9,6 +9,8 @@ tags:
   - name: Health
   - name: Auth
   - name: Back office
+  - name: Dashboard
+  - name: Audit
   - name: Admin users
   - name: Publishing
   - name: Moderation
@@ -330,6 +332,102 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/BackOfficePrincipal"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/dashboard:
+    get:
+      tags: [Dashboard]
+      operationId: getDashboardSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Live editor counts and administrative counts when authorized.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/audit-events:
+    get:
+      tags: [Audit]
+      operationId: listAuditEvents
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: actorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: action
+          in: query
+          schema: { type: string, pattern: "^[A-Za-z][A-Za-z0-9]{0,99}$", maxLength: 100 }
+        - name: targetType
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditTargetType"
+        - name: targetId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: outcome
+          in: query
+          schema:
+            $ref: "#/components/schemas/AuditOutcome"
+        - name: fromUtc
+          in: query
+          description: Inclusive UTC bound with a Z suffix.
+          schema: { type: string, format: date-time }
+        - name: toUtc
+          in: query
+          description: Exclusive UTC bound with a Z suffix.
+          schema: { type: string, format: date-time }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          description: Signed continuation bound to the active filters.
+          schema: { type: string, maxLength: 100 }
+      responses:
+        "200":
+          description: Administrator journal ordered by time and event ID, newest first.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/audit-events/{id}:
+    get:
+      tags: [Audit]
+      operationId: getAuditEvent
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Administrator journal detail with redacted reason and structured changes.
+          headers:
+            X-Correlation-ID:
+              $ref: "#/components/headers/CorrelationId"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuditEventDetail"
         default:
           $ref: "#/components/responses/Problem"
   /api/admin/v1/users:
@@ -2834,6 +2932,86 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/AdminUserSummary"
+        nextCursor: { type: string }
+    DashboardSummary:
+      type: object
+      additionalProperties: false
+      required: [asOfUtc, submittedMaterials, materialsInReview, openModerationCases, restrictedMedia]
+      properties:
+        asOfUtc: { type: string, format: date-time }
+        submittedMaterials: { type: integer, minimum: 0 }
+        materialsInReview: { type: integer, minimum: 0 }
+        openModerationCases: { type: integer, minimum: 0 }
+        restrictedMedia: { type: integer, minimum: 0 }
+        administrative:
+          $ref: "#/components/schemas/DashboardAdministrative"
+    DashboardAdministrative:
+      type: object
+      additionalProperties: false
+      required: [bannedAccounts, failedPasswordResetsLast24Hours, auditEventsLast24Hours]
+      properties:
+        bannedAccounts: { type: integer, minimum: 0 }
+        failedPasswordResetsLast24Hours: { type: integer, minimum: 0 }
+        auditEventsLast24Hours: { type: integer, minimum: 0 }
+    AuditTargetType:
+      type: string
+      enum: [Account, Catalog, Material, Moderation, Other]
+    AuditOutcome:
+      type: string
+      enum: [Succeeded, Failed, Denied]
+    AuditChange:
+      type: object
+      additionalProperties: false
+      required: [field, value]
+      properties:
+        field: { type: string }
+        value: { type: string }
+    AuditEventSummary:
+      type: object
+      additionalProperties: false
+      required: [id, occurredAtUtc, actorId, action, targetType, targetId, outcome]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAtUtc: { type: string, format: date-time }
+        actorId: { type: string, format: uuid }
+        actorRole: { type: string, enum: [User, Editor, Administrator] }
+        action: { type: string }
+        targetType:
+          $ref: "#/components/schemas/AuditTargetType"
+        targetId: { type: string, format: uuid }
+        outcome:
+          $ref: "#/components/schemas/AuditOutcome"
+    AuditEventDetail:
+      type: object
+      additionalProperties: false
+      required: [id, occurredAtUtc, actorId, action, targetType, targetId, outcome, traceId]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAtUtc: { type: string, format: date-time }
+        actorId: { type: string, format: uuid }
+        actorRole: { type: string, enum: [User, Editor, Administrator] }
+        action: { type: string }
+        targetType:
+          $ref: "#/components/schemas/AuditTargetType"
+        targetId: { type: string, format: uuid }
+        outcome:
+          $ref: "#/components/schemas/AuditOutcome"
+        traceId: { type: string }
+        reason: { type: string }
+        operationId: { type: string, format: uuid }
+        changeSummary:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditChange"
+    AuditEventPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditEventSummary"
         nextCursor: { type: string }
     BackOfficePrincipal:
       type: object

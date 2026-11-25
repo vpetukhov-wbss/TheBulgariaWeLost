@@ -13,6 +13,7 @@ import { isUUID } from 'class-validator';
 import { Connection, Model, mongo, type ClientSession } from 'mongoose';
 import { createHash } from 'node:crypto';
 import { uuidv7 } from 'uuidv7';
+import { AuditTargetType } from '../back-office/audit-event.types';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
 import { MaterialStatus } from '../publishing/persistence/material.schema';
@@ -506,6 +507,8 @@ export class ModerationService {
       [
         {
           actorId: principal.profile.id,
+          actorRole: principal.profile.role,
+          targetType: AuditTargetType.Moderation,
           targetId: record._id,
           targetVersion: record.version,
           action,

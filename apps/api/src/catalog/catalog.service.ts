@@ -10,6 +10,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, type ClientSession, mongo } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
+import { AuditTargetType } from '../back-office/audit-event.types';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
 import {
@@ -264,7 +265,7 @@ export class CatalogService {
           id,
           1,
           'CatalogCreated',
-          principal.profile.id,
+          principal,
           correlationId,
           session,
           { kind },
@@ -319,7 +320,7 @@ export class CatalogService {
           id,
           expectedVersion + 1,
           'CatalogUpdated',
-          principal.profile.id,
+          principal,
           correlationId,
           session,
           { kind, changedFields: Object.keys(dto) },
@@ -357,7 +358,7 @@ export class CatalogService {
         id,
         dto.expectedVersion + 1,
         `Catalog${dto.action}`,
-        principal.profile.id,
+        principal,
         correlationId,
         session,
         { kind, fromStatus: entry.status, toStatus: status },
@@ -447,7 +448,7 @@ export class CatalogService {
         id,
         dto.expectedVersion + 1,
         'CatalogMerged',
-        principal.profile.id,
+        principal,
         correlationId,
         session,
         { kind, sourceId: id, targetId: dto.targetId },
@@ -458,7 +459,7 @@ export class CatalogService {
         dto.targetId,
         dto.targetExpectedVersion + 1,
         'CatalogMergeTargetSelected',
-        principal.profile.id,
+        principal,
         correlationId,
         session,
         { kind, sourceId: id, targetId: dto.targetId },
@@ -865,7 +866,7 @@ export class CatalogService {
     targetId: string,
     version: number,
     action: string,
-    actorId: string,
+    principal: Principal,
     correlationId: string,
     session: ClientSession,
     metadata: Record<string, unknown>,
@@ -878,7 +879,9 @@ export class CatalogService {
         {
           _id: uuidv7(),
           schemaVersion: 1,
-          actorId,
+          actorId: principal.profile.id,
+          actorRole: principal.profile.role,
+          targetType: AuditTargetType.Catalog,
           action,
           targetId,
           targetVersion: version,

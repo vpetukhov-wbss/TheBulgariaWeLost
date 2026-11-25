@@ -10,6 +10,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, type ClientSession } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
+import { AuditTargetType } from '../back-office/audit-event.types';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
 import {
@@ -201,7 +202,7 @@ export class PublishingService {
         materialId,
         1,
         'MaterialCreated',
-        principal.profile.id,
+        principal,
         correlationId,
         session,
       );
@@ -280,7 +281,7 @@ export class PublishingService {
         id,
         nextVersion,
         'MaterialDraftUpdated',
-        principal.profile.id,
+        principal,
         correlationId,
         session,
       );
@@ -344,7 +345,7 @@ export class PublishingService {
         id,
         nextVersion,
         `Material${dto.action}`,
-        principal.profile.id,
+        principal,
         correlationId,
         session,
         dto.reason,
@@ -439,7 +440,7 @@ export class PublishingService {
         id,
         nextVersion,
         'MaterialRevisionRestored',
-        principal.profile.id,
+        principal,
         correlationId,
         session,
         dto.reason,
@@ -562,7 +563,7 @@ export class PublishingService {
       id,
       expectedVersion + 1,
       events[action],
-      principal.profile.id,
+      principal,
       correlationId,
       session,
       reason,
@@ -1033,7 +1034,7 @@ export class PublishingService {
     materialId: string,
     version: number,
     action: string,
-    actorId: string,
+    principal: Principal,
     correlationId: string,
     session: ClientSession,
     reason?: string,
@@ -1045,7 +1046,9 @@ export class PublishingService {
         {
           _id: uuidv7(),
           schemaVersion: 1,
-          actorId,
+          actorId: principal.profile.id,
+          actorRole: principal.profile.role,
+          targetType: AuditTargetType.Material,
           action,
           targetId: materialId,
           targetVersion: version,
