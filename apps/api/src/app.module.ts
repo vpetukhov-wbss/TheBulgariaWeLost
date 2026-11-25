@@ -16,6 +16,7 @@ import mailConfig from './mail/config/mail.config';
 import mediaConfig from './media/config/media.config';
 import { MediaModule } from './media/media.module';
 import { PublishingModule } from './publishing/publishing.module';
+import { ModerationModule } from './moderation/moderation.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { PublishingModule } from './publishing/publishing.module';
     BackOfficeModule,
     MediaModule,
     PublishingModule,
+    ModerationModule,
     CatalogModule,
   ],
   controllers: [HealthController],

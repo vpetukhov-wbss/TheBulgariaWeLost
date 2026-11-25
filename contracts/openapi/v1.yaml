@@ -10,6 +10,7 @@ tags:
   - name: Auth
   - name: Back office
   - name: Publishing
+  - name: Moderation
   - name: Authoring
   - name: Catalog
   - name: Media
@@ -722,6 +723,125 @@ paths:
                 $ref: "#/components/schemas/PublicMaterial"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/materials/{slug}/reports:
+    post:
+      tags: [Moderation]
+      operationId: submitModerationReport
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/MaterialSlug"
+        - $ref: "#/components/parameters/ModerationIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateModerationReportRequest"
+      responses:
+        "202":
+          description: Accepted for editorial review.
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/moderation-cases:
+    get:
+      tags: [Moderation]
+      operationId: listModerationCases
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ModerationStatus"
+        - name: priority
+          in: query
+          schema:
+            $ref: "#/components/schemas/ModerationPriority"
+        - name: caseType
+          in: query
+          schema:
+            $ref: "#/components/schemas/ModerationType"
+      responses:
+        "200":
+          description: Moderation cases ordered by priority and most recent change.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationCasePage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/moderation-cases/{id}:
+    parameters:
+      - $ref: "#/components/parameters/CorrelationId"
+      - $ref: "#/components/parameters/ModerationCaseId"
+    get:
+      tags: [Moderation]
+      operationId: getModerationCase
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/ModerationCaseDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Moderation]
+      operationId: takeModerationCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/IfMatch"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TakeModerationCaseRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModerationCaseDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/moderation-cases/{id}/reports:
+    get:
+      tags: [Moderation]
+      operationId: listModerationReports
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/ModerationCaseId"
+      responses:
+        "200":
+          description: Report evidence and public revision numbers.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ModerationReportPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/moderation-cases/{id}/decisions:
+    post:
+      tags: [Moderation]
+      operationId: decideModerationCase
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - $ref: "#/components/parameters/ModerationCaseId"
+        - $ref: "#/components/parameters/ModerationIdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecideModerationCaseRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/ModerationCaseDetail"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/admin/v1/catalog/{kind}:
     get:
       tags: [Catalog]
@@ -1182,6 +1302,17 @@ components:
       scheme: bearer
       description: Private, rotated service credential.
   parameters:
+    ModerationCaseId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ModerationIdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID v4. Reuse with the same payload after a retryable error.
+      schema: { type: string, format: uuid }
     AuthorCatalogField:
       name: field
       in: path
@@ -1301,6 +1432,16 @@ components:
           schema:
             $ref: "#/components/schemas/HashRequest"
   responses:
+    ModerationCaseDetail:
+      description: Moderation case, current material state and permitted decisions.
+      headers:
+        ETag:
+          description: Current case version for conditional updates.
+          schema: { type: string }
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ModerationCaseDetail"
     NoContent:
       description: Operation completed.
       headers:
@@ -1329,6 +1470,127 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetails"
   schemas:
+    ModerationStatus:
+      type: string
+      enum: [Open, UnderReview, Resolved]
+    ModerationPriority:
+      type: string
+      enum: [High, Normal]
+    ModerationType:
+      type: string
+      enum: [Rights, Content]
+    ReportReason:
+      type: string
+      enum: [Copyright, Privacy, Inaccuracy, Other]
+    ModerationDecision:
+      type: string
+      enum: [Dismiss, RequestCorrection, WithdrawMaterial, RestoreMaterial]
+    CreateModerationReportRequest:
+      type: object
+      required: [reasonCode]
+      properties:
+        reasonCode:
+          $ref: "#/components/schemas/ReportReason"
+        description: { type: string, maxLength: 1500 }
+        evidenceUrl: { type: string, format: uri, maxLength: 1500 }
+    TakeModerationCaseRequest:
+      type: object
+      required: [priority]
+      properties:
+        priority:
+          $ref: "#/components/schemas/ModerationPriority"
+    DecideModerationCaseRequest:
+      type: object
+      required: [decision, reason, expectedVersion]
+      properties:
+        decision:
+          $ref: "#/components/schemas/ModerationDecision"
+        reason: { type: string, minLength: 3, maxLength: 500 }
+        expectedVersion: { type: integer, minimum: 1 }
+        targetExpectedVersion:
+          type: integer
+          minimum: 1
+          description: Required when the decision changes the material.
+    ModerationCaseSummary:
+      type: object
+      required: [id, targetId, title, caseType, priority, status, reportCount, version, createdAtUtc, updatedAtUtc]
+      properties:
+        id: { type: string, format: uuid }
+        targetId: { type: string, format: uuid }
+        title: { type: string }
+        caseType:
+          $ref: "#/components/schemas/ModerationType"
+        priority:
+          $ref: "#/components/schemas/ModerationPriority"
+        status:
+          $ref: "#/components/schemas/ModerationStatus"
+        reportCount: { type: integer, minimum: 1 }
+        version: { type: integer, minimum: 1 }
+        assigneeId: { type: string, format: uuid }
+        createdAtUtc: { type: string, format: date-time }
+        updatedAtUtc: { type: string, format: date-time }
+    ModerationCasePage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationCaseSummary"
+    ModerationCaseDetail:
+      allOf:
+        - $ref: "#/components/schemas/ModerationCaseSummary"
+        - type: object
+          required: [target, canTake, allowedDecisions]
+          properties:
+            target:
+              $ref: "#/components/schemas/ModerationTarget"
+            canTake: { type: boolean }
+            allowedDecisions:
+              type: array
+              items:
+                $ref: "#/components/schemas/ModerationDecision"
+            resolution:
+              $ref: "#/components/schemas/ModerationResolution"
+            withdrawal:
+              $ref: "#/components/schemas/ModerationResolution"
+    ModerationTarget:
+      type: object
+      required: [slug, status, version, publicVisibility]
+      properties:
+        slug: { type: string }
+        status:
+          type: string
+          enum: [Unpublished, Published, Withdrawn, Archived]
+        version: { type: integer, minimum: 1 }
+        publicVisibility: { type: boolean }
+    ModerationResolution:
+      type: object
+      required: [decision, reason, decidedAtUtc]
+      properties:
+        decision:
+          $ref: "#/components/schemas/ModerationDecision"
+        reason: { type: string }
+        decidedAtUtc: { type: string, format: date-time }
+    ModerationReport:
+      type: object
+      required: [id, reasonCode, revisionNumber, createdAtUtc]
+      properties:
+        id: { type: string, format: uuid }
+        reasonCode:
+          $ref: "#/components/schemas/ReportReason"
+        description: { type: string }
+        evidenceUrl: { type: string, format: uri }
+        revisionNumber: { type: integer, minimum: 1 }
+        createdAtUtc: { type: string, format: date-time }
+    ModerationReportPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ModerationReport"
     HealthResponse:
       type: object
       additionalProperties: false

@@ -101,6 +101,9 @@ export class Material {
   @Prop({ default: false, required: true })
   publicVisibility: boolean;
 
+  @Prop({ type: String })
+  moderationCaseId?: string;
+
   @Prop({ type: String, enum: MaterialStatus })
   archivedFromStatus?: MaterialStatus;
 

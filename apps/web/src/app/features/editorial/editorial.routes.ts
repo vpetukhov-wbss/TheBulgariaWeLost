@@ -1,4 +1,5 @@
 import type { Routes } from '@angular/router';
+import { ModerationStore } from '../moderation/moderation.store';
 
 const catalogEntry = () => import('./catalog-entry').then((m) => m.CatalogEntry);
 
@@ -23,4 +24,21 @@ export const editorialRoutes: Routes = [
   },
   { path: 'catalog/:kind/new', loadComponent: catalogEntry },
   { path: 'catalog/:kind/:id', loadComponent: catalogEntry },
+  {
+    path: 'moderation',
+    providers: [ModerationStore],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () =>
+          import('../moderation/moderation-queue').then((m) => m.ModerationQueue),
+      },
+      {
+        path: ':id',
+        loadComponent: () =>
+          import('../moderation/moderation-detail').then((m) => m.ModerationDetail),
+      },
+    ],
+  },
 ];

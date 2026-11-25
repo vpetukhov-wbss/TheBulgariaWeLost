@@ -32,7 +32,11 @@ export function skipBearer(request: HttpRequest<unknown>): boolean {
     return true;
 
   const { pathname } = new URL(request.url, 'https://archive.invalid');
-  return !/^\/api\/(?:v1|admin\/v1)\//.test(pathname) || anonymousAuthPaths.has(pathname);
+  return (
+    !/^\/api\/(?:v1|admin\/v1)\//.test(pathname) ||
+    anonymousAuthPaths.has(pathname) ||
+    /^\/api\/v1\/materials\/[^/]+\/reports$/.test(pathname)
+  );
 }
 
 function readTokens(_action: string, response: HttpResponse<unknown>) {

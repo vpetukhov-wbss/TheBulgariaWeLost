@@ -57,5 +57,6 @@ import { SavedMaterialsService } from './saved-materials.service';
     SavedMaterialsController,
   ],
   providers: [PublishingService, BackOfficeGuard, SavedMaterialsService],
+  exports: [PublishingService],
 })
 export class PublishingModule {}

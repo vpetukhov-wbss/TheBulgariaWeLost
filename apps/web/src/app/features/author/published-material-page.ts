@@ -10,9 +10,10 @@ import type { PublicMaterial } from '../../api/generated/models/public-material'
 import { AuthoringService } from '../../api/generated/services/authoring.service';
 import { PublishingService } from '../../api/generated/services/publishing.service';
 import { actionError } from '../../core/auth/auth-errors';
+import { MaterialReportForm } from '../moderation/material-report-form';
 
 @Component({
-  imports: [RouterLink, NbAlertModule, NbButtonModule, NbCardModule],
+  imports: [RouterLink, NbAlertModule, NbButtonModule, NbCardModule, MaterialReportForm],
   template: `
     @if (material(); as current) {
       <article>
@@ -65,6 +66,7 @@ import { actionError } from '../../core/auth/auth-errors';
                 }
               }
             }
+            <app-material-report-form [slug]="current.slug" />
           </nb-card-body>
         </nb-card>
       </article>

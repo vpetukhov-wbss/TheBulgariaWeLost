@@ -1509,6 +1509,222 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     );
   });
 
+  void it('should deduplicate anonymous reports and require an authorized decision to restore a material', async () => {
+    const editor = await createEditor();
+    const admin = await createAdministrator();
+    const readerEmail = randomUUID() + '@example.test';
+    await register(readerEmail);
+    await confirm(readerEmail);
+    const reader = await login(readerEmail);
+    const materials = '/api/admin/v1/materials';
+    const queue = '/api/admin/v1/moderation-cases';
+    const title = 'Снимка на училището';
+    const created = await api
+      .post(materials)
+      .auth(editor.token, { type: 'bearer' })
+      .send({ type: 'Story', language: 'bg', title })
+      .expect(201);
+    const { id, slug } = created.body as MaterialResponse;
+    const materialUrl = materials + '/' + id;
+    const publicUrl = '/api/v1/materials/' + slug;
+    await api
+      .patch(materialUrl)
+      .auth(editor.token, { type: 'bearer' })
+      .set('If-Match', String(created.headers.etag))
+      .send({
+        body: 'Спомен за първия учебен ден.',
+        categoryIds: [randomUUID()],
+        topicIds: [randomUUID()],
+        sourceIds: [randomUUID()],
+        rights: {
+          publicDisplayAllowed: true,
+          statement: 'Авторът разрешава публичното показване.',
+        },
+      })
+      .expect(200);
+    const transition = (
+      action: string,
+      expectedVersion: number,
+      reason?: string,
+    ) =>
+      api
+        .post(materialUrl + '/transitions')
+        .auth(editor.token, { type: 'bearer' })
+        .send({ action, expectedVersion, reason });
+    await transition('SubmitForReview', 2).expect(200);
+    await transition('StartReview', 3).expect(200);
+    await transition('Publish', 4).expect(200);
+    await api.get(publicUrl).expect(200);
+
+    const report = {
+      reasonCode: 'Copyright',
+      description:
+        'Източникът е описан от reporter@example.test и +359 888 123 456',
+      evidenceUrl:
+        'https://archive.example.org/photo?email=reporter@example.test#contact',
+    };
+    const reportKey = randomUUID();
+    const submit = (body = report, key = reportKey) =>
+      api
+        .post(publicUrl + '/reports')
+        .set('Idempotency-Key', key)
+        .send(body);
+    for (const result of await Promise.all([submit(), submit()])) {
+      assert.equal(result.status, 202);
+      assert.equal(result.text, '');
+    }
+    await submit({ ...report, description: 'Друго описание' }).expect(409);
+    await api.get(queue).expect(401);
+    await api.get(queue).auth(reader.token, { type: 'bearer' }).expect(403);
+    const list = await api
+      .get(queue)
+      .auth(editor.token, { type: 'bearer' })
+      .query({ caseType: 'Rights', status: 'Open', priority: 'High' })
+      .expect(200);
+    const entry = (
+      list.body.items as { id: string; targetId: string; reportCount: number }[]
+    ).find((item) => item.targetId === id);
+    assert(entry);
+    assert.equal(entry.reportCount, 1);
+    const detail = queue + '/' + entry.id;
+    const reports = await api
+      .get(detail + '/reports')
+      .auth(editor.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(reports.body.items.length, 1);
+    assert.equal(
+      reports.body.items[0].evidenceUrl,
+      'https://archive.example.org/photo',
+    );
+    assert.equal(reports.body.items[0].revisionNumber, 2);
+    assert.equal(
+      reports.body.items[0].description,
+      'Източникът е описан от [скрит имейл] и [скрит номер]',
+    );
+    assert.doesNotMatch(
+      reports.text,
+      /reporter@example|888 123 456|payloadHash|requestHash/,
+    );
+    const open = await api
+      .get(detail)
+      .auth(editor.token, { type: 'bearer' })
+      .expect(200);
+    assert.deepEqual(open.body.allowedDecisions, []);
+    const take = () =>
+      api
+        .patch(detail)
+        .auth(editor.token, { type: 'bearer' })
+        .set('If-Match', String(open.headers.etag))
+        .send({ priority: 'High' });
+    const taken = await take().expect(200);
+    assert.equal(taken.body.assigneeId, editor.id);
+    await take().expect(412);
+
+    const withdraw = {
+      decision: 'WithdrawMaterial',
+      reason: 'Липсва доказателство за разрешение.',
+      expectedVersion: taken.body.version as number,
+      targetExpectedVersion: taken.body.target.version as number,
+    };
+    const decide = (token: string, body: typeof withdraw, key = randomUUID()) =>
+      api
+        .post(detail + '/decisions')
+        .auth(token, { type: 'bearer' })
+        .set('Idempotency-Key', key)
+        .send(body);
+    await decide(editor.token, {
+      ...withdraw,
+      targetExpectedVersion: 4,
+    }).expect(409);
+    const withdrawKey = randomUUID();
+    const withdrawn = await decide(editor.token, withdraw, withdrawKey).expect(
+      200,
+    );
+    assert.equal(withdrawn.body.target.status, 'Withdrawn');
+    assert.equal(withdrawn.body.target.publicVisibility, false);
+    await api.get(publicUrl).expect(404);
+    await submit().expect(202);
+    await submit(report, randomUUID()).expect(404);
+    assert.equal(
+      (await transition('Publish', 6).expect(409)).body.code,
+      'moderation_hold',
+    );
+    assert.equal(
+      (await transition('Archive', 6, 'Архивна проверка.').expect(409)).body
+        .code,
+      'moderation_hold',
+    );
+
+    const restore = {
+      decision: 'RestoreMaterial',
+      reason: 'Проверено е разрешение за показване.',
+      expectedVersion: withdrawn.body.version as number,
+      targetExpectedVersion: withdrawn.body.target.version as number,
+    };
+    await decide(editor.token, restore).expect(403);
+    const sessions = db.db().collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    assert.equal(
+      (await decide(admin.token, restore).expect(403)).body.code,
+      'mfa_required',
+    );
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+    const restored = await decide(admin.token, restore).expect(200);
+    assert.equal(restored.body.target.status, 'Published');
+    assert.equal(restored.body.withdrawal.reason, withdraw.reason);
+    const publicResult = await api.get(publicUrl).expect(200);
+    assert.equal(publicResult.body.content.title, title);
+    assert.equal(publicResult.body.revisionNumber, 2);
+    assert.deepEqual(
+      (await decide(editor.token, withdraw, withdrawKey).expect(200)).body,
+      withdrawn.body,
+    );
+    await decide(
+      editor.token,
+      { ...withdraw, reason: 'Променена причина' },
+      withdrawKey,
+    ).expect(409);
+
+    const audit = db.db().collection('auditEvents');
+    assert.equal(
+      await audit.countDocuments({
+        targetId: entry.id,
+        action: 'ModerationWithdrawMaterial',
+      }),
+      1,
+    );
+    assert.equal(
+      await audit.countDocuments({
+        targetId: id,
+        action: 'MaterialModerationWithdrawn',
+        'metadata.moderationCaseId': entry.id,
+      }),
+      1,
+    );
+    assert.equal(
+      await audit.countDocuments({
+        targetId: id,
+        action: 'MaterialModerationRestored',
+        actorId: admin.id,
+      }),
+      1,
+    );
+    const outbox = db.db().collection('outboxEvents');
+    assert.equal(
+      await outbox.countDocuments({
+        aggregateId: id,
+        'payload.moderationCaseId': entry.id,
+      }),
+      2,
+    );
+  });
+
   void it(
     'should govern catalog proposals, hierarchies and canonical merges',
     { timeout: 60_000 },

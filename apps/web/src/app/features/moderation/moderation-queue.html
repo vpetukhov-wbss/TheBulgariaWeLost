@@ -1,0 +1,86 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb"><a routerLink="/admin">Работен панел</a> / Редакция</p>
+    <h1>Сигнали за съдържание</h1>
+  </div>
+  <a nbButton outline routerLink="/admin/materials">Редакторска опашка</a>
+</header>
+<nb-card>
+  <nb-card-body class="filters">
+    <div class="field">
+      <label for="moderation-status">Статус</label>
+      <select
+        id="moderation-status"
+        [ngModel]="filters().status ?? ''"
+        (ngModelChange)="filter('status', $event)"
+      >
+        <option value="">Всички статуси</option>
+        @for (option of statuses | keyvalue; track option.key) {
+          <option [value]="option.key">{{ option.value }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label for="moderation-priority">Приоритет</label>
+      <select
+        id="moderation-priority"
+        [ngModel]="filters().priority ?? ''"
+        (ngModelChange)="filter('priority', $event)"
+      >
+        <option value="">Всички приоритети</option>
+        @for (option of priorities | keyvalue; track option.key) {
+          <option [value]="option.key">{{ option.value }}</option>
+        }
+      </select>
+    </div>
+    <div class="field">
+      <label for="moderation-type">Вид</label>
+      <select
+        id="moderation-type"
+        [ngModel]="filters().caseType ?? ''"
+        (ngModelChange)="filter('caseType', $event)"
+      >
+        <option value="">Всички видове</option>
+        @for (option of types | keyvalue; track option.key) {
+          <option [value]="option.key">{{ option.value }}</option>
+        }
+      </select>
+    </div>
+  </nb-card-body>
+</nb-card>
+@if (store.queueLoading()) {
+  <p role="status">Зареждане на сигналите…</p>
+} @else if (store.queueError()) {
+  <nb-alert status="danger" role="alert">{{ store.queueError() }}</nb-alert>
+  <button nbButton outline type="button" (click)="store.loadQueue(filters())">Опитай отново</button>
+} @else {
+  <nb-card>
+    <nb-card-body class="records">
+      @for (item of store.queue(); track item.id) {
+        <article class="record">
+          <div>
+            <h2>
+              <a [routerLink]="['/admin/moderation', item.id]" queryParamsHandling="preserve">{{
+                item.title
+              }}</a>
+            </h2>
+            <p class="muted">
+              {{ types[item.caseType] }} · Сигнали: {{ item.reportCount }} ·
+              <time [attr.datetime]="item.createdAtUtc">{{
+                item.createdAtUtc | date: 'dd.MM.yyyy, HH:mm'
+              }}</time>
+            </p>
+          </div>
+          <div class="actions">
+            @if (item.priority === 'High') {
+              <span class="badge">Висок приоритет</span>
+            }
+            <span class="badge secondary">{{ statuses[item.status] }}</span>
+          </div>
+        </article>
+      } @empty {
+        <p>Няма сигнали за избраните филтри.</p>
+      }
+    </nb-card-body>
+  </nb-card>
+}

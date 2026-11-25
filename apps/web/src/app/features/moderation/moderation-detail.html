@@ -1,0 +1,164 @@
+<header class="page-heading">
+  <div>
+    <p class="breadcrumb">
+      <a routerLink="/admin/moderation" queryParamsHandling="preserve">Сигнали за съдържание</a> /
+      Преглед
+    </p>
+    <h1>{{ store.detail()?.title || 'Редакторски сигнал' }}</h1>
+  </div>
+  @if (store.detail(); as current) {
+    <a nbButton outline [routerLink]="['/admin/materials', current.targetId]">Отвори материала</a>
+  }
+</header>
+@if (store.error()) {
+  <nb-alert status="danger" role="alert">{{ store.error() }}</nb-alert>
+}
+@if (store.notice()) {
+  <nb-alert status="success" role="status">{{ store.notice() }}</nb-alert>
+}
+@if (store.stale() && !store.loading()) {
+  <button nbButton outline type="button" (click)="store.loadCase(store.activeId())">
+    Зареди актуалната версия
+  </button>
+}
+@if (store.loading()) {
+  <p role="status">Зареждане на случая…</p>
+}
+@if (store.detail(); as current) {
+  <div class="split">
+    <nb-card>
+      <nb-card-header>Доказателства от подадените сигнали</nb-card-header>
+      <nb-card-body class="records">
+        @for (report of store.reports(); track report.id) {
+          <article class="record">
+            <div>
+              <h2>{{ reasons[report.reasonCode] }}</h2>
+              <p class="muted">
+                Публична ревизия №{{ report.revisionNumber }} ·
+                <time [attr.datetime]="report.createdAtUtc">{{
+                  report.createdAtUtc | date: 'dd.MM.yyyy, HH:mm'
+                }}</time>
+              </p>
+              @if (report.description) {
+                <p class="wrap">{{ report.description }}</p>
+              }
+              @if (report.evidenceUrl) {
+                <p class="wrap">Публичен източник: {{ report.evidenceUrl }}</p>
+              }
+            </div>
+          </article>
+        } @empty {
+          <p>Няма достъпни доказателства.</p>
+        }
+      </nb-card-body>
+    </nb-card>
+    <div>
+      <nb-card>
+        <nb-card-header>Статус и приоритет</nb-card-header>
+        <nb-card-body>
+          <p class="actions">
+            <span class="badge">{{ statuses[current.status] }}</span>
+            <span class="badge secondary">{{ types[current.caseType] }}</span>
+          </p>
+          <p>
+            Материал: {{ visibility[current.target.status] }} · Версия {{ current.target.version }}
+          </p>
+          @if (current.assigneeId) {
+            <p class="muted wrap">Отговорник: {{ current.assigneeId }}</p>
+          }
+          @if (current.canTake && store.etag()) {
+            <form class="divider" (ngSubmit)="store.take(priority())">
+              <div class="field">
+                <label for="case-priority">Приоритет</label>
+                <select
+                  id="case-priority"
+                  name="priority"
+                  [ngModel]="priority()"
+                  (ngModelChange)="priority.set($event)"
+                  [disabled]="!store.canChange()"
+                >
+                  @for (option of priorities | keyvalue; track option.key) {
+                    <option [value]="option.key">{{ option.value }}</option>
+                  }
+                </select>
+              </div>
+              <button nbButton outline type="submit" [disabled]="!store.canChange()">
+                {{ current.status === 'Open' ? 'Поеми за преглед' : 'Запази приоритета' }}
+              </button>
+            </form>
+          } @else {
+            <p>Приоритет: {{ priorities[current.priority] }}</p>
+          }
+        </nb-card-body>
+      </nb-card>
+      <nb-card>
+        <nb-card-header>Решение</nb-card-header>
+        <nb-card-body>
+          @if (current.resolution; as resolution) {
+            <p>
+              <strong>{{ actions[resolution.decision] }}</strong> ·
+              {{ resolution.decidedAtUtc | date: 'dd.MM.yyyy, HH:mm' }}
+            </p>
+            <p class="wrap">{{ resolution.reason }}</p>
+          }
+          @if (current.withdrawal && current.resolution?.decision === 'RestoreMaterial') {
+            <p class="muted wrap">
+              Причина за първоначалното сваляне: {{ current.withdrawal.reason }}
+            </p>
+          }
+          @if (current.allowedDecisions.length) {
+            <form (ngSubmit)="submit()">
+              <fieldset [disabled]="!store.canChange()">
+                <div class="field">
+                  <label for="moderation-decision">Редакторско действие</label>
+                  <select
+                    id="moderation-decision"
+                    name="decision"
+                    [ngModel]="decision()"
+                    (ngModelChange)="decision.set($event)"
+                  >
+                    <option value="">Избери действие</option>
+                    @for (option of current.allowedDecisions; track option) {
+                      <option [value]="option">{{ actions[option] }}</option>
+                    }
+                  </select>
+                </div>
+                @if (decision() === 'WithdrawMaterial') {
+                  <p>Материалът веднага ще стане недостъпен за посетителите.</p>
+                }
+                <label class="field"
+                  >Причина за решението
+                  <textarea
+                    nbInput
+                    fullWidth
+                    rows="3"
+                    name="reason"
+                    maxlength="500"
+                    [ngModel]="reason()"
+                    (ngModelChange)="reason.set($event)"
+                  ></textarea>
+                </label>
+                <button
+                  nbButton
+                  status="primary"
+                  type="submit"
+                  [disabled]="!decision() || reason().trim().length < 3"
+                >
+                  Потвърди решението
+                </button>
+              </fieldset>
+            </form>
+          } @else if (current.status === 'Open') {
+            <p>Поеми случая, за да запишеш решение.</p>
+          } @else if (
+            current.caseType === 'Rights' && current.resolution?.decision === 'WithdrawMaterial'
+          ) {
+            <p>Възстановяването при спор за права изисква администратор.</p>
+          } @else if (current.status === 'UnderReview') {
+            <p>Случаят се обработва от назначения отговорник.</p>
+          }
+        </nb-card-body>
+      </nb-card>
+    </div>
+  </div>
+}
