@@ -71,6 +71,18 @@ export type { SaveMaterial$Params as SaveMaterial$Params } from './fn/authoring/
 export { saveMaterial as saveMaterial } from './fn/authoring/save-material';
 export type { RemoveSavedMaterial$Params as RemoveSavedMaterial$Params } from './fn/authoring/remove-saved-material';
 export { removeSavedMaterial as removeSavedMaterial } from './fn/authoring/remove-saved-material';
+export type { SubmitModerationReport$Params as SubmitModerationReport$Params } from './fn/moderation/submit-moderation-report';
+export { submitModerationReport as submitModerationReport } from './fn/moderation/submit-moderation-report';
+export type { ListModerationCases$Params as ListModerationCases$Params } from './fn/moderation/list-moderation-cases';
+export { listModerationCases as listModerationCases } from './fn/moderation/list-moderation-cases';
+export type { GetModerationCase$Params as GetModerationCase$Params } from './fn/moderation/get-moderation-case';
+export { getModerationCase as getModerationCase } from './fn/moderation/get-moderation-case';
+export type { TakeModerationCase$Params as TakeModerationCase$Params } from './fn/moderation/take-moderation-case';
+export { takeModerationCase as takeModerationCase } from './fn/moderation/take-moderation-case';
+export type { ListModerationReports$Params as ListModerationReports$Params } from './fn/moderation/list-moderation-reports';
+export { listModerationReports as listModerationReports } from './fn/moderation/list-moderation-reports';
+export type { DecideModerationCase$Params as DecideModerationCase$Params } from './fn/moderation/decide-moderation-case';
+export { decideModerationCase as decideModerationCase } from './fn/moderation/decide-moderation-case';
 export type { ListCatalogEntries$Params as ListCatalogEntries$Params } from './fn/catalog/list-catalog-entries';
 export { listCatalogEntries as listCatalogEntries } from './fn/catalog/list-catalog-entries';
 export type { CreateCatalogEntry$Params as CreateCatalogEntry$Params } from './fn/catalog/create-catalog-entry';

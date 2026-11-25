@@ -6,5 +6,6 @@ export { AuthService } from './services/auth.service';
 export { BackOfficeService } from './services/back-office.service';
 export { PublishingService } from './services/publishing.service';
 export { AuthoringService } from './services/authoring.service';
+export { ModerationService } from './services/moderation.service';
 export { CatalogService } from './services/catalog.service';
 export { MediaService } from './services/media.service';

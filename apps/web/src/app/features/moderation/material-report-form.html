@@ -1,0 +1,53 @@
+<section class="divider">
+  @if (sent()) {
+    <nb-alert status="success" role="status">Сигналът е приет за редакторски преглед.</nb-alert>
+  } @else {
+    <button
+      nbButton
+      ghost
+      type="button"
+      [attr.aria-expanded]="open()"
+      [disabled]="busy()"
+      (click)="open.set(!open())"
+    >
+      Подай сигнал
+    </button>
+    @if (open()) {
+      @if (error()) {
+        <nb-alert status="danger" role="alert">{{ error() }}</nb-alert>
+      }
+      <form [formGroup]="form" (ngSubmit)="send()">
+        <fieldset [disabled]="busy()">
+          <legend>Сигнал за този материал</legend>
+          <p>Можеш да подадеш сигнал без профил. Не включвай имена, телефони или имейли.</p>
+          <div class="field">
+            <label for="report-reason">Причина за сигнала</label>
+            <select id="report-reason" formControlName="reasonCode">
+              <option value="">Избери причина</option>
+              @for (option of reasons | keyvalue; track option.key) {
+                <option [value]="option.key">{{ option.value }}</option>
+              }
+            </select>
+          </div>
+          <label class="field"
+            >Описание (по желание)
+            <textarea
+              nbInput
+              fullWidth
+              rows="3"
+              maxlength="1500"
+              formControlName="description"
+            ></textarea>
+          </label>
+          <label class="field"
+            >Публичен URL за доказателство (по желание)
+            <input nbInput fullWidth type="url" maxlength="1500" formControlName="evidenceUrl" />
+          </label>
+          <button nbButton status="primary" type="submit" [disabled]="busy()">
+            Изпрати сигнала
+          </button>
+        </fieldset>
+      </form>
+    }
+  }
+</section>

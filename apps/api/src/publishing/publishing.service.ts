@@ -1,5 +1,6 @@
 import {
   ConflictException,
+  ForbiddenException,
   HttpException,
   Injectable,
   NotFoundException,
@@ -49,6 +50,10 @@ import {
 } from './persistence/publishing-event.schema';
 
 type Principal = SignedInAccount;
+type ModerationAction =
+  | 'RequestCorrection'
+  | 'WithdrawMaterial'
+  | 'RestoreMaterial';
 const authorCatalogFields: AuthorCatalogField[] = [
   'categoryIds',
   'topicIds',
@@ -451,6 +456,120 @@ export class PublishingService {
     return this.publicMaterial({ _id: id });
   }
 
+  async moderationTarget(id: string, session?: ClientSession) {
+    const query = this.materials.findById(id);
+    if (session) query.session(session);
+    const material = await query.exec();
+    if (!material?.publishedRevisionNumber) this.publicNotFound();
+    return {
+      id: material._id,
+      slug: material.slug,
+      status: material.status,
+      version: material.version,
+      revisionNumber: material.publishedRevisionNumber,
+      publicVisibility: material.publicVisibility,
+      holdCaseId: material.moderationCaseId,
+    };
+  }
+
+  async moderate(
+    principal: Principal,
+    id: string,
+    caseId: string,
+    action: ModerationAction,
+    expectedVersion: number,
+    reason: string,
+    correlationId: string,
+    session: ClientSession,
+  ): Promise<void> {
+    if (![Role.Editor, Role.Administrator].includes(principal.profile.role)) {
+      throw new ForbiddenException({ code: 'forbidden' });
+    }
+    const material = await this.materials.findById(id).session(session).exec();
+    if (!material?.publishedRevisionNumber) this.publicNotFound();
+    this.requireVersion(material, expectedVersion, false);
+
+    let set: Record<string, unknown>;
+    let unset: Record<string, 1> | undefined;
+    if (action === 'RestoreMaterial') {
+      if (
+        material.status !== MaterialStatus.Withdrawn ||
+        material.moderationCaseId !== caseId
+      ) {
+        this.invalidTransition();
+      }
+      const revision = await this.revisions
+        .findOne({
+          materialId: id,
+          revisionNumber: material.publishedRevisionNumber,
+        })
+        .session(session)
+        .exec();
+      if (!revision)
+        throw new NotFoundException({ code: 'revision_not_found' });
+      const blockers = await this.publicationBlockers(
+        revision.content,
+        session,
+      );
+      if (blockers.length)
+        throw new UnprocessableEntityException({
+          code: 'publication_rights_missing',
+          message: blockers,
+        });
+      set = { status: MaterialStatus.Published, publicVisibility: true };
+      unset = { moderationCaseId: 1 };
+    } else {
+      if (
+        material.status !== MaterialStatus.Published ||
+        !material.publicVisibility
+      ) {
+        this.invalidTransition();
+      }
+      set =
+        action === 'WithdrawMaterial'
+          ? {
+              status: MaterialStatus.Withdrawn,
+              publicVisibility: false,
+              moderationCaseId: caseId,
+            }
+          : {
+              workingStatus: WorkingStatus.ChangesRequested,
+              workingRevisionNumber:
+                material.workingRevisionNumber ??
+                material.publishedRevisionNumber,
+              correctionNote: reason,
+              hasBeenSubmitted: true,
+            };
+    }
+    const update = await this.materials
+      .updateOne(
+        { _id: id, version: expectedVersion },
+        {
+          $set: { ...set, updatedAt: new Date() },
+          ...(unset ? { $unset: unset } : {}),
+          $inc: { version: 1 },
+        },
+        { session },
+      )
+      .exec();
+    if (update.modifiedCount !== 1) this.versionConflict(false);
+    const events = {
+      RequestCorrection: 'MaterialModerationChangesRequested',
+      WithdrawMaterial: 'MaterialModerationWithdrawn',
+      RestoreMaterial: 'MaterialModerationRestored',
+    };
+    await this.record(
+      id,
+      expectedVersion + 1,
+      events[action],
+      principal.profile.id,
+      correlationId,
+      session,
+      reason,
+      { moderationCaseId: caseId },
+    );
+  }
+
   private async publicMaterial(
     identity: { slug: string } | { _id: string },
   ): Promise<PublicMaterialDto> {
@@ -493,6 +612,14 @@ export class PublishingService {
       restoredFrom: number;
     };
   }> {
+    if (
+      material.moderationCaseId &&
+      [MaterialTransition.Publish, MaterialTransition.Archive].includes(
+        dto.action,
+      )
+    ) {
+      throw new ConflictException({ code: 'moderation_hold' });
+    }
     switch (dto.action) {
       case MaterialTransition.SubmitForReview:
         this.requireWorkingStatus(material, [
@@ -786,7 +913,9 @@ export class PublishingService {
     if (material.status === MaterialStatus.Archived) {
       return [MaterialTransition.RestoreFromArchive];
     }
-    const actions = [MaterialTransition.Archive];
+    const actions = material.moderationCaseId
+      ? []
+      : [MaterialTransition.Archive];
     if (
       material.workingStatus === WorkingStatus.Draft ||
       material.workingStatus === WorkingStatus.ChangesRequested
@@ -797,10 +926,8 @@ export class PublishingService {
       actions.push(MaterialTransition.StartReview);
     }
     if (material.workingStatus === WorkingStatus.InReview) {
-      actions.push(
-        MaterialTransition.RequestChanges,
-        MaterialTransition.Publish,
-      );
+      actions.push(MaterialTransition.RequestChanges);
+      if (!material.moderationCaseId) actions.push(MaterialTransition.Publish);
     }
     if (material.status === MaterialStatus.Published) {
       actions.push(MaterialTransition.Withdraw);
@@ -910,6 +1037,7 @@ export class PublishingService {
     correlationId: string,
     session: ClientSession,
     reason?: string,
+    metadata?: Record<string, unknown>,
   ): Promise<void> {
     const occurredAt = new Date();
     await this.auditEvents.create(
@@ -922,6 +1050,7 @@ export class PublishingService {
           targetId: materialId,
           targetVersion: version,
           ...(reason ? { reason } : {}),
+          ...(metadata ? { metadata } : {}),
           correlationId,
           occurredAt,
         },
@@ -936,7 +1065,7 @@ export class PublishingService {
           eventType: action,
           aggregateId: materialId,
           aggregateVersion: version,
-          payload: { materialId, version },
+          payload: { materialId, version, ...metadata },
           occurredAt,
         },
       ],

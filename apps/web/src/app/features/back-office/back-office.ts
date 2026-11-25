@@ -40,6 +40,7 @@ function hasBackOfficeAccess(
                   >Редакторска опашка</a
                 >
                 <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
+                <a nbButton outline routerLink="/admin/moderation">Сигнали за съдържание</a>
               </nav>
               <h2>Активни права</h2>
               <ul>
