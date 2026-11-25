@@ -18,7 +18,8 @@ import {
 } from 'node:crypto';
 import { Model } from 'mongoose';
 import type { AllConfigType } from '../config/config.type';
-import { Account, AccountStatus, Role } from './persistence/account.schema';
+import { availableAccount } from './account-access';
+import { Account, Role } from './persistence/account.schema';
 import { Session } from './persistence/session.schema';
 
 const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -47,7 +48,7 @@ export class MfaService {
     currentPassword: string,
   ): Promise<{ secret: string; provisioningUri: string }> {
     const account = await this.accounts
-      .findOne({ _id: accountId, status: AccountStatus.Active })
+      .findOne({ _id: accountId, ...availableAccount() })
       .select('+passwordHash +mfaSecretEncrypted')
       .exec();
     this.requireAdministrator(account);
@@ -62,10 +63,17 @@ export class MfaService {
     }
 
     const secret = this.base32(randomBytes(20));
-    await this.accounts.updateOne(
-      { _id: accountId, mfaEnabled: false },
+    const updated = await this.accounts.updateOne(
+      {
+        _id: accountId,
+        authVersion: account.authVersion,
+        role: Role.Administrator,
+        mfaEnabled: false,
+        ...availableAccount(),
+      },
       { $set: { mfaPendingSecretEncrypted: this.encrypt(secret) } },
     );
+    if (!updated.matchedCount) throw new UnauthorizedException();
     const issuer = this.config.getOrThrow('app.name', { infer: true });
     const label = `${issuer}:${account.email}`;
     return {
@@ -83,7 +91,7 @@ export class MfaService {
     code: string,
   ): Promise<string[]> {
     const account = await this.accounts
-      .findOne({ _id: accountId, status: AccountStatus.Active })
+      .findOne({ _id: accountId, ...availableAccount() })
       .select('+mfaPendingSecretEncrypted')
       .exec();
     this.requireAdministrator(account);
@@ -100,7 +108,9 @@ export class MfaService {
     const result = await this.accounts.updateOne(
       {
         _id: accountId,
-        status: AccountStatus.Active,
+        authVersion: account.authVersion,
+        role: Role.Administrator,
+        ...availableAccount(),
         mfaEnabled: false,
         mfaPendingSecretEncrypted: account.mfaPendingSecretEncrypted,
       },
@@ -129,7 +139,7 @@ export class MfaService {
     const account = await this.accounts
       .findOne({
         _id: accountId,
-        status: AccountStatus.Active,
+        ...availableAccount(),
         mfaEnabled: true,
       })
       .select('+mfaSecretEncrypted +mfaLastUsedStep')
@@ -144,6 +154,9 @@ export class MfaService {
     const consumed = await this.accounts.updateOne(
       {
         _id: accountId,
+        role: Role.Administrator,
+        authVersion: account.authVersion,
+        ...availableAccount(),
         mfaEnabled: true,
         $or: [
           { mfaLastUsedStep: { $lt: step } },
@@ -166,7 +179,7 @@ export class MfaService {
       {
         _id: accountId,
         role: Role.Administrator,
-        status: AccountStatus.Active,
+        ...availableAccount(),
         mfaEnabled: true,
         mfaRecoveryCodeHashes: hash,
       },

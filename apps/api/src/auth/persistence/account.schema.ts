@@ -13,6 +13,19 @@ export enum AccountStatus {
   Disabled = 'Disabled',
 }
 
+@Schema({ _id: false })
+class ActiveAccountSanction {
+  @Prop({ required: true })
+  id: string;
+
+  @Prop({ type: Date, default: null })
+  expiresAt: Date | null;
+}
+
+const ActiveAccountSanctionSchema = SchemaFactory.createForClass(
+  ActiveAccountSanction,
+);
+
 @Schema({ collection: 'users', timestamps: true })
 export class Account {
   @Prop({ type: String, default: uuidv7 })
@@ -46,6 +59,21 @@ export class Account {
 
   @Prop({ default: 0, required: true })
   authVersion: number;
+
+  @Prop({ required: true, default: 1 })
+  adminVersion: number;
+
+  @Prop({ select: false })
+  administrationAccessVersion?: number;
+
+  @Prop({ maxlength: 120 })
+  displayName?: string;
+
+  @Prop({ maxlength: 2000 })
+  bio?: string;
+
+  @Prop({ type: ActiveAccountSanctionSchema })
+  activeSanction?: ActiveAccountSanction;
 
   @Prop({ default: false, required: true })
   mfaEnabled: boolean;

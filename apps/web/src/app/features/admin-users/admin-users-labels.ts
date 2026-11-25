@@ -10,4 +10,5 @@ export const userStatuses = {
   Pending: 'Очаква потвърждение',
   Active: 'Активен',
   Disabled: 'Деактивиран',
+  Banned: 'Блокиран',
 } satisfies Record<AdminUserSummary['status'], string>;

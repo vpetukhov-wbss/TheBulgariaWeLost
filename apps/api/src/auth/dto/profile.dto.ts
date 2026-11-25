@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Account, Role } from '../persistence/account.schema';
 
 export class ProfileDto {
@@ -14,6 +14,12 @@ export class ProfileDto {
   @ApiProperty()
   lastName: string;
 
+  @ApiPropertyOptional()
+  displayName?: string;
+
+  @ApiPropertyOptional()
+  bio?: string;
+
   @ApiProperty({ enum: Role })
   role: Role;
 
@@ -26,6 +32,8 @@ export class ProfileDto {
       email: account.email,
       firstName: account.firstName,
       lastName: account.lastName,
+      ...(account.displayName ? { displayName: account.displayName } : {}),
+      ...(account.bio ? { bio: account.bio } : {}),
       role: account.role,
       mfaEnabled: account.mfaEnabled,
     };

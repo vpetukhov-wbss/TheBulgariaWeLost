@@ -10,15 +10,9 @@ import { BaseService } from '../base-service';
 import { ArchiveApiConfiguration } from '../archive-api-configuration';
 import { StrictHttpResponse } from '../strict-http-response';
 
-import { AdminUserDetail } from '../models/admin-user-detail';
-import { AdminUserPage } from '../models/admin-user-page';
 import { BackOfficePrincipal } from '../models/back-office-principal';
-import { getAdminUser } from '../fn/back-office/get-admin-user';
-import { GetAdminUser$Params } from '../fn/back-office/get-admin-user';
 import { getBackOfficePrincipal } from '../fn/back-office/get-back-office-principal';
 import { GetBackOfficePrincipal$Params } from '../fn/back-office/get-back-office-principal';
-import { listAdminUsers } from '../fn/back-office/list-admin-users';
-import { ListAdminUsers$Params } from '../fn/back-office/list-admin-users';
 
 @Injectable({ providedIn: 'root' })
 export class BackOfficeService extends BaseService {
@@ -50,60 +44,6 @@ export class BackOfficeService extends BaseService {
     const resp = this.getBackOfficePrincipal$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<BackOfficePrincipal>): BackOfficePrincipal => r.body)
-    );
-  }
-
-  /** Path part for operation `listAdminUsers()` */
-  static readonly ListAdminUsersPath = '/api/admin/v1/users';
-
-  /**
-   * This method provides access to the full `HttpResponse`, allowing access to response headers.
-   * To access only the response body, use `listAdminUsers()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  listAdminUsers$Response(params?: ListAdminUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<AdminUserPage>> {
-    const obs = listAdminUsers(this.http, this.rootUrl, params, context);
-    return obs;
-  }
-
-  /**
-   * This method provides access only to the response body.
-   * To access the full response (for headers, for example), `listAdminUsers$Response()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  listAdminUsers(params?: ListAdminUsers$Params, context?: HttpContext): Observable<AdminUserPage> {
-    const resp = this.listAdminUsers$Response(params, context);
-    return resp.pipe(
-      map((r: StrictHttpResponse<AdminUserPage>): AdminUserPage => r.body)
-    );
-  }
-
-  /** Path part for operation `getAdminUser()` */
-  static readonly GetAdminUserPath = '/api/admin/v1/users/{id}';
-
-  /**
-   * This method provides access to the full `HttpResponse`, allowing access to response headers.
-   * To access only the response body, use `getAdminUser()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getAdminUser$Response(params: GetAdminUser$Params, context?: HttpContext): Observable<StrictHttpResponse<AdminUserDetail>> {
-    const obs = getAdminUser(this.http, this.rootUrl, params, context);
-    return obs;
-  }
-
-  /**
-   * This method provides access only to the response body.
-   * To access the full response (for headers, for example), `getAdminUser$Response()` instead.
-   *
-   * This method doesn't expect any request body.
-   */
-  getAdminUser(params: GetAdminUser$Params, context?: HttpContext): Observable<AdminUserDetail> {
-    const resp = this.getAdminUser$Response(params, context);
-    return resp.pipe(
-      map((r: StrictHttpResponse<AdminUserDetail>): AdminUserDetail => r.body)
     );
   }
 

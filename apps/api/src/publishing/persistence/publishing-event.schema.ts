@@ -39,6 +39,7 @@ export const PublishingAuditEventSchema =
 
 PublishingAuditEventSchema.index({ targetId: 1, occurredAt: -1, _id: -1 });
 PublishingAuditEventSchema.index({ correlationId: 1, _id: 1 });
+PublishingAuditEventSchema.index({ action: 1, actorId: 1, occurredAt: -1 });
 
 @Schema({ collection: 'outboxEvents', timestamps: false })
 export class PublishingOutboxEvent {

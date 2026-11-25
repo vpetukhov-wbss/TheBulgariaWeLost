@@ -7,28 +7,24 @@ import { filter, map } from 'rxjs/operators';
 import { StrictHttpResponse } from '../../strict-http-response';
 import { RequestBuilder } from '../../request-builder';
 
-import { AdminUserPage } from '../../models/admin-user-page';
+import { AccountSanctionPage } from '../../models/account-sanction-page';
 
-export interface ListAdminUsers$Params {
+export interface ListAccountSanctions$Params {
 
 /**
  * Optional caller correlation ID. The server echoes it or creates a safe value.
  */
   'X-Correlation-ID'?: string;
-  q?: string;
-  role?: 'User' | 'Editor' | 'Administrator';
-  status?: 'Pending' | 'Active' | 'Disabled';
+  id: string;
   limit?: number;
   cursor?: string;
 }
 
-export function listAdminUsers(http: HttpClient, rootUrl: string, params?: ListAdminUsers$Params, context?: HttpContext): Observable<StrictHttpResponse<AdminUserPage>> {
-  const rb = new RequestBuilder(rootUrl, listAdminUsers.PATH, 'get');
+export function listAccountSanctions(http: HttpClient, rootUrl: string, params: ListAccountSanctions$Params, context?: HttpContext): Observable<StrictHttpResponse<AccountSanctionPage>> {
+  const rb = new RequestBuilder(rootUrl, listAccountSanctions.PATH, 'get');
   if (params) {
     rb.header('X-Correlation-ID', params['X-Correlation-ID'], {});
-    rb.query('q', params.q, {});
-    rb.query('role', params.role, {});
-    rb.query('status', params.status, {});
+    rb.path('id', params.id, {});
     rb.query('limit', params.limit, {});
     rb.query('cursor', params.cursor, {});
   }
@@ -38,9 +34,9 @@ export function listAdminUsers(http: HttpClient, rootUrl: string, params?: ListA
   ).pipe(
     filter((r: any): r is HttpResponse<any> => r instanceof HttpResponse),
     map((r: HttpResponse<any>) => {
-      return r as StrictHttpResponse<AdminUserPage>;
+      return r as StrictHttpResponse<AccountSanctionPage>;
     })
   );
 }
 
-listAdminUsers.PATH = '/api/admin/v1/users';
+listAccountSanctions.PATH = '/api/admin/v1/users/{id}/sanctions';

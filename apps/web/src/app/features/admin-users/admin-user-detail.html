@@ -6,6 +6,15 @@
     <h1>{{ store.detail()?.displayName || 'Потребителски профил' }}</h1>
   </div>
 </header>
+@if (store.notice()) {
+  <nb-alert status="success" role="status">{{ store.notice() }}</nb-alert>
+}
+@if (store.actionError()) {
+  <nb-alert status="danger" role="alert">{{ store.actionError() }}</nb-alert>
+}
+@if (store.stale()) {
+  <button nbButton outline type="button" (click)="retry()">Зареди актуалния профил</button>
+}
 @if (store.loadingDetail()) {
   <p role="status">Зареждане на профила…</p>
 } @else if (store.detailError()) {
@@ -23,6 +32,10 @@
         <dd>{{ user.verifiedContactMasked || 'Няма потвърден контакт' }}</dd>
         <dt>MFA</dt>
         <dd>{{ user.mfaEnabled ? 'Включено' : 'Изключено' }}</dd>
+        @if (user.bio) {
+          <dt>Биография</dt>
+          <dd class="wrap">{{ user.bio }}</dd>
+        }
         @if (user.createdAtUtc) {
           <dt>Дата на регистрация</dt>
           <dd>
@@ -32,6 +45,247 @@
           </dd>
         }
       </dl>
+      <div class="actions">
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="!store.canChange()"
+          (click)="choose('edit')"
+        >
+          Редактирай профила
+        </button>
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="!store.canChange()"
+          (click)="choose('role')"
+        >
+          Смени ролята
+        </button>
+        @if (user.activeSanction) {
+          <button
+            nbButton
+            outline
+            type="button"
+            [disabled]="!store.canChange()"
+            (click)="choose('unban')"
+          >
+            Отмени санкцията
+          </button>
+        } @else {
+          <button
+            nbButton
+            outline
+            status="danger"
+            type="button"
+            [disabled]="!store.canChange()"
+            (click)="choose('ban')"
+          >
+            Блокирай профила
+          </button>
+        }
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="!store.canChange()"
+          (click)="choose('sessions')"
+        >
+          Прекрати сесиите
+        </button>
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="!store.canChange() || user.status !== 'Active'"
+          (click)="choose('reset')"
+        >
+          Изпрати линк за нова парола
+        </button>
+      </div>
+    </nb-card-body>
+  </nb-card>
+
+  @if (selected(); as action) {
+    <nb-card>
+      <nb-card-body>
+        <form (ngSubmit)="submit()">
+          <fieldset [disabled]="!store.canChange()">
+            <legend>{{ titles[action] }}</legend>
+            @if (action === 'edit') {
+              <label class="field">
+                Име за показване
+                <input
+                  nbInput
+                  fullWidth
+                  name="displayName"
+                  maxlength="120"
+                  [ngModel]="displayName()"
+                  (ngModelChange)="displayName.set($event)"
+                  required
+                />
+              </label>
+              <label class="field">
+                Биография
+                <textarea
+                  nbInput
+                  fullWidth
+                  name="bio"
+                  rows="4"
+                  maxlength="2000"
+                  [ngModel]="bio()"
+                  (ngModelChange)="bio.set($event)"
+                ></textarea>
+              </label>
+            } @else {
+              @if (action === 'role') {
+                <div class="field">
+                  <label for="new-account-role">Нова роля</label>
+                  <select
+                    id="new-account-role"
+                    name="role"
+                    [ngModel]="role()"
+                    (ngModelChange)="role.set($event)"
+                  >
+                    @for (option of roles | keyvalue; track option.key) {
+                      <option [value]="option.key">{{ option.value }}</option>
+                    }
+                  </select>
+                </div>
+              }
+              @if (action === 'ban') {
+                <label class="field">
+                  <span
+                    ><input
+                      type="checkbox"
+                      name="permanent"
+                      [ngModel]="permanent()"
+                      (ngModelChange)="permanent.set($event)"
+                    />
+                    Без срок</span
+                  >
+                </label>
+                @if (!permanent()) {
+                  <label class="field">
+                    Изтича на (местно време)
+                    <input
+                      nbInput
+                      fullWidth
+                      type="datetime-local"
+                      name="expiry"
+                      [ngModel]="expiry()"
+                      (ngModelChange)="expiry.set($event)"
+                      required
+                    />
+                  </label>
+                }
+              }
+              @if (action === 'role' || action === 'ban' || action === 'sessions') {
+                <p>Потвърждението прекратява всички активни сесии на профила.</p>
+              }
+              @if (action === 'reset') {
+                <p>Линкът ще бъде изпратен до потвърдения имейл на профила.</p>
+              }
+              <label class="field">
+                Причина
+                <textarea
+                  nbInput
+                  fullWidth
+                  rows="3"
+                  maxlength="500"
+                  name="reason"
+                  [ngModel]="reason()"
+                  (ngModelChange)="reason.set($event)"
+                  required
+                ></textarea>
+              </label>
+            }
+            @if (formError()) {
+              <nb-alert status="danger" role="alert">{{ formError() }}</nb-alert>
+            }
+            <div class="actions">
+              <button nbButton status="primary" type="submit" [disabled]="!canSubmit()">
+                {{ action === 'edit' ? 'Запази профила' : 'Потвърди действието' }}
+              </button>
+              <button nbButton outline type="button" (click)="choose(null)">Откажи</button>
+            </div>
+          </fieldset>
+        </form>
+      </nb-card-body>
+    </nb-card>
+  }
+
+  @if (store.resetId(); as resetId) {
+    <nb-card>
+      <nb-card-header>Доставка на линка за нова парола</nb-card-header>
+      <nb-card-body>
+        @if (store.resetOperation(); as operation) {
+          <p role="status">{{ resetStatuses[operation.status] }}</p>
+        }
+        @if (store.resetError()) {
+          <nb-alert status="warning" role="alert">{{ store.resetError() }}</nb-alert>
+        }
+        <p class="muted wrap">Заявка {{ resetId }}</p>
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="store.resetChecking()"
+          (click)="store.checkResetStatus()"
+        >
+          Обнови статуса
+        </button>
+      </nb-card-body>
+    </nb-card>
+  }
+
+  <nb-card>
+    <nb-card-header>История на санкциите</nb-card-header>
+    <nb-card-body class="records">
+      @for (sanction of store.history(); track sanction.id) {
+        <article class="record">
+          <div>
+            <h2>{{ sanction.startsAtUtc | date: 'dd.MM.yyyy HH:mm' }}</h2>
+            <p class="wrap">{{ sanction.reason }}</p>
+            @if (sanction.expiresAtUtc) {
+              <p class="muted">Срок до {{ sanction.expiresAtUtc | date: 'dd.MM.yyyy HH:mm' }}</p>
+            } @else {
+              <p class="muted">Без срок</p>
+            }
+            @if (sanction.revokedAtUtc) {
+              <p class="wrap">
+                Отменена на {{ sanction.revokedAtUtc | date: 'dd.MM.yyyy HH:mm' }} ·
+                {{ sanction.revokeReason }}
+              </p>
+            }
+          </div>
+          <span class="badge">{{
+            user.activeSanction?.id === sanction.id
+              ? 'Активна'
+              : sanction.revokedAtUtc
+                ? 'Отменена'
+                : 'Изтекла'
+          }}</span>
+        </article>
+      } @empty {
+        <p>Няма наложени санкции.</p>
+      }
+      @if (store.historyError()) {
+        <nb-alert status="warning" role="alert">{{ store.historyError() }}</nb-alert>
+      }
+      @if (store.historyCursor()) {
+        <button
+          nbButton
+          outline
+          type="button"
+          [disabled]="store.historyLoading()"
+          (click)="store.loadMoreHistory()"
+        >
+          Зареди още
+        </button>
+      }
     </nb-card-body>
   </nb-card>
 }

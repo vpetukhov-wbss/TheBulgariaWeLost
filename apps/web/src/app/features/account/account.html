@@ -28,6 +28,16 @@
         <button nbButton status="primary" type="button" (click)="load()">Опитай отново</button>
       }
       @case ('ready') {
+        @if (profile(); as current) {
+          @if (current.displayName) {
+            <p>
+              Име за показване <strong>{{ current.displayName }}</strong>
+            </p>
+          }
+          @if (current.bio) {
+            <p>{{ current.bio }}</p>
+          }
+        }
         <nav class="account-links" aria-label="Авторско пространство">
           <a nbButton outline routerLink="/account/materials">Моите материали</a>
           <a nbButton outline routerLink="/account/saved">Запазени материали</a>

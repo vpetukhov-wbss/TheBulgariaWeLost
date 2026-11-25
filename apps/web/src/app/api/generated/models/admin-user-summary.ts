@@ -6,5 +6,5 @@ export interface AdminUserSummary {
   displayName: string;
   id: string;
   role: 'User' | 'Editor' | 'Administrator';
-  status: 'Pending' | 'Active' | 'Disabled';
+  status: 'Pending' | 'Active' | 'Disabled' | 'Banned';
 }

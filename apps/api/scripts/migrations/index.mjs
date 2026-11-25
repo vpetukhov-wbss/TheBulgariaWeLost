@@ -6,6 +6,7 @@ import { publishingFoundationMigration } from './005-publishing-foundation.mjs';
 import { catalogTaxonomyMigration } from './006-catalog-taxonomy.mjs';
 import { authorBookmarksMigration } from './007-author-bookmarks.mjs';
 import { materialModerationMigration } from './008-material-moderation.mjs';
+import { adminUserActionsMigration } from './009-admin-user-actions.mjs';
 
 export const migrations = [
   authFoundationMigration,
@@ -16,4 +17,5 @@ export const migrations = [
   catalogTaxonomyMigration,
   authorBookmarksMigration,
   materialModerationMigration,
+  adminUserActionsMigration,
 ];
