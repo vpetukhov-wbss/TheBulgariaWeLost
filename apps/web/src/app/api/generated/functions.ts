@@ -47,6 +47,18 @@ export type { ReplaceAdminSiteSettings$Params as ReplaceAdminSiteSettings$Params
 export { replaceAdminSiteSettings as replaceAdminSiteSettings } from './fn/admin-site-settings/replace-admin-site-settings';
 export type { GetPublicSiteSettings$Params as GetPublicSiteSettings$Params } from './fn/public-site-settings/get-public-site-settings';
 export { getPublicSiteSettings as getPublicSiteSettings } from './fn/public-site-settings/get-public-site-settings';
+export type { ListAdminMedia$Params as ListAdminMedia$Params } from './fn/admin-media/list-admin-media';
+export { listAdminMedia as listAdminMedia } from './fn/admin-media/list-admin-media';
+export type { GetAdminMedia$Params as GetAdminMedia$Params } from './fn/admin-media/get-admin-media';
+export { getAdminMedia as getAdminMedia } from './fn/admin-media/get-admin-media';
+export type { EditAdminMedia$Params as EditAdminMedia$Params } from './fn/admin-media/edit-admin-media';
+export { editAdminMedia as editAdminMedia } from './fn/admin-media/edit-admin-media';
+export type { GetAdminMediaUsages$Params as GetAdminMediaUsages$Params } from './fn/admin-media/get-admin-media-usages';
+export { getAdminMediaUsages as getAdminMediaUsages } from './fn/admin-media/get-admin-media-usages';
+export type { ChangeAdminMediaRestriction$Params as ChangeAdminMediaRestriction$Params } from './fn/admin-media/change-admin-media-restriction';
+export { changeAdminMediaRestriction as changeAdminMediaRestriction } from './fn/admin-media/change-admin-media-restriction';
+export type { CreateAdminMediaPreviewGrant$Params as CreateAdminMediaPreviewGrant$Params } from './fn/admin-media/create-admin-media-preview-grant';
+export { createAdminMediaPreviewGrant as createAdminMediaPreviewGrant } from './fn/admin-media/create-admin-media-preview-grant';
 export type { ListAdminUsers$Params as ListAdminUsers$Params } from './fn/admin-users/list-admin-users';
 export { listAdminUsers as listAdminUsers } from './fn/admin-users/list-admin-users';
 export type { GetAdminUser$Params as GetAdminUser$Params } from './fn/admin-users/get-admin-user';

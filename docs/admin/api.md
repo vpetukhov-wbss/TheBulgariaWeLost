@@ -75,13 +75,14 @@
 | `PATCH /catalog/{kind}/{id}` | Редакция на полетата за вида → `CatalogDetail` |
 | `POST /catalog/{kind}/{id}/transitions` | `action, reason` → `CatalogDetail`. Допустимите преходи са по вид |
 | `POST /catalog/{kind}/{id}/merges` | `targetId, targetExpectedVersion, reason` → `202`. Поддържа `topics` и `categories`. Каноничният запис се фиксира веднага, а препратките се обновяват фоново |
-| `GET /media-assets` | `q, status, type, rightsStatus` → `Page<MediaAssetSummary>` |
-| `GET /media-assets/{id}` | `MediaAssetDetail` с права, произход, използване и статус на обработката |
-| `PATCH /media-assets/{id}` | `creditLine, rights, accessibilityText` → `MediaAssetDetail`. Промяната на правата преоценява публичния достъп |
-| `GET /media-assets/{id}/preview` | `302` към защитен HTTPS преглед на производно копие. NestJS проверява разрешението преди пренасочването и при заявка за файла |
-| `POST /media-assets/{id}/access-restrictions` | `action = Restrict / LiftRestriction`, `reason` → `MediaAssetDetail`. Публичният достъп остава обусловен от правата и статуса на файла |
+| `GET /media-assets` | `q, processingStatus, accessStatus, type, rightsStatus` → `AdminMediaPage` |
+| `GET /media-assets/{id}` | `AdminMediaDetail` с права, предназначение, обработка и ETag |
+| `GET /media-assets/{id}/usages` | Текущи работни и публикувани ревизии с връзка към файла, обобщени по достъпен материал |
+| `PATCH /media-assets/{id}` | `creditLine, rightsEvidence, accessibilityText, reason` с `If-Match` → `AdminMediaDetail`. За администратор или редактор, качил файла |
+| `POST /media-assets/{id}/preview-grants` | `201 MediaReadGrant` за производното копие. При трансфер .NET предава разрешението на NestJS за повторна проверка |
+| `POST /media-assets/{id}/access-restrictions` | Само администратор. `action = Restrict / LiftRestriction, expectedVersion, reason` и `Idempotency-Key` → `AdminMediaDetail` |
 
-`kind` е затворен списък с видовете `topics`, `categories`, `entities`, `places`, `sources` и `archive-institutions`. NestJS валидира вида и приема само DTO за него. При преглед NestJS проверява правата върху ресурса и връща пренасочване към краткотраен HTTPS адрес на файловата услуга. Достъпът до оригинал изисква отделна проверка. Качването използва общия [файлов поток](../architecture.md#файлов-поток).
+`kind` е затворен списък с видовете `topics`, `categories`, `entities`, `places`, `sources` и `archive-institutions`. NestJS валидира вида и приема само DTO за него. Редакторската медийна справка включва собствените файлове и тези в текущи ревизии на достъпни материали. Прегледът използва краткотрайно Bearer разрешение за производното копие. Достъпът до оригинал използва отделния потребителски поток. Качването използва общия [файлов поток](../architecture.md#файлов-поток).
 
 ## Хранилища, задачи и одит
 

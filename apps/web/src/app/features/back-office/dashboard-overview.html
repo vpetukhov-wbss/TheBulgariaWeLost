@@ -31,7 +31,15 @@
         <dd>{{ data.openModerationCases }}</dd>
       </div>
       <div>
-        <dt>Ограничени файлове</dt>
+        <dt>
+          @if (data.administrative) {
+            <a routerLink="/admin/media" [queryParams]="{ accessStatus: 'Restricted' }"
+              >Ограничени файлове</a
+            >
+          } @else {
+            Ограничени файлове
+          }
+        </dt>
         <dd>{{ data.restrictedMedia }}</dd>
       </div>
     </dl>

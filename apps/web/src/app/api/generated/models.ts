@@ -3,6 +3,9 @@
 
 export type { AccountSanction } from './models/account-sanction';
 export type { AccountSanctionPage } from './models/account-sanction-page';
+export type { AdminMediaDetail } from './models/admin-media-detail';
+export type { AdminMediaPage } from './models/admin-media-page';
+export type { AdminMediaSummary } from './models/admin-media-summary';
 export type { AdminPasswordResetAccepted } from './models/admin-password-reset-accepted';
 export type { AdminPasswordResetOperation } from './models/admin-password-reset-operation';
 export type { AdminUserDecisionRequest } from './models/admin-user-decision-request';
@@ -31,6 +34,7 @@ export type { CatalogSourceVerification } from './models/catalog-source-verifica
 export type { CatalogSummary } from './models/catalog-summary';
 export type { CatalogTransitionRequest } from './models/catalog-transition-request';
 export type { ChangeAdminUserRoleRequest } from './models/change-admin-user-role-request';
+export type { ChangeMediaRestrictionRequest } from './models/change-media-restriction-request';
 export type { CreateAccountSanctionRequest } from './models/create-account-sanction-request';
 export type { CreateMaterialRequest } from './models/create-material-request';
 export type { CreateModerationReportRequest } from './models/create-moderation-report-request';
@@ -39,6 +43,7 @@ export type { CreateUploadRequest } from './models/create-upload-request';
 export type { DashboardAdministrative } from './models/dashboard-administrative';
 export type { DashboardSummary } from './models/dashboard-summary';
 export type { DecideModerationCaseRequest } from './models/decide-moderation-case-request';
+export type { EditAdminMediaRequest } from './models/edit-admin-media-request';
 export type { EditAdminUserRequest } from './models/edit-admin-user-request';
 export type { FeaturedMaterial } from './models/featured-material';
 export type { ForgotPasswordRequest } from './models/forgot-password-request';
@@ -58,6 +63,8 @@ export type { MaterialRights } from './models/material-rights';
 export type { MaterialSummary } from './models/material-summary';
 export type { MediaAsset } from './models/media-asset';
 export type { MediaReadGrant } from './models/media-read-grant';
+export type { MediaUsage } from './models/media-usage';
+export type { MediaUsages } from './models/media-usages';
 export type { MfaCodeRequest } from './models/mfa-code-request';
 export type { MfaEnrollment } from './models/mfa-enrollment';
 export type { MfaEnrollmentRequest } from './models/mfa-enrollment-request';

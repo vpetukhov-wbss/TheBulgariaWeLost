@@ -19,6 +19,17 @@ export const editorialRoutes: Routes = [
     path: 'materials/:id',
     loadComponent: () => import('./material-review').then((m) => m.MaterialReview),
   },
+  {
+    path: 'media',
+    data: { requiredPermission: 'Editorial.Manage' },
+    loadComponent: () => import('../admin-media/admin-media-list').then((m) => m.AdminMediaList),
+  },
+  {
+    path: 'media/:id',
+    data: { requiredPermission: 'Editorial.Manage' },
+    loadComponent: () =>
+      import('../admin-media/admin-media-detail').then((m) => m.AdminMediaDetail),
+  },
   { path: 'catalog', pathMatch: 'full', redirectTo: 'catalog/topics' },
   {
     path: 'catalog/:kind',

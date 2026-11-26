@@ -1,0 +1,244 @@
+<header class="page-heading">
+  <div>
+    <a class="breadcrumb" routerLink="/admin/media" queryParamsHandling="preserve">Медии</a>
+    <h1>{{ asset()?.accessibilityText || asset()?.creditLine || 'Детайл на файла' }}</h1>
+  </div>
+</header>
+
+@if (store.error()) {
+  <nb-alert status="warning" role="alert">
+    {{ store.error() }}
+    @if (store.stale() || !asset()) {
+      <button nbButton outline [disabled]="store.loading()" (click)="store.load(id())">
+        Зареди актуалния детайл
+      </button>
+    }
+  </nb-alert>
+}
+@if (store.notice()) {
+  <nb-alert status="success" role="status">{{ store.notice() }}</nb-alert>
+}
+@if (store.loading()) {
+  <p role="status">Зареждане на файла…</p>
+}
+
+@if (asset(); as file) {
+  <div class="split">
+    <nb-card>
+      <nb-card-header>Преглед</nb-card-header>
+      <nb-card-body>
+        @if (preview(); as current) {
+          @if (current.image) {
+            <img
+              class="media-preview"
+              [src]="current.url"
+              [alt]="file.accessibilityText || 'Преглед на файл'"
+            />
+          } @else {
+            <a nbButton status="primary" [href]="current.url" download="archive-preview.pdf"
+              >Изтегли PDF преглед</a
+            >
+          }
+        } @else if (previewBlob.isLoading()) {
+          <p role="status">Зареждане на прегледа…</p>
+        } @else if (previewBlob.error()) {
+          <p role="alert">Прегледът е недостъпен.</p>
+          <button nbButton outline (click)="previewBlob.reload()">Опитай отново</button>
+        } @else if (file.previewAvailable) {
+          <button nbButton outline (click)="previewRequested.set(true)">Зареди прегледа</button>
+        } @else {
+          <p>Прегледът е недостъпен при текущия статус.</p>
+        }
+        <dl class="wrap">
+          <dt>Тип и предназначение</dt>
+          <dd>{{ types[file.type] }} · {{ purposes[file.purpose] }}</dd>
+          <dt>Достъп</dt>
+          <dd>{{ accessStatuses[file.accessStatus] }}</dd>
+          <dt>Обработка</dt>
+          <dd>{{ processing[file.processingStatus] }}</dd>
+          <dt>Размер</dt>
+          <dd>{{ file.length | number }} B</dd>
+          <dt>Последна промяна</dt>
+          <dd>{{ file.updatedAtUtc | date: 'dd.MM.yyyy, HH:mm:ss' }}</dd>
+          <dt>ID</dt>
+          <dd>{{ file.id }}</dd>
+        </dl>
+      </nb-card-body>
+    </nb-card>
+
+    <nb-card>
+      <nb-card-header>Права и метаданни</nb-card-header>
+      <nb-card-body>
+        @switch (tab()) {
+          @case ('metadata') {
+            @if (file.canEdit) {
+              <form (ngSubmit)="save()">
+                <label class="field"
+                  >Кредит
+                  <input
+                    nbInput
+                    fullWidth
+                    name="creditLine"
+                    maxlength="200"
+                    [ngModel]="draft().creditLine"
+                    (ngModelChange)="change('creditLine', $event)"
+                  />
+                </label>
+                <label class="field"
+                  >Достъпно описание
+                  <textarea
+                    nbInput
+                    fullWidth
+                    name="accessibilityText"
+                    maxlength="500"
+                    rows="2"
+                    [ngModel]="draft().accessibilityText"
+                    (ngModelChange)="change('accessibilityText', $event)"
+                  ></textarea>
+                </label>
+                <label class="field"
+                  >Основание за права
+                  <textarea
+                    nbInput
+                    fullWidth
+                    name="rightsEvidence"
+                    maxlength="2000"
+                    rows="3"
+                    [ngModel]="draft().rightsEvidence"
+                    (ngModelChange)="change('rightsEvidence', $event)"
+                  ></textarea>
+                </label>
+                <label class="field"
+                  >Причина за промяната
+                  <textarea
+                    nbInput
+                    fullWidth
+                    name="reason"
+                    maxlength="500"
+                    rows="2"
+                    [ngModel]="draft().reason"
+                    (ngModelChange)="change('reason', $event)"
+                  ></textarea>
+                </label>
+                <div class="actions">
+                  <button
+                    nbButton
+                    status="primary"
+                    type="submit"
+                    [disabled]="store.busy() || store.stale() || !draft().reason.trim()"
+                  >
+                    Запази метаданните
+                  </button>
+                  <button
+                    nbButton
+                    outline
+                    type="button"
+                    [disabled]="store.busy()"
+                    (click)="tab.set('overview')"
+                  >
+                    Назад
+                  </button>
+                </div>
+              </form>
+            }
+          }
+          @case ('access') {
+            @if (file.restrictionAction) {
+              <form (ngSubmit)="changeRestriction()">
+                @if (file.restrictionAction === 'Restrict') {
+                  <p>
+                    Ограничението спира следващите заявки за файла и публичния достъп до материали,
+                    които го използват.
+                  </p>
+                } @else {
+                  <p>
+                    Публичният достъп след отмяна зависи от правата, обработката и състоянието на
+                    материала.
+                  </p>
+                }
+                <label class="field"
+                  >Причина за промяната
+                  <textarea
+                    nbInput
+                    fullWidth
+                    name="restrictionReason"
+                    maxlength="500"
+                    rows="3"
+                    [(ngModel)]="restrictionReason"
+                  ></textarea>
+                </label>
+                <div class="actions">
+                  <button
+                    nbButton
+                    [status]="file.restrictionAction === 'Restrict' ? 'danger' : 'primary'"
+                    type="submit"
+                    [disabled]="store.busy() || store.stale() || !restrictionReason().trim()"
+                  >
+                    Потвърди
+                  </button>
+                  <button
+                    nbButton
+                    outline
+                    type="button"
+                    [disabled]="store.busy()"
+                    (click)="tab.set('overview')"
+                  >
+                    Назад
+                  </button>
+                </div>
+              </form>
+            }
+          }
+          @default {
+            <p [class.badge]="file.publicationEligible">{{ rights[file.rightsStatus] }}</p>
+            <p class="wrap">{{ file.rightsEvidence || 'Липсва документ за правата.' }}</p>
+            @if (file.creditLine) {
+              <p class="wrap">Кредит · {{ file.creditLine }}</p>
+            }
+            <div class="actions">
+              @if (file.canEdit) {
+                <button nbButton outline (click)="tab.set('metadata')">
+                  Редактирай метаданните
+                </button>
+              }
+              @if (file.restrictionAction) {
+                <button nbButton outline (click)="tab.set('access')">
+                  {{
+                    file.restrictionAction === 'Restrict'
+                      ? 'Ограничи достъпа'
+                      : 'Отмени ограничението'
+                  }}
+                </button>
+              }
+            </div>
+          }
+        }
+      </nb-card-body>
+    </nb-card>
+  </div>
+
+  @if (store.usages(); as refs) {
+    <nb-card>
+      <nb-card-header>Текущи използвания · {{ refs.total }}</nb-card-header>
+      <nb-card-body>
+        <div class="records">
+          @for (usage of refs.items; track usage.materialId) {
+            <article class="record">
+              <div>
+                <h2>
+                  <a [routerLink]="['/admin/materials', usage.materialId]">{{ usage.title }}</a>
+                </h2>
+                <p class="muted">Ревизия {{ usage.revisionNumber }}</p>
+              </div>
+            </article>
+          } @empty {
+            <p>Няма използвания в достъпните материали.</p>
+          }
+        </div>
+        @if (refs.total > refs.items.length) {
+          <p class="muted">Показани са {{ refs.items.length }} от {{ refs.total }} материала.</p>
+        }
+      </nb-card-body>
+    </nb-card>
+  }
+}

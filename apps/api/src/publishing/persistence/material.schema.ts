@@ -165,3 +165,4 @@ MaterialRevisionSchema.index(
   { unique: true },
 );
 MaterialRevisionSchema.index({ materialId: 1, revisionNumber: -1 });
+MaterialRevisionSchema.index({ 'content.mediaRefs.mediaId': 1 });

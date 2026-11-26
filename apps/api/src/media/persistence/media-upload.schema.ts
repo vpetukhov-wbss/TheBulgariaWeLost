@@ -61,6 +61,9 @@ export class MediaUpload {
   @Prop({ maxlength: 2_000 })
   rightsEvidence?: string;
 
+  @Prop({ maxlength: 200 })
+  creditLine?: string;
+
   @Prop({ required: true })
   storageLocationId: string;
 
@@ -139,10 +142,14 @@ export class MediaUpload {
 
   @Prop({ default: 1, required: true })
   accessVersion: number;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const MediaUploadSchema = SchemaFactory.createForClass(MediaUpload);
 
+MediaUploadSchema.index({ status: 1, _id: -1 });
 MediaUploadSchema.index({ fileKey: 1 }, { unique: true });
 MediaUploadSchema.index({ accountId: 1, status: 1, expiresAt: 1 });
 MediaUploadSchema.index({ status: 1, leaseExpiresAt: 1 });

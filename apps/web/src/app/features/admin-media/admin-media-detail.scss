@@ -1,0 +1,12 @@
+.media-preview {
+  display: block;
+  width: 100%;
+  max-height: 24rem;
+  object-fit: contain;
+  background: var(--background-basic-color-2);
+}
+
+dl dd {
+  margin-inline: 0;
+  margin-bottom: 0.6rem;
+}

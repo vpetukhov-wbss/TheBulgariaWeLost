@@ -50,6 +50,9 @@ function hasBackOfficeAccess(
                 >
                 <a nbButton outline routerLink="/admin/catalog/topics">Архивен каталог</a>
                 <a nbButton outline routerLink="/admin/moderation">Сигнали за съдържание</a>
+                @if (state.principal.permissions.includes('Editorial.Manage')) {
+                  <a nbButton outline routerLink="/admin/media">Медии</a>
+                }
               </nav>
               @if (
                 state.principal.permissions.includes('Users.Manage') ||

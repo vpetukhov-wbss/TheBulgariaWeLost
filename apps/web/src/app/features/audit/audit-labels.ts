@@ -5,6 +5,7 @@ export const auditTargets: Record<AuditTargetType, string> = {
   Account: 'Потребител',
   Catalog: 'Каталог',
   Material: 'Материал',
+  Media: 'Медия',
   Moderation: 'Модерация',
   Other: 'Друго',
   SiteSettings: 'Настройки на сайта',
@@ -17,6 +18,9 @@ export const auditOutcomes: Record<AuditOutcome, string> = {
 };
 
 const auditActions: Record<string, string> = {
+  MediaMetadataUpdated: 'Редактирани метаданни на файл',
+  MediaAccessRestricted: 'Ограничен достъп до файл',
+  MediaRestrictionLifted: 'Отменено ограничение на файл',
   AccountProfileUpdated: 'Редакция на профил',
   AccountRoleChanged: 'Промяна на роля',
   AccountSanctionIssued: 'Наложена санкция',
@@ -37,6 +41,8 @@ const auditActions: Record<string, string> = {
 };
 
 export const auditFields: Record<string, string> = {
+  previousStatus: 'Предишен достъп',
+  accessStatus: 'Текущ достъп',
   previousRole: 'Предишна роля',
   role: 'Нова роля',
   sanctionId: 'Санкция',
