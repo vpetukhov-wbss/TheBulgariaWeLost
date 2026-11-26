@@ -45,7 +45,10 @@ function redactReason(reason: string): string {
     .replace(/[\p{Cc}\p{Cf}]/gu, ' ');
 }
 
-function allowedChanges(metadata: Record<string, unknown>): AuditChangeDto[] {
+function allowedChanges(
+  metadata: Record<string, unknown>,
+  targetType: AuditTargetType,
+): AuditChangeDto[] {
   const changes: AuditChangeDto[] = [];
   for (const field of ['previousRole', 'role']) {
     const value = metadata[field];
@@ -68,7 +71,18 @@ function allowedChanges(metadata: Record<string, unknown>): AuditChangeDto[] {
   }
   const modifiedFields = metadata.fields;
   if (Array.isArray(modifiedFields)) {
-    const fields = ['displayName', 'bio'].filter((field) =>
+    const allowedFields =
+      targetType === AuditTargetType.SiteSettings
+        ? [
+            'siteName',
+            'supportContact',
+            'footerLinks',
+            'socialLinks',
+            'banners',
+            'featuredMaterialIds',
+          ]
+        : ['displayName', 'bio'];
+    const fields = allowedFields.filter((field) =>
       modifiedFields.includes(field),
     );
     if (fields.length)
@@ -175,7 +189,7 @@ export class AuditService {
       .exec();
     if (!record) throw new NotFoundException({ code: 'audit_event_not_found' });
     const metadata = record.metadata ?? {};
-    const changeSummary = allowedChanges(metadata);
+    const changeSummary = allowedChanges(metadata, record.targetType);
     const operation = metadata.operationId;
     await this.access.create({
       actorId,

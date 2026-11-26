@@ -7,6 +7,7 @@ export const auditTargets: Record<AuditTargetType, string> = {
   Material: 'Материал',
   Moderation: 'Модерация',
   Other: 'Друго',
+  SiteSettings: 'Настройки на сайта',
 };
 
 export const auditOutcomes: Record<AuditOutcome, string> = {
@@ -24,6 +25,7 @@ const auditActions: Record<string, string> = {
   AccountPasswordResetRequested: 'Поискано възстановяване на парола',
   AccountPasswordResetDispatched: 'Изпратен линк за възстановяване',
   AccountPasswordResetFailed: 'Неуспешно изпращане на линк',
+  SiteSettingsUpdated: 'Променени настройки на сайта',
   CatalogCreated: 'Създаден запис в каталога',
   CatalogUpdated: 'Редактиран запис в каталога',
   MaterialCreated: 'Създаден материал',

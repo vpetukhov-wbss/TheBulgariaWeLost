@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { NbAuthService, NbTokenService } from '@nebular/auth';
 import { NbEvaIconsModule } from '@nebular/eva-icons';
@@ -6,6 +6,8 @@ import { NbSecurityModule } from '@nebular/security';
 import { NbButtonModule, NbIconModule, NbLayoutModule, NbToastrService } from '@nebular/theme';
 import { firstValueFrom } from 'rxjs';
 import { AUTH_STRATEGY } from './core/auth/auth.config';
+import { SiteFooter, SiteNotices } from './core/site-presentation/site-presentation';
+import { SitePresentationResource } from './core/site-presentation/site-presentation.resource';
 
 @Component({
   selector: 'app-root',
@@ -17,6 +19,8 @@ import { AUTH_STRATEGY } from './core/auth/auth.config';
     NbIconModule,
     NbEvaIconsModule,
     NbSecurityModule,
+    SiteFooter,
+    SiteNotices,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
@@ -27,6 +31,16 @@ export class App {
   private readonly router = inject(Router);
   private readonly toastr = inject(NbToastrService);
 
+  protected readonly presentation = inject(SitePresentationResource).settings;
+  protected readonly inBackOffice = computed(
+    () =>
+      this.router.lastSuccessfulNavigation()?.finalUrl?.root.children['primary']?.segments[0]
+        ?.path === 'admin',
+  );
+  protected readonly hasFooter = computed(() => {
+    const site = this.presentation();
+    return !!(site.footerLinks.length || site.socialLinks.length || site.supportContact);
+  });
   protected readonly signingOut = signal(false);
 
   protected async logout(): Promise<void> {

@@ -118,7 +118,9 @@
 | `POST /ad-campaigns/{id}/transitions` | Advertising.Manage | `action = SubmitForReview / Approve / Stop` → `AdCampaignDetail` |
 | `GET /ad-campaigns/{id}/metrics` | Advertising.Manage | `fromUtc, toUtc, placement` → `Page<AdDailyMetric>`. Интервал до 366 дни |
 | `GET /site-settings` | SiteSettings.Manage | `SiteSettings` с ETag |
-| `PUT /site-settings` | SiteSettings.Manage | `SiteSettingsInput` с `If-Match` → `SiteSettings` |
+| `PUT /site-settings` | SiteSettings.Manage | `UpdateSiteSettingsRequest` с причина и актуален `If-Match` → `SiteSettings` и ETag |
+
+Публичният `GET /api/v1/site-settings` връща активните информационни ленти и видимите акценти в зададения ред. Админският запис с липсващ `If-Match` връща `428 precondition_required`. При остарял ETag връща `412 version_conflict`. Успешният запис с променени стойности създава `SiteSettingsUpdated` с причината, оператора, имената на полетата и Correlation ID.
 
 ## Примери
 

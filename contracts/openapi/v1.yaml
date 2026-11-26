@@ -10,6 +10,8 @@ tags:
   - name: Auth
   - name: Back office
   - name: Dashboard
+  - name: Admin site settings
+  - name: Public site settings
   - name: Audit
   - name: Admin users
   - name: Publishing
@@ -428,6 +430,63 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/AuditEventDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/site-settings:
+    get:
+      tags: [Admin site settings]
+      operationId: getAdminSiteSettings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          $ref: "#/components/responses/SiteSettings"
+        default:
+          $ref: "#/components/responses/Problem"
+    put:
+      tags: [Admin site settings]
+      operationId: replaceAdminSiteSettings
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: If-Match
+          in: header
+          required: true
+          description: Current strong settings ETag.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateSiteSettingsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/SiteSettings"
+        "412":
+          $ref: "#/components/responses/Problem"
+        "422":
+          $ref: "#/components/responses/Problem"
+        "428":
+          $ref: "#/components/responses/Problem"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/v1/site-settings:
+    get:
+      tags: [Public site settings]
+      operationId: getPublicSiteSettings
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Current public presentation and visible featured materials in display order.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicSiteSettings"
         default:
           $ref: "#/components/responses/Problem"
   /api/admin/v1/users:
@@ -1824,6 +1883,15 @@ components:
           schema:
             $ref: "#/components/schemas/HashRequest"
   responses:
+    SiteSettings:
+      description: Site presentation, including disabled banners, at the current version.
+      headers:
+        ETag:
+          schema: { type: string }
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/SiteSettings"
     ModerationCaseDetail:
       description: Moderation case, current material state and permitted decisions.
       headers:
@@ -2933,6 +3001,121 @@ components:
           items:
             $ref: "#/components/schemas/AdminUserSummary"
         nextCursor: { type: string }
+    SiteLink:
+      type: object
+      additionalProperties: false
+      required: [label, url]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 80 }
+        url: { type: string, minLength: 1, maxLength: 500 }
+    SiteSocialLink:
+      type: object
+      additionalProperties: false
+      required: [platform, url]
+      properties:
+        platform: { type: string, enum: [YouTube, Facebook, Instagram, TikTok] }
+        url: { type: string, minLength: 1, maxLength: 500 }
+    SiteBanner:
+      type: object
+      additionalProperties: false
+      required: [text, enabled]
+      properties:
+        text: { type: string, minLength: 1, maxLength: 240 }
+        enabled: { type: boolean }
+        link:
+          $ref: "#/components/schemas/SiteLink"
+    FeaturedMaterial:
+      type: object
+      additionalProperties: false
+      required: [id, title, slug]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        slug: { type: string }
+    SiteSettings:
+      type: object
+      additionalProperties: false
+      required: [siteName, footerLinks, socialLinks, banners, featuredMaterialIds, version]
+      properties:
+        siteName: { type: string, minLength: 1, maxLength: 80 }
+        supportContact: { type: string, format: email, nullable: true, maxLength: 254 }
+        footerLinks:
+          type: array
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/SiteLink"
+        socialLinks:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/SiteSocialLink"
+        banners:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/SiteBanner"
+        featuredMaterialIds:
+          type: array
+          maxItems: 6
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        version: { type: integer, minimum: 1 }
+        updatedAtUtc: { type: string, format: date-time }
+    UpdateSiteSettingsRequest:
+      type: object
+      additionalProperties: false
+      required: [siteName, footerLinks, socialLinks, banners, featuredMaterialIds, reason]
+      properties:
+        siteName: { type: string, minLength: 1, maxLength: 80 }
+        supportContact: { type: string, format: email, nullable: true, maxLength: 254 }
+        footerLinks:
+          type: array
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/SiteLink"
+        socialLinks:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/SiteSocialLink"
+        banners:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/SiteBanner"
+        featuredMaterialIds:
+          type: array
+          maxItems: 6
+          uniqueItems: true
+          items: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    PublicSiteSettings:
+      type: object
+      additionalProperties: false
+      required: [siteName, footerLinks, socialLinks, banners, featuredMaterials]
+      properties:
+        siteName: { type: string, minLength: 1, maxLength: 80 }
+        supportContact: { type: string, format: email, nullable: true, maxLength: 254 }
+        footerLinks:
+          type: array
+          maxItems: 8
+          items:
+            $ref: "#/components/schemas/SiteLink"
+        socialLinks:
+          type: array
+          maxItems: 4
+          items:
+            $ref: "#/components/schemas/SiteSocialLink"
+        banners:
+          type: array
+          maxItems: 3
+          items:
+            $ref: "#/components/schemas/SiteBanner"
+        featuredMaterials:
+          type: array
+          maxItems: 6
+          items:
+            $ref: "#/components/schemas/FeaturedMaterial"
     DashboardSummary:
       type: object
       additionalProperties: false
@@ -2955,7 +3138,7 @@ components:
         auditEventsLast24Hours: { type: integer, minimum: 0 }
     AuditTargetType:
       type: string
-      enum: [Account, Catalog, Material, Moderation, Other]
+      enum: [Account, Catalog, Material, Moderation, Other, SiteSettings]
     AuditOutcome:
       type: string
       enum: [Succeeded, Failed, Denied]

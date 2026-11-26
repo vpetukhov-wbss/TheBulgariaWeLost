@@ -453,8 +453,11 @@ export class PublishingService {
     return this.publicMaterial({ slug });
   }
 
-  async publicById(id: string): Promise<PublicMaterialDto> {
-    return this.publicMaterial({ _id: id });
+  async publicById(
+    id: string,
+    session?: ClientSession,
+  ): Promise<PublicMaterialDto> {
+    return this.publicMaterial({ _id: id }, session);
   }
 
   async moderationTarget(id: string, session?: ClientSession) {
@@ -573,6 +576,7 @@ export class PublishingService {
 
   private async publicMaterial(
     identity: { slug: string } | { _id: string },
+    session?: ClientSession,
   ): Promise<PublicMaterialDto> {
     const material = await this.materials
       .findOne({
@@ -580,6 +584,7 @@ export class PublishingService {
         status: MaterialStatus.Published,
         publicVisibility: true,
       })
+      .session(session ?? null)
       .exec();
     if (!material?.publishedRevisionNumber) this.publicNotFound();
     const revision = await this.revisions
@@ -587,8 +592,12 @@ export class PublishingService {
         materialId: material!._id,
         revisionNumber: material!.publishedRevisionNumber,
       })
+      .session(session ?? null)
       .exec();
-    if (!revision || (await this.mediaBlockers(revision.content)).length) {
+    if (
+      !revision ||
+      (await this.mediaBlockers(revision.content, session)).length
+    ) {
       this.publicNotFound();
     }
     return {
