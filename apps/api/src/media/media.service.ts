@@ -15,6 +15,9 @@ import { randomBytes } from 'node:crypto';
 import { Connection, Model, mongo } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
 import { AuthService } from '../auth/auth.service';
+import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
+import { BackOfficeGuard } from '../back-office/back-office.guard';
+import { MediaLibraryScope } from './admin/media-library-scope.service';
 import type { AllConfigType } from '../config/config.type';
 import type {
   AuthorizeReadRequestDto,
@@ -55,6 +58,7 @@ interface ReadGrantClaims {
   assetId: string;
   variant: MediaVariant;
   accessVersion: number;
+  scope?: 'back-office-preview';
 }
 
 @Injectable()
@@ -67,6 +71,8 @@ export class MediaService {
     @InjectConnection() private readonly connection: Connection,
     private readonly jwt: JwtService,
     private readonly auth: AuthService,
+    private readonly backOffice: BackOfficeGuard,
+    private readonly library: MediaLibraryScope,
     private readonly config: ConfigService<AllConfigType>,
   ) {}
 
@@ -322,8 +328,37 @@ export class MediaService {
     if (!asset || asset.accountId !== accountId) {
       throw new NotFoundException({ code: 'media_not_found' });
     }
-    this.requireReadable(asset, dto.variant);
+    return this.issueReadGrant(asset, accountId, sessionId, dto.variant);
+  }
 
+  async createBackOfficePreviewGrant(
+    principal: SignedInAccount,
+    assetId: string,
+  ): Promise<ReadGrantDto> {
+    this.backOffice.requireAccess(principal);
+    const asset = await this.uploads
+      .findOne({ _id: assetId, status: UploadStatus.Completed })
+      .exec();
+    if (!asset) throw new NotFoundException({ code: 'media_not_found' });
+    await this.library.requireVisible(asset, principal.profile);
+    return this.issueReadGrant(
+      asset,
+      principal.profile.id,
+      principal.sessionId,
+      MediaVariant.Preview,
+      'back-office-preview',
+    );
+  }
+
+  private async issueReadGrant(
+    asset: MediaUpload,
+    accountId: string,
+    sessionId: string,
+    variant: MediaVariant,
+    scope?: ReadGrantClaims['scope'],
+  ): Promise<ReadGrantDto> {
+    this.requireReadable(asset, variant);
+    const assetId = asset._id;
     const expiresSeconds = this.value('readGrantExpiresSeconds');
     const expiresAt = new Date(Date.now() + expiresSeconds * 1_000);
     const grant = await this.jwt.signAsync(
@@ -332,8 +367,9 @@ export class MediaService {
         sub: accountId,
         sessionId,
         assetId,
-        variant: dto.variant,
+        variant,
         accessVersion: asset.accessVersion,
+        ...(scope ? { scope } : {}),
       } satisfies ReadGrantClaims,
       {
         secret: this.config.getOrThrow('media.readGrantSecret', {
@@ -346,9 +382,9 @@ export class MediaService {
     );
     return {
       assetId,
-      variant: dto.variant,
+      variant,
       grant,
-      url: `/media/v1/assets/${assetId}/${dto.variant}`,
+      url: `/media/v1/assets/${assetId}/${variant}`,
       expiresAtUtc: expiresAt.toISOString(),
     };
   }
@@ -364,16 +400,20 @@ export class MediaService {
     const asset = await this.uploads.findById(assetId).exec();
     if (!asset) throw new NotFoundException({ code: 'media_not_found' });
     if (
-      asset.accountId !== claims.sub ||
-      asset.accessVersion !== claims.accessVersion
+      asset.accessVersion !== claims.accessVersion ||
+      (!claims.scope && asset.accountId !== claims.sub)
     ) {
       this.invalidReadGrant();
     }
-    await this.requireActiveSession(
-      asset.accountId,
+    const principal = await this.requireActiveSession(
+      claims.sub,
       claims.sessionId,
       'media_session_revoked',
     );
+    if (claims.scope === 'back-office-preview') {
+      this.backOffice.requireAccess(principal);
+      await this.library.requireVisible(asset, principal.profile);
+    }
     this.requireReadable(asset, dto.variant);
     return dto.variant === MediaVariant.Original
       ? {
@@ -626,7 +666,10 @@ export class MediaService {
         !isUUID(claims.sessionId, '7') ||
         !isUUID(claims.assetId, '7') ||
         !Object.values(MediaVariant).includes(claims.variant) ||
-        !Number.isSafeInteger(claims.accessVersion)
+        !Number.isSafeInteger(claims.accessVersion) ||
+        (claims.scope !== undefined &&
+          (claims.scope !== 'back-office-preview' ||
+            claims.variant !== MediaVariant.Preview))
       ) {
         this.invalidReadGrant();
       }
@@ -654,9 +697,9 @@ export class MediaService {
     accountId: string,
     sessionId: string,
     code = 'upload_session_revoked',
-  ): Promise<void> {
+  ): ReturnType<AuthService['activeSession']> {
     try {
-      await this.auth.activeSession(sessionId, accountId);
+      return await this.auth.activeSession(sessionId, accountId);
     } catch (error: unknown) {
       if (error instanceof UnauthorizedException) {
         throw new ForbiddenException({ code });

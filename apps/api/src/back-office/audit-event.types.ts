@@ -2,6 +2,7 @@ export enum AuditTargetType {
   Account = 'Account',
   Catalog = 'Catalog',
   Material = 'Material',
+  Media = 'Media',
   Moderation = 'Moderation',
   Other = 'Other',
   SiteSettings = 'SiteSettings',

@@ -9,6 +9,7 @@ import { materialModerationMigration } from './008-material-moderation.mjs';
 import { adminUserActionsMigration } from './009-admin-user-actions.mjs';
 import { auditJournalMigration } from './010-audit-journal.mjs';
 import { siteSettingsMigration } from './011-site-settings.mjs';
+import { adminMediaGalleryMigration } from './012-admin-media-gallery.mjs';
 
 export const migrations = [
   authFoundationMigration,
@@ -22,4 +23,5 @@ export const migrations = [
   adminUserActionsMigration,
   auditJournalMigration,
   siteSettingsMigration,
+  adminMediaGalleryMigration,
 ];

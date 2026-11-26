@@ -18,7 +18,13 @@ export class BackOfficeGuard implements CanActivate {
     const request = context
       .switchToHttp()
       .getRequest<RequestWithUser<SignedInAccount>>();
-    const principal = request.user;
+    this.requireAccess(request.user);
+    return true;
+  }
+
+  requireAccess(
+    principal: Pick<SignedInAccount, 'profile' | 'mfaVerifiedAt'>,
+  ): void {
     if (
       principal.profile.role !== Role.Editor &&
       principal.profile.role !== Role.Administrator
@@ -40,6 +46,5 @@ export class BackOfficeGuard implements CanActivate {
         });
       }
     }
-    return true;
   }
 }

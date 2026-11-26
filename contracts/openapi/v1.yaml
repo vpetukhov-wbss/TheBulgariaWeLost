@@ -14,6 +14,7 @@ tags:
   - name: Public site settings
   - name: Audit
   - name: Admin users
+  - name: Admin media
   - name: Publishing
   - name: Moderation
   - name: Authoring
@@ -487,6 +488,175 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicSiteSettings"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/media-assets:
+    get:
+      tags: [Admin media]
+      operationId: listAdminMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: q
+          in: query
+          schema: { type: string, maxLength: 100 }
+        - name: type
+          in: query
+          schema: { type: string, enum: [Image, Pdf, Other] }
+        - name: processingStatus
+          in: query
+          schema: { type: string, enum: [Pending, Claimed, Ready, Failed] }
+        - name: accessStatus
+          in: query
+          schema: { type: string, enum: [Active, Hidden, Restricted, Removed] }
+        - name: rightsStatus
+          in: query
+          schema: { type: string, enum: [Recorded, Missing] }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 80 }
+      responses:
+        "200":
+          description: Successful media operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMediaPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/media-assets/{id}:
+    get:
+      tags: [Admin media]
+      operationId: getAdminMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Successful media operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMediaDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Admin media]
+      operationId: editAdminMedia
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          description: Latest strong media detail ETag.
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditAdminMediaRequest"
+      responses:
+        "200":
+          description: Successful media operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMediaDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/media-assets/{id}/usages:
+    get:
+      tags: [Admin media]
+      operationId: getAdminMediaUsages
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Successful media operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaUsages"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/media-assets/{id}/access-restrictions:
+    post:
+      tags: [Admin media]
+      operationId: changeAdminMediaRestriction
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/AdminUserCommandKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangeMediaRestrictionRequest"
+      responses:
+        "200":
+          description: Successful media operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdminMediaDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/media-assets/{id}/preview-grants:
+    post:
+      tags: [Admin media]
+      operationId: createAdminMediaPreviewGrant
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "201":
+          description: Successful media operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MediaReadGrant"
         default:
           $ref: "#/components/responses/Problem"
   /api/admin/v1/users:
@@ -3116,6 +3286,89 @@ components:
           maxItems: 6
           items:
             $ref: "#/components/schemas/FeaturedMaterial"
+    AdminMediaSummary:
+      type: object
+      additionalProperties: false
+      required: [id, type, purpose, processingStatus, accessStatus, rightsStatus, updatedAtUtc]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [Image, Pdf, Other] }
+        purpose: { type: string, enum: [profile-image, material-original, source-document, advertisement-creative] }
+        processingStatus: { type: string, enum: [Pending, Claimed, Ready, Failed] }
+        accessStatus: { type: string, enum: [Active, Hidden, Restricted, Removed] }
+        rightsStatus: { type: string, enum: [Recorded, Missing] }
+        accessibilityText: { type: string, maxLength: 500 }
+        creditLine: { type: string, maxLength: 200 }
+        updatedAtUtc: { type: string, format: date-time }
+    AdminMediaDetail:
+      type: object
+      additionalProperties: false
+      required: [id, type, purpose, processingStatus, accessStatus, rightsStatus, updatedAtUtc, length, previewAvailable, publicationEligible, version, canEdit]
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [Image, Pdf, Other] }
+        purpose: { type: string, enum: [profile-image, material-original, source-document, advertisement-creative] }
+        processingStatus: { type: string, enum: [Pending, Claimed, Ready, Failed] }
+        accessStatus: { type: string, enum: [Active, Hidden, Restricted, Removed] }
+        rightsStatus: { type: string, enum: [Recorded, Missing] }
+        accessibilityText: { type: string, maxLength: 500 }
+        creditLine: { type: string, maxLength: 200 }
+        updatedAtUtc: { type: string, format: date-time }
+        rightsEvidence: { type: string, maxLength: 2000 }
+        contentType: { type: string }
+        length: { type: integer, format: int64, minimum: 1 }
+        inspectionOutcome: { type: string }
+        previewAvailable: { type: boolean }
+        publicationEligible: { type: boolean }
+        version: { type: integer, minimum: 1 }
+        canEdit: { type: boolean }
+        restrictionAction: { type: string, enum: [Restrict, LiftRestriction] }
+    AdminMediaPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdminMediaSummary"
+        nextCursor: { type: string }
+    MediaUsage:
+      type: object
+      additionalProperties: false
+      required: [materialId, title, revisionNumber]
+      properties:
+        materialId: { type: string, format: uuid }
+        title: { type: string }
+        revisionNumber: { type: integer, minimum: 1 }
+    MediaUsages:
+      type: object
+      additionalProperties: false
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          maxItems: 25
+          items:
+            $ref: "#/components/schemas/MediaUsage"
+        total: { type: integer, minimum: 0 }
+    EditAdminMediaRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        creditLine: { type: string, maxLength: 200 }
+        accessibilityText: { type: string, maxLength: 500 }
+        rightsEvidence: { type: string, maxLength: 2000 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    ChangeMediaRestrictionRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion, reason]
+      properties:
+        action: { type: string, enum: [Restrict, LiftRestriction] }
+        expectedVersion: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 500 }
     DashboardSummary:
       type: object
       additionalProperties: false
@@ -3138,7 +3391,7 @@ components:
         auditEventsLast24Hours: { type: integer, minimum: 0 }
     AuditTargetType:
       type: string
-      enum: [Account, Catalog, Material, Moderation, Other, SiteSettings]
+      enum: [Account, Catalog, Material, Media, Moderation, Other, SiteSettings]
     AuditOutcome:
       type: string
       enum: [Succeeded, Failed, Denied]

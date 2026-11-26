@@ -31,7 +31,7 @@
 | `MaterialRevisionSummary / MaterialRevisionDetail` | `materialId, revisionNumber, createdAtUtc, createdByUserId, changeSummary?, restoredFromRevisionNumber?`. Детайлът съдържа реконструирано съдържание и метаданни за сравнение |
 | `ModerationCaseSummary / ModerationCaseDetail` | `id, target, caseType, priority, status, assigneeId?, reportCount, updatedAtUtc, version`. Детайлът добавя `resolution?, allowedDecisions[]` и кратка справка за обекта |
 | `ModerationReport` | `id, caseId, reasonCode, reason, sourceRefs[], createdAtUtc`. Показва сведенията по сигнала. Личните контакти са извън DTO |
-| `MediaAssetSummary / MediaAssetDetail` | Редът показва `id, originalFileName, type, status, rightsStatus, updatedAtUtc`. Детайлът добавя `creditLine, rights, accessibilityText, provenance, publicAccess, usageCount, linkedMaterialIds, integrityStatus, processingStatus, version`. Връзките в детайла са ограничена справка |
+| `AdminMediaSummary / AdminMediaDetail` | Редът показва ID, достъпно описание, кредит, тип, основание за права, предназначение и статуси за достъп и обработка. Детайлът добавя основанието за права, размер, резултат от инспекция и допустими действия. `MediaUsages` показва броя и първите 25 видими текущи използвания |
 
 | Действие | Правило |
 | --- | --- |

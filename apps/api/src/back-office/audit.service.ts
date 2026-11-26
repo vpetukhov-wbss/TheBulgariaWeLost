@@ -69,6 +69,13 @@ function allowedChanges(
   if (metadata.priority === 'Normal' || metadata.priority === 'High') {
     changes.push({ field: 'priority', value: metadata.priority });
   }
+  if (targetType === AuditTargetType.Media) {
+    for (const field of ['previousStatus', 'accessStatus']) {
+      const value = metadata[field];
+      if (value === 'Active' || value === 'Restricted')
+        changes.push({ field, value });
+    }
+  }
   const modifiedFields = metadata.fields;
   if (Array.isArray(modifiedFields)) {
     const allowedFields =
@@ -81,7 +88,9 @@ function allowedChanges(
             'banners',
             'featuredMaterialIds',
           ]
-        : ['displayName', 'bio'];
+        : targetType === AuditTargetType.Media
+          ? ['creditLine', 'accessibilityText', 'rightsEvidence']
+          : ['displayName', 'bio'];
     const fields = allowedFields.filter((field) =>
       modifiedFields.includes(field),
     );

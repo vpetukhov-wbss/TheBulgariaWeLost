@@ -1893,6 +1893,209 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert(!auditDetail.text.includes(body.supportContact));
   });
 
+  void it('should scope gallery reads to editorial access, audit changes and revoke media grants', async () => {
+    const owner = await createEditor();
+    const viewer = await createEditor();
+    const admin = await createAdministrator();
+    const gallery = '/api/admin/v1/media-assets';
+    const upload = await createUpload(owner.token, 256, {
+      alternativeText: 'Градският архив през есента',
+      rightsEvidence: 'Разрешение от носителя на правата.',
+    });
+    const id = upload.uploadId;
+    const path = gallery + '/' + id;
+    const claimed = await claimUpload(upload).expect(200);
+    await completeUpload(upload, claimed.body.attemptId).expect(204);
+    const uploads = db
+      .db()
+      .collection<{ _id: string; [key: string]: unknown }>('mediaUploads');
+    await uploads.updateOne(
+      { _id: id },
+      {
+        $set: {
+          processingStatus: 'Ready',
+          previewFileKey: createHash('sha256').update(id).digest('hex'),
+          previewStorageLocationId: 'preview-fixture',
+          previewLength: 256,
+          previewContentType: 'image/png',
+        },
+      },
+    );
+
+    const get = (route: string, token = admin.token) =>
+      api.get(route).auth(token, { type: 'bearer' });
+    const preview = (token: string) =>
+      api.post(path + '/preview-grants').auth(token, { type: 'bearer' });
+    await api.get(gallery).expect(401);
+    await get(path, viewer.token).expect(404);
+    await preview(viewer.token).expect(404);
+    const hidden = await get(gallery, viewer.token)
+      .query({ q: id })
+      .expect(200);
+    assert.deepEqual(hidden.body.items, []);
+    const owned = await get(gallery, owner.token)
+      .query({
+        q: 'архив през есента',
+        type: 'Image',
+        rightsStatus: 'Recorded',
+      })
+      .expect(200);
+    assert.equal(owned.body.items[0].id, id);
+    assert.equal(owned.body.items[0].rightsEvidence, undefined);
+
+    const materialCall = (method: 'post' | 'patch', suffix: string) =>
+      api[method]('/api/admin/v1/materials' + suffix).auth(owner.token, {
+        type: 'bearer',
+      });
+    const created = await materialCall('post', '')
+      .send({ type: 'Story', language: 'bg', title: 'Градски архив' })
+      .expect(201);
+    const material = created.body as MaterialResponse;
+    await materialCall('patch', '/' + material.id)
+      .set('If-Match', created.headers.etag as string)
+      .send({
+        body: 'Архивен преглед на града.',
+        categoryIds: [randomUUID()],
+        topicIds: [randomUUID()],
+        sourceIds: [randomUUID()],
+        rights: {
+          publicDisplayAllowed: true,
+          statement: 'Правата са потвърдени.',
+        },
+        mediaRefs: [{ mediaId: id, role: 'hero', order: 0 }],
+        changeSummary: 'Добавена е архивната снимка.',
+      })
+      .expect(200);
+    await get(path, viewer.token).expect(404);
+    const transition = (action: string, expectedVersion: number) =>
+      materialCall('post', '/' + material.id + '/transitions').send({
+        action,
+        expectedVersion,
+      });
+    await transition('SubmitForReview', 2).expect(200);
+    await transition('StartReview', 3).expect(200);
+    await transition('Publish', 4).expect(200);
+    const published = '/api/v1/materials/' + material.slug;
+    await api.get(published).expect(200);
+
+    const visible = await get(path, viewer.token).expect(200);
+    assert.equal(visible.body.canEdit, false);
+    assert.equal(visible.body.restrictionAction, undefined);
+    assert.equal(visible.body.fileKey, undefined);
+    assert.equal(visible.body.accountId, undefined);
+    assert.equal(visible.body.sha256, undefined);
+    const scoped = await get(gallery, viewer.token)
+      .query({ q: id })
+      .expect(200);
+    assert.deepEqual(
+      scoped.body.items.map((item: { id: string }) => item.id),
+      [id],
+    );
+    const usages = await get(path + '/usages', viewer.token).expect(200);
+    assert.deepEqual(usages.body, {
+      items: [
+        { materialId: material.id, title: 'Градски архив', revisionNumber: 2 },
+      ],
+      total: 1,
+    });
+    const viewerPreview = await preview(viewer.token).expect(201);
+    const galleryGrant = viewerPreview.body.grant as string;
+    sensitiveSamples.push(galleryGrant);
+    await authorizeRead(id, 'preview', galleryGrant).expect(200);
+    await authorizeRead(id, 'original', galleryGrant).expect(403);
+
+    const detail = await get(path).expect(200);
+    const etag = detail.headers.etag as string;
+    const patch = (token: string, tag: string) =>
+      api
+        .patch(path)
+        .auth(token, { type: 'bearer' })
+        .set('If-Match', tag)
+        .send({
+          creditLine: 'Градски фотоархив',
+          reason: 'Уточнен е кредитът.',
+        });
+    await patch(viewer.token, visible.headers.etag as string).expect(403);
+    const edited = await patch(admin.token, etag).expect(200);
+    assert.equal(edited.body.creditLine, 'Градски фотоархив');
+    await patch(admin.token, etag).expect(412);
+    await authorizeRead(id, 'preview', galleryGrant).expect(403);
+
+    const adminPreview = await preview(admin.token).expect(201);
+    const adminGrant = adminPreview.body.grant as string;
+    sensitiveSamples.push(adminGrant);
+    await authorizeRead(id, 'preview', adminGrant).expect(200);
+    const sessions = db.db().collection('sessions');
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $unset: { mfaVerifiedAt: 1 } },
+    );
+    assert.equal(
+      (await authorizeRead(id, 'preview', adminGrant).expect(403)).body.code,
+      'mfa_required',
+    );
+    await sessions.updateOne(
+      { accountId: admin.id },
+      { $set: { mfaVerifiedAt: new Date() } },
+    );
+
+    const ownerGrant = await createReadGrant(owner.token, id, 'original');
+    const key = randomUUID();
+    const command = {
+      action: 'Restrict',
+      expectedVersion: edited.body.version,
+      reason: 'Проверка на правата.',
+    };
+    const change = (
+      token: string,
+      idempotencyKey: string,
+      body: Record<string, unknown>,
+    ) =>
+      api
+        .post(path + '/access-restrictions')
+        .auth(token, { type: 'bearer' })
+        .set('Idempotency-Key', idempotencyKey)
+        .set('X-Correlation-ID', 'media-restriction-check')
+        .send(body);
+    await change(owner.token, key, command).expect(403);
+    const responses = await Promise.all([
+      change(admin.token, key, command).expect(200),
+      change(admin.token, key, command).expect(200),
+    ]);
+    assert.deepEqual(responses[0].body, responses[1].body);
+    assert.equal(responses[0].body.accessStatus, 'Restricted');
+    assert.equal(responses[0].body.previewAvailable, false);
+    await change(admin.token, key, {
+      ...command,
+      reason: 'Различна причина.',
+    }).expect(409);
+    await authorizeRead(id, 'preview', adminGrant).expect(403);
+    await authorizeRead(id, 'original', ownerGrant.grant).expect(403);
+    await preview(admin.token).expect(403);
+    await api.get(published).expect(404);
+    const lifted = await change(admin.token, randomUUID(), {
+      action: 'LiftRestriction',
+      expectedVersion: responses[0].body.version,
+      reason: 'Правата са потвърдени.',
+    }).expect(200);
+    assert.equal(lifted.body.accessStatus, 'Active');
+    await api.get(published).expect(200);
+    await authorizeRead(id, 'original', ownerGrant.grant).expect(403);
+    const events = await get('/api/admin/v1/audit-events')
+      .query({ targetId: id, targetType: 'Media' })
+      .expect(200);
+    assert.equal(events.body.items.length, 3);
+    const restriction = events.body.items.find(
+      (event: { action: string }) => event.action === 'MediaAccessRestricted',
+    ) as { id: string };
+    const audit = await get(
+      '/api/admin/v1/audit-events/' + restriction.id,
+    ).expect(200);
+    assert.equal(audit.body.traceId, 'media-restriction-check');
+    assert.equal(audit.body.reason, 'Проверка на правата.');
+    assert.equal(audit.body.changeSummary[1].value, 'Restricted');
+  });
+
   void it('should restrict the account directory and mask verified contact details', async () => {
     const admin = await createAdministrator();
     const editor = await createEditor();

@@ -1,0 +1,102 @@
+<header class="page-heading">
+  <div>
+    <a routerLink="/admin" class="breadcrumb">Работен панел</a>
+    <h1>Медии</h1>
+  </div>
+  <a nbButton status="primary" routerLink="/media/upload">Качи файл</a>
+</header>
+
+<nb-card>
+  <nb-card-body>
+    <form class="filters" aria-label="Филтри на медиите" (ngSubmit)="search()">
+      <label class="field"
+        >Описание, кредит или ID
+        <input
+          nbInput
+          fullWidth
+          name="q"
+          maxlength="100"
+          [ngModel]="filters().q"
+          (ngModelChange)="edit('q', $event)"
+        />
+      </label>
+      @for (filter of fields; track filter.field) {
+        <label class="field"
+          >{{ filter.label }}
+          <select
+            [name]="filter.field"
+            [ngModel]="filters()[filter.field]"
+            (ngModelChange)="edit(filter.field, $event)"
+          >
+            <option value="">Всички</option>
+            @for (option of filter.options | keyvalue; track option.key) {
+              <option [value]="option.key">{{ option.value }}</option>
+            }
+          </select>
+        </label>
+      }
+      <div class="actions">
+        <button type="submit" nbButton status="primary">Филтрирай</button>
+        <button type="button" nbButton outline (click)="clear()">Изчисти</button>
+      </div>
+    </form>
+  </nb-card-body>
+</nb-card>
+
+<nb-card>
+  <nb-card-body aria-live="polite">
+    @if (page.isLoading()) {
+      <p role="status">Зареждане на файловете…</p>
+    } @else if (page.error()) {
+      <nb-alert status="warning" role="alert"
+        >Списъкът е временно недостъпен или страницата е остаряла.</nb-alert
+      >
+      <button nbButton outline (click)="page.reload()">Опитай отново</button>
+    } @else if (page.value(); as result) {
+      <div class="records">
+        @for (asset of result.items; track asset.id) {
+          <article class="record">
+            <div>
+              <h2>
+                <a [routerLink]="[asset.id]" queryParamsHandling="preserve">{{
+                  asset.accessibilityText || asset.creditLine || asset.id
+                }}</a>
+              </h2>
+              <p class="muted">
+                {{ types[asset.type] }} · {{ processing[asset.processingStatus] }}
+              </p>
+              <p class="muted">
+                {{ rights[asset.rightsStatus] }} · {{ asset.updatedAtUtc | date: 'dd.MM.yyyy' }}
+              </p>
+            </div>
+            <span class="badge" [class.secondary]="asset.accessStatus === 'Active'">{{
+              accessStatuses[asset.accessStatus]
+            }}</span>
+          </article>
+        } @empty {
+          <p>Няма файлове за избраните филтри.</p>
+        }
+      </div>
+      @if (result.nextCursor) {
+        <a
+          nbButton
+          outline
+          [routerLink]="[]"
+          queryParamsHandling="merge"
+          [queryParams]="{ cursor: result.nextCursor }"
+          >Следваща страница</a
+        >
+      }
+    }
+    @if (cursor()) {
+      <a
+        nbButton
+        ghost
+        [routerLink]="[]"
+        queryParamsHandling="merge"
+        [queryParams]="{ cursor: null }"
+        >Първа страница</a
+      >
+    }
+  </nb-card-body>
+</nb-card>
