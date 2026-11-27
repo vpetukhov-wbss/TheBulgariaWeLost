@@ -88,6 +88,18 @@ export class PublishingOutboxEvent {
 
   @Prop()
   publishedAt?: Date;
+
+  @Prop()
+  searchProjectedAt?: Date;
+
+  @Prop()
+  searchAvailableAt?: Date;
+
+  @Prop()
+  searchLease?: string;
+
+  @Prop()
+  searchFailures?: number;
 }
 
 export const PublishingOutboxEventSchema = SchemaFactory.createForClass(
@@ -99,3 +111,9 @@ PublishingOutboxEventSchema.index(
   { unique: true },
 );
 PublishingOutboxEventSchema.index({ publishedAt: 1, occurredAt: 1, _id: 1 });
+
+PublishingOutboxEventSchema.index({
+  searchProjectedAt: 1,
+  occurredAt: 1,
+  _id: 1,
+});

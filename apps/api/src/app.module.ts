@@ -11,6 +11,7 @@ import { CatalogModule } from './catalog/catalog.module';
 import appConfig from './config/app.config';
 import type { AllConfigType } from './config/config.type';
 import databaseConfig from './database/database.config';
+import { DiscoveryModule } from './discovery/discovery.module';
 import { HealthController } from './health/health.controller';
 import mailConfig from './mail/config/mail.config';
 import mediaConfig from './media/config/media.config';
@@ -46,6 +47,7 @@ import { ModerationModule } from './moderation/moderation.module';
     BackOfficeModule,
     MediaModule,
     PublishingModule,
+    DiscoveryModule,
     ModerationModule,
     CatalogModule,
   ],

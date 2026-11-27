@@ -43,7 +43,67 @@ const mediaGrantSecret = `${randomUUID()}${randomUUID()}`;
 const mediaReadGrantSecret = `${randomUUID()}${randomUUID()}`;
 const mediaProbeToken = `${randomUUID()}${randomUUID()}`;
 const storageProbes: string[] = [];
+const indexPath = '/archive-materials-v1';
+const indexed = new Map<
+  string,
+  { version: number; document: Record<string, unknown> }
+>();
+let staleHits:
+  | { _id: string; _source: { revision: number }; sort: [number, string] }[]
+  | undefined;
+let mappingReceived = false;
+let rejectNextPublishedProjection = true;
 const storageService = createServer((request, response) => {
+  if (request.url === indexPath && request.method === 'HEAD') {
+    response.writeHead(mappingReceived ? 200 : 404).end();
+    return;
+  }
+  if (request.url === indexPath && request.method === 'PUT') {
+    request.resume();
+    request.on('end', () => {
+      mappingReceived = true;
+      response.writeHead(200).end();
+    });
+    return;
+  }
+  if (
+    request.url?.startsWith(indexPath + '/_doc/') &&
+    request.method === 'PUT'
+  ) {
+    const url = new URL(request.url, 'http://localhost');
+    const id = url.pathname.slice(indexPath.length + '/_doc/'.length);
+    const version = Number(url.searchParams.get('version'));
+    let body = '';
+    request.setEncoding('utf8');
+    request.on('data', (chunk: string) => {
+      body += chunk;
+    });
+    request.on('end', () => {
+      const prior = indexed.get(id);
+      if (prior && prior.version >= version) {
+        response.writeHead(409).end();
+        return;
+      }
+      const document = JSON.parse(body) as Record<string, unknown>;
+      if (document.visible === true && rejectNextPublishedProjection) {
+        rejectNextPublishedProjection = false;
+        response.writeHead(503).end();
+        return;
+      }
+      indexed.set(id, {
+        version,
+        document,
+      });
+      response.writeHead(201).end();
+    });
+    return;
+  }
+  if (request.url === indexPath + '/_search' && request.method === 'POST') {
+    request.resume();
+    response.writeHead(200, { 'content-type': 'application/json' });
+    response.end(JSON.stringify({ hits: { hits: staleHits ?? [] } }));
+    return;
+  }
   if (request.headers.authorization !== 'Bearer ' + mediaProbeToken) {
     response.writeHead(401).end();
   } else if (
@@ -456,6 +516,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         MEDIA_PROBE_ORIGIN: `http://127.0.0.1:${probeAddress.port}`,
         MEDIA_PROBE_TOKEN: mediaProbeToken,
         OPERATIONS_BACKUP_REPORT_TOKEN: backupReportToken,
+        OPENSEARCH_URL: `http://127.0.0.1:${probeAddress.port}`,
+        OPENSEARCH_INDEX: 'archive-materials-v1',
         MEDIA_ACCOUNT_QUOTA_BYTES: '1024',
         MEDIA_MAX_UPLOAD_BYTES: '33554432',
         AUTH_JWT_TOKEN_EXPIRES_IN:
@@ -1231,11 +1293,77 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     const publicMaterial = await api.get(publicUrl).expect(200);
     assert.equal(publicMaterial.body.revisionNumber, 2);
     assert.equal(publicMaterial.body.content.title, update.title);
+    const admin = await createAdministrator();
+    const search = '/api/v1/archive/search';
+    const rebuild = '/api/admin/v1/search/rebuild';
+    await api
+      .post(rebuild)
+      .auth(reviewer.token, { type: 'bearer' })
+      .send({})
+      .expect(403);
+    const outbox = db.db().collection('outboxEvents');
+    const retriedFilter = {
+      aggregateId: initial.id,
+      searchFailures: { $gte: 1 },
+      searchProjectedAt: { $exists: true },
+    };
+    for (
+      let attempt = 0;
+      attempt < 85 && !(await outbox.findOne(retriedFilter));
+      attempt++
+    ) {
+      await delay(150);
+    }
+    assert(await outbox.findOne(retriedFilter));
+    assert.equal(indexed.get(initial.id)?.document.title, update.title);
+
+    await api
+      .post(rebuild)
+      .auth(admin.token, { type: 'bearer' })
+      .send({})
+      .expect(200);
+    await api
+      .post(rebuild)
+      .auth(admin.token, { type: 'bearer' })
+      .send({})
+      .expect(200);
+    assert.equal(indexed.get(initial.id)?.document.revision, 2);
+    staleHits = [
+      { _id: initial.id, _source: { revision: 2 }, sort: [1, initial.id] },
+    ];
+    const found = await api
+      .get(search)
+      .query({ q: update.title, limit: 1 })
+      .expect(200);
+    assert.equal(found.body.items[0].title, update.title);
+    assert.equal(typeof found.body.nextCursor, 'string');
+    await api
+      .get(search)
+      .query({ q: update.title, cursor: found.body.nextCursor })
+      .expect(200);
+    await api
+      .get(search)
+      .query({ q: 'друго', cursor: found.body.nextCursor })
+      .expect(400);
+
+    const cursor = (
+      await api
+        .get(search)
+        .query({ q: update.title, cursor: 'invalid' })
+        .expect(400)
+    ).body;
+    assert.equal(cursor.code, 'invalid_cursor');
+    assert.deepEqual(
+      (await api.get(search).query({ type: 'Episode' }).expect(200)).body.items,
+      [],
+    );
+
     await uploads.updateOne(
       { _id: upload.uploadId },
       { $set: { accessStatus: 'Restricted' } },
     );
     await api.get(publicUrl).expect(404);
+    assert.deepEqual((await api.get(search).expect(200)).body.items, []);
     await uploads.updateOne(
       { _id: upload.uploadId },
       { $set: { accessStatus: 'Active' } },
@@ -1295,6 +1423,14 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
 
     await transition(reviewer.token, 'Publish', 9).expect(200);
     await api.get(publicUrl).expect(200);
+    assert.deepEqual((await api.get(search).expect(200)).body.items, []);
+    staleHits = [
+      { _id: initial.id, _source: { revision: 5 }, sort: [1, initial.id] },
+    ];
+    assert.equal(
+      (await api.get(search).expect(200)).body.items[0].id,
+      initial.id,
+    );
     const withdrawn = await transition(
       reviewer.token,
       'Withdraw',
@@ -1305,6 +1441,25 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.equal(finalMaterial.status, 'Withdrawn');
     assert.equal(finalMaterial.version, 11);
     await api.get(publicUrl).expect(404);
+    assert.deepEqual((await api.get(search).expect(200)).body.items, []);
+    staleHits = undefined;
+    for (
+      let attempt = 0;
+      attempt < 50 && indexed.get(initial.id)?.document.visible !== false;
+      attempt++
+    ) {
+      await delay(150);
+    }
+    assert.deepEqual(indexed.get(initial.id)?.document, {
+      id: initial.id,
+      visible: false,
+    });
+    const metrics = await api
+      .get('/api/admin/v1/search/metrics')
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(metrics.body.enabled, true);
+    assert(metrics.body.lastProjectedAtUtc);
 
     const finalRevisions = await api
       .get(`/api/admin/v1/materials/${initial.id}/revisions`)
