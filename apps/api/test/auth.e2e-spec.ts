@@ -1331,6 +1331,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     staleHits = [
       { _id: initial.id, _source: { revision: 2 }, sort: [1, initial.id] },
     ];
+    const nextId = uuidv7();
+    staleHits.push({ _id: nextId, _source: { revision: 1 }, sort: [0, nextId] });
     const found = await api
       .get(search)
       .query({ q: update.title, limit: 1 })
