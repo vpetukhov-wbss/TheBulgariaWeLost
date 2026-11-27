@@ -6,6 +6,7 @@ export enum AuditTargetType {
   Moderation = 'Moderation',
   Other = 'Other',
   SiteSettings = 'SiteSettings',
+  StorageLocation = 'StorageLocation',
 }
 
 export enum AuditOutcome {

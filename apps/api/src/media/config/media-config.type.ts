@@ -9,4 +9,6 @@ export type MediaConfig = {
   maxUploadBytes: number;
   accountQuotaBytes: number;
   defaultStorageLocationId: string;
+  probeOrigin: string;
+  probeToken: string;
 };

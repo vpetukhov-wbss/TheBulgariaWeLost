@@ -8,6 +8,7 @@ export { DashboardService } from './services/dashboard.service';
 export { AuditService } from './services/audit.service';
 export { AdminSiteSettingsService } from './services/admin-site-settings.service';
 export { PublicSiteSettingsService } from './services/public-site-settings.service';
+export { AdminStorageService } from './services/admin-storage.service';
 export { AdminMediaService } from './services/admin-media.service';
 export { AdminUsersService } from './services/admin-users.service';
 export { PublishingService } from './services/publishing.service';

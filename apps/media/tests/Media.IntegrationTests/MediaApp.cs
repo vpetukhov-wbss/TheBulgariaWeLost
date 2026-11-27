@@ -76,6 +76,8 @@ internal sealed class MediaApp : WebApplicationFactory<Program>
         public int ProbeCount { get; private set; }
         public int Opens { get; private set; }
 
+        public IReadOnlyList<string> LocationIds => ["archive"];
+
         public bool HasLocation(string locationId) => locationId == "archive";
 
         public Task<StoredFile?> OpenReadAsync(string locationId, string fileKey, CancellationToken cancellationToken)

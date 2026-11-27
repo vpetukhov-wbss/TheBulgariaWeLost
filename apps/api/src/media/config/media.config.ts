@@ -47,6 +47,19 @@ export default registerAs<MediaConfig>('media', () => {
   if (!/^[a-z0-9][a-z0-9_-]{0,99}$/i.test(defaultStorageLocationId)) {
     throw new Error('MEDIA_DEFAULT_STORAGE_LOCATION_ID is invalid.');
   }
+  const probeOrigin = process.env.MEDIA_PROBE_ORIGIN?.trim() ?? '';
+  const probeToken = process.env.MEDIA_PROBE_TOKEN?.trim() ?? '';
+  if (probeOrigin || probeToken) {
+    if (
+      !/^https?:\/\/[^/?#@]+\/?$/.test(probeOrigin) ||
+      probeToken.length < 32 ||
+      [serviceToken, uploadGrantSecret, readGrantSecret].includes(probeToken)
+    ) {
+      throw new Error(
+        'Set MEDIA_PROBE_ORIGIN and an independent MEDIA_PROBE_TOKEN of at least 32 characters.',
+      );
+    }
+  }
 
   return {
     serviceToken,
@@ -71,5 +84,7 @@ export default registerAs<MediaConfig>('media', () => {
       1024 * 1024 * 1024,
     ),
     defaultStorageLocationId,
+    probeOrigin,
+    probeToken,
   };
 });

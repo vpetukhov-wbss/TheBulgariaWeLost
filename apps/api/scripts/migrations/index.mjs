@@ -10,6 +10,7 @@ import { adminUserActionsMigration } from './009-admin-user-actions.mjs';
 import { auditJournalMigration } from './010-audit-journal.mjs';
 import { siteSettingsMigration } from './011-site-settings.mjs';
 import { adminMediaGalleryMigration } from './012-admin-media-gallery.mjs';
+import { storageAdminMigration } from './013-storage-admin.mjs';
 
 export const migrations = [
   authFoundationMigration,
@@ -24,4 +25,5 @@ export const migrations = [
   auditJournalMigration,
   siteSettingsMigration,
   adminMediaGalleryMigration,
+  storageAdminMigration,
 ];
