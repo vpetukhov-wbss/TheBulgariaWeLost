@@ -26,6 +26,7 @@ check 'Angular' 'http://127.0.0.1:4200/healthz'
 check 'NestJS + MongoDB' 'http://127.0.0.1:3000/api/v1/health'
 check '.NET Media' 'http://127.0.0.1:5088/media/health/live'
 check 'Mailpit' 'http://127.0.0.1:8025/readyz'
+check 'OpenSearch API' 'http://127.0.0.1:3000/api/v1/archive/search?q=archive'
 
 status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
   --request POST \

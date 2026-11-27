@@ -6,6 +6,8 @@ info:
 servers:
   - url: /
 tags:
+  - name: Archive search
+  - name: Admin search
   - name: Health
   - name: Auth
   - name: Back office
@@ -26,6 +28,103 @@ tags:
   - name: Internal media
     description: Private service-to-service operations. Never call these from a browser.
 paths:
+  /api/v1/archive/search:
+    get:
+      tags:
+        - Archive search
+      operationId: searchArchive
+      parameters:
+        - &a2
+          $ref: "#/components/parameters/CorrelationId"
+        - name: q
+          in: query
+          schema:
+            type: string
+            maxLength: 150
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum:
+              - Story
+              - Document
+              - PhotoEssay
+              - Episode
+        - name: topicId
+          in: query
+          schema: &a1
+            type: string
+            format: uuid
+        - name: categoryId
+          in: query
+          schema: *a1
+        - name: language
+          in: query
+          schema:
+            type: string
+            maxLength: 12
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: cursor
+          in: query
+          schema:
+            type: string
+            maxLength: 220
+      responses:
+        "200":
+          description: Successful archive search operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchiveSearchPage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/search/rebuild:
+    post:
+      tags:
+        - Admin search
+      operationId: rebuildArchiveSearch
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RebuildSearchPage"
+      responses:
+        "200":
+          description: Successful archive search operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RebuildSearchResult"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/search/metrics:
+    get:
+      tags:
+        - Admin search
+      operationId: getArchiveSearchMetrics
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+      responses:
+        "200":
+          description: Successful archive search operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SearchMetrics"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/health:
     get:
       tags: [Health]
@@ -2591,6 +2690,70 @@ components:
           schema:
             $ref: "#/components/schemas/ProblemDetails"
   schemas:
+    ArchiveSearchItem:
+      type: object
+      required:
+        - id
+        - slug
+        - type
+        - language
+        - title
+      properties:
+        id: &a2
+          type: string
+          format: uuid
+        slug: &a1
+          type: string
+        type:
+          type: string
+          enum:
+            - Story
+            - Document
+            - PhotoEssay
+            - Episode
+        language: *a1
+        title: *a1
+        summary: *a1
+    ArchiveSearchPage:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArchiveSearchItem"
+        nextCursor: *a1
+    RebuildSearchPage:
+      type: object
+      properties:
+        after: *a2
+    RebuildSearchResult:
+      type: object
+      required:
+        - processed
+      properties:
+        processed: &a3
+          type: integer
+          minimum: 0
+        nextAfter: *a2
+    SearchMetrics:
+      type: object
+      required:
+        - enabled
+        - pending
+        - retrying
+      properties:
+        enabled:
+          type: boolean
+        pending: *a3
+        retrying: *a3
+        oldestPendingAtUtc:
+          type: string
+          format: date-time
+        lastProjectedAtUtc:
+          type: string
+          format: date-time
     ModerationStatus:
       type: string
       enum: [Open, UnderReview, Resolved]

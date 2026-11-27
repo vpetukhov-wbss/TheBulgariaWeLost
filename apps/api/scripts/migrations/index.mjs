@@ -1,3 +1,4 @@
+import { archiveSearchMigration } from './015-archive-search.mjs';
 import { authFoundationMigration } from './001-auth-foundation.mjs';
 import { mediaUploadsMigration } from './002-media-uploads.mjs';
 import { mediaProcessingMigration } from './003-media-processing.mjs';
@@ -28,4 +29,5 @@ export const migrations = [
   adminMediaGalleryMigration,
   storageAdminMigration,
   operationsMigration,
+  archiveSearchMigration,
 ];

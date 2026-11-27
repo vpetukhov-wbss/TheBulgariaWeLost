@@ -2,6 +2,7 @@ name: the-bulgaria-we-lost
 
 x-api-environment: &api-environment
   NODE_ENV: development
+  OPENSEARCH_URL: http://opensearch:9200
   APP_PORT: 3000
   APP_NAME: The Bulgaria We Lost
   FRONTEND_DOMAIN: http://localhost:4200
@@ -61,6 +62,22 @@ services:
       timeout: 5s
       retries: 30
       start_period: 5s
+
+  opensearch:
+    image: opensearchproject/opensearch:3.10.1
+    environment:
+      discovery.type: single-node
+      node.store.allow_mmap: "false"
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+      DISABLE_SECURITY_PLUGIN: "true"
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+    volumes:
+      - search-data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9200/_cluster/health >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
 
   mailpit:
     image: axllent/mailpit:v1.28.0
@@ -187,5 +204,6 @@ services:
 
 volumes:
   mongo-data:
+  search-data:
   sftp-data:
   media-quarantine:
