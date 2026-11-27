@@ -15,6 +15,7 @@ tags:
   - name: Audit
   - name: Admin users
   - name: Admin media
+  - name: Admin storage
   - name: Publishing
   - name: Moderation
   - name: Authoring
@@ -488,6 +489,261 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PublicSiteSettings"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-connection-profiles:
+    get:
+      tags: [Admin storage]
+      operationId: listStorageConnectionProfiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: Successful storage operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageConnectionProfilePage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations:
+    get:
+      tags: [Admin storage]
+      operationId: listStorageLocations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/StorageLocationStatus"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: Successful storage operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageLocationPage"
+        default:
+          $ref: "#/components/responses/Problem"
+    post:
+      tags: [Admin storage]
+      operationId: createStorageLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateStorageLocationRequest"
+      responses:
+        "201":
+          description: Successful storage operation.
+          headers:
+            Location:
+              schema: { type: string }
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageLocationDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations/{id}:
+    get:
+      tags: [Admin storage]
+      operationId: getStorageLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Successful storage operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageLocationDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+    patch:
+      tags: [Admin storage]
+      operationId: editStorageLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: If-Match
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EditStorageLocationRequest"
+      responses:
+        "200":
+          description: Successful storage operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageLocationDetail"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations/{id}/health:
+    get:
+      tags: [Admin storage]
+      operationId: getStorageHealth
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Successful storage operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations/{id}/asset-issues:
+    get:
+      tags: [Admin storage]
+      operationId: listStorageAssetIssues
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: kind
+          in: query
+          schema:
+            $ref: "#/components/schemas/StorageAssetIssueKind"
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 25 }
+        - name: cursor
+          in: query
+          schema: { type: string, maxLength: 200 }
+      responses:
+        "200":
+          description: Successful storage operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageAssetIssuePage"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations/{id}/connection-checks:
+    post:
+      tags: [Admin storage]
+      operationId: checkStorageConnection
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CheckStorageConnectionRequest"
+      responses:
+        "200":
+          description: Successful storage operation.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageHealth"
+        default:
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/storage-locations/{id}/transitions:
+    post:
+      tags: [Admin storage]
+      operationId: transitionStorageLocation
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string, minLength: 8, maxLength: 128, pattern: "^[a-zA-Z0-9_-]+$" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransitionStorageLocationRequest"
+      responses:
+        "200":
+          description: Successful storage operation.
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageLocationDetail"
         default:
           $ref: "#/components/responses/Problem"
   /api/admin/v1/media-assets:
@@ -1876,13 +2132,32 @@ paths:
           $ref: "#/components/responses/NoContent"
         default:
           $ref: "#/components/responses/Problem"
+  /internal/media/v1/storage/profiles:
+    get:
+      x-internal: true
+      tags: [Internal media]
+      operationId: listMediaStorageProfiles
+      security:
+        - mediaProbeToken: []
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Configured storage profile identifiers.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string, maxLength: 100 }
+        default:
+          $ref: "#/components/responses/Problem"
   /internal/media/v1/storage/{locationId}/probe:
     post:
       x-internal: true
       tags: [Internal media]
       operationId: probeStorage
       security:
-        - serviceToken: []
+        - mediaProbeToken: []
       parameters:
         - $ref: "#/components/parameters/CorrelationId"
         - name: locationId
@@ -1906,6 +2181,10 @@ components:
       type: http
       scheme: bearer
       description: Private, rotated service credential.
+    mediaProbeToken:
+      type: http
+      scheme: bearer
+      description: Independent credential for the private storage health operations.
   parameters:
     AdminUserId:
       name: id
@@ -3389,9 +3668,138 @@ components:
         bannedAccounts: { type: integer, minimum: 0 }
         failedPasswordResetsLast24Hours: { type: integer, minimum: 0 }
         auditEventsLast24Hours: { type: integer, minimum: 0 }
+    StorageLocationStatus:
+      type: string
+      enum: [Draft, ActiveForNewWrites, ReadOnly, Archived]
+    StorageConnectionStatus:
+      type: string
+      enum: [NotChecked, Healthy, Unavailable, Denied]
+    StorageTransition:
+      type: string
+      enum: [ActivateForNewWrites, ArchiveDraft]
+    StorageAssetIssueKind:
+      type: string
+      enum: [Missing, FailedUpload, IntegrityMismatch]
+    CreateStorageLocationRequest:
+      type: object
+      additionalProperties: false
+      required: [label, profileId]
+      properties:
+        label: { type: string, minLength: 1, maxLength: 100 }
+        profileId: { type: string, pattern: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$" }
+    EditStorageLocationRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        label: { type: string, minLength: 1, maxLength: 100 }
+        profileId: { type: string, pattern: "^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$" }
+    CheckStorageConnectionRequest:
+      type: object
+      additionalProperties: false
+      required: [expectedVersion]
+      properties:
+        expectedVersion: { type: integer, minimum: 1 }
+    TransitionStorageLocationRequest:
+      type: object
+      additionalProperties: false
+      required: [action, expectedVersion, reason]
+      properties:
+        action:
+          $ref: "#/components/schemas/StorageTransition"
+        expectedVersion: { type: integer, minimum: 1 }
+        expectedRoutingVersion:
+          type: integer
+          minimum: 1
+          description: Required when activating a location for new writes.
+        reason: { type: string, minLength: 1, maxLength: 500 }
+    StorageConnectionProfile:
+      type: object
+      additionalProperties: false
+      required: [id, label]
+      properties:
+        id: { type: string }
+        label: { type: string }
+    StorageConnectionProfilePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorageConnectionProfile"
+        nextCursor: { type: string }
+    StorageLocationSummary:
+      type: object
+      required: [id, label, provider, profileId, status, version, updatedAtUtc, connectionStatus]
+      properties:
+        id: { type: string, format: uuid }
+        label: { type: string }
+        provider: { type: string, enum: [Sftp] }
+        profileId: { type: string }
+        status:
+          $ref: "#/components/schemas/StorageLocationStatus"
+        version: { type: integer, minimum: 1 }
+        updatedAtUtc: { type: string, format: date-time }
+        connectionStatus:
+          $ref: "#/components/schemas/StorageConnectionStatus"
+    StorageLocationDetail:
+      allOf:
+        - $ref: "#/components/schemas/StorageLocationSummary"
+        - type: object
+          required: [routingVersion, transitions]
+          properties:
+            routingVersion: { type: integer, minimum: 1 }
+            transitions:
+              type: array
+              items:
+                $ref: "#/components/schemas/StorageTransition"
+    StorageLocationPage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorageLocationSummary"
+        nextCursor: { type: string }
+    StorageHealth:
+      type: object
+      additionalProperties: false
+      required: [locationId, status, checkedAtUtc, usedBytes, capacityBytes, lastSuccessfulBackupAtUtc, lastVerifiedRestoreAtUtc]
+      properties:
+        locationId: { type: string, format: uuid }
+        status:
+          $ref: "#/components/schemas/StorageConnectionStatus"
+        checkedAtUtc: { type: string, format: date-time, nullable: true }
+        usedBytes: { type: integer, format: int64, minimum: 0, nullable: true }
+        capacityBytes: { type: integer, format: int64, minimum: 0, nullable: true }
+        lastSuccessfulBackupAtUtc: { type: string, format: date-time, nullable: true }
+        lastVerifiedRestoreAtUtc: { type: string, format: date-time, nullable: true }
+    StorageAssetIssue:
+      type: object
+      additionalProperties: false
+      required: [uploadId, kind, detectedAtUtc]
+      properties:
+        uploadId: { type: string, format: uuid }
+        assetId: { type: string, format: uuid }
+        kind:
+          $ref: "#/components/schemas/StorageAssetIssueKind"
+        detectedAtUtc: { type: string, format: date-time }
+    StorageAssetIssuePage:
+      type: object
+      additionalProperties: false
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/StorageAssetIssue"
+        nextCursor: { type: string }
     AuditTargetType:
       type: string
-      enum: [Account, Catalog, Material, Media, Moderation, Other, SiteSettings]
+      enum: [Account, Catalog, Material, Media, Moderation, Other, SiteSettings, StorageLocation]
     AuditOutcome:
       type: string
       enum: [Succeeded, Failed, Denied]

@@ -11,6 +11,8 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
     private readonly IReadOnlyDictionary<string, SftpProfile> profiles =
         new Dictionary<string, SftpProfile>(options.Value.Profiles, StringComparer.Ordinal);
 
+    public IReadOnlyList<string> LocationIds => profiles.Keys.Order(StringComparer.Ordinal).ToArray();
+
     public bool HasLocation(string locationId) => profiles.ContainsKey(locationId);
 
     public async Task<StoredFile?> OpenReadAsync(string locationId, string fileKey, CancellationToken cancellationToken)
@@ -78,8 +80,8 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
         byte[] marker = [0x21];
         var fileKey = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32));
         var profile = profiles[locationId];
-        var path = FilePath(profile, fileKey);
-        var temp = path + ".probe";
+        var temp = FilePath(profile, fileKey) + ".probe";
+        var path = temp + ".verified";
         var (client, key) = await ConnectAsync(profile, cancellationToken);
         using (key)
         using (client)
@@ -99,7 +101,7 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
             }
             catch (Exception ex) when (IsStorageError(ex))
             {
-                throw new StorageFailure();
+                throw new StorageFailure(ex is SftpPermissionDeniedException);
             }
             finally
             {
@@ -166,6 +168,7 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
     {
         PrivateKeyFile? key = null;
         SftpClient? client = null;
+        var hostKeyRejected = false;
         try
         {
             await using var keyStream = new FileStream(profile.PrivateKeyPath, FileMode.Open, FileAccess.Read,
@@ -186,6 +189,7 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
             {
                 var fingerprint = "SHA256:" + Convert.ToBase64String(SHA256.HashData(args.HostKey)).TrimEnd('=');
                 args.CanTrust = string.Equals(fingerprint, profile.HostKeySha256, StringComparison.Ordinal);
+                hostKeyRejected = !args.CanTrust;
             };
             await client.ConnectAsync(cancellationToken);
             return (client, key);
@@ -194,7 +198,7 @@ internal sealed class SftpObjectStorage(IOptions<SftpOptions> options) : IObject
         {
             client?.Dispose();
             key?.Dispose();
-            if (IsStorageError(ex)) throw new StorageFailure();
+            if (IsStorageError(ex)) throw new StorageFailure(hostKeyRejected || ex is SshAuthenticationException);
             throw;
         }
     }

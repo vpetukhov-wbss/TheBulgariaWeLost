@@ -68,6 +68,9 @@ npm run seed:dev
 
 За production задай независими `MEDIA_SERVICE_TOKEN`, `MEDIA_UPLOAD_GRANT_SECRET` и `MEDIA_READ_GRANT_SECRET` с поне 32 символа. `MEDIA_MAX_UPLOAD_BYTES` трябва да съвпада с лимита на .NET Media API. `MEDIA_ACCOUNT_QUOTA_BYTES`, `MEDIA_UPLOAD_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_UPLOAD_LEASE_SECONDS`, `MEDIA_READ_GRANT_EXPIRES_IN_SECONDS`, `MEDIA_INSPECTION_LEASE_SECONDS` и `MEDIA_DEFAULT_STORAGE_LOCATION_ID` управляват квотата, сроковете и routing целта.
 
+За управление на SFTP от панела настрой `MEDIA_PROBE_ORIGIN` с вътрешния адрес на .NET Media API и независим `MEDIA_PROBE_TOKEN` с поне 32 символа. Същият токен се настройва в .NET като `MediaControl:ProbeToken`. `MEDIA_DEFAULT_STORAGE_LOCATION_ID` задава началния профил. След първата административна промяна актуалната цел се записва в MongoDB. Вече издадените разрешения за качване запазват записания при създаването профил.
+
+
 ## Проверки
 
 ```sh

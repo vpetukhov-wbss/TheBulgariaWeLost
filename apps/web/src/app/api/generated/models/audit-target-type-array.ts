@@ -13,5 +13,6 @@ export const AUDIT_TARGET_TYPE: AuditTargetType[] = [
   'Media',
   'Moderation',
   'Other',
-  'SiteSettings'
+  'SiteSettings',
+  'StorageLocation'
 ];

@@ -1,0 +1,317 @@
+<nb-card>
+  <nb-card-header>
+    <a [routerLink]="id() ? '/admin/storage' : '/admin'">
+      {{ id() ? 'Към хранилищата' : 'Към работния панел' }}
+    </a>
+    <h1>{{ store.detail()?.value?.label ?? (id() ? 'Хранилище' : 'Файлови хранилища') }}</h1>
+  </nb-card-header>
+  <nb-card-body>
+    @if (store.error()) {
+      <nb-alert status="danger" role="alert">{{ store.error() }}</nb-alert>
+    }
+    @if (store.conflict()) {
+      <nb-alert status="warning" role="alert">
+        Състоянието се промени. Презареди хранилището и прегледай новите данни.
+      </nb-alert>
+    }
+    @if (store.feedback()) {
+      <nb-alert status="success" role="status">{{ store.feedback() }}</nb-alert>
+    }
+    @if (store.busy()) {
+      <p role="status" [nbSpinner]="true">
+        {{ id() ? 'Изчакване на отговор за хранилището…' : 'Зареждане на хранилищата…' }}
+      </p>
+    }
+
+    @if (!id()) {
+      @if (store.locations(); as locations) {
+        <div class="storage-actions">
+          <label for="storage-status-filter">Статус</label>
+          <select
+            #statusFilter
+            id="storage-status-filter"
+            [value]="filter() ?? ''"
+            (change)="filterBy(statusFilter.value)"
+            [disabled]="store.busy() || form() !== null"
+          >
+            <option value="">Всички</option>
+            @for (status of statuses; track status) {
+              <option [value]="status">{{ statusLabels[status] }}</option>
+            }
+          </select>
+          <button
+            nbButton
+            status="primary"
+            type="button"
+            [disabled]="store.busy()"
+            (click)="openForm('create')"
+          >
+            Добави хранилище
+          </button>
+        </div>
+        @if (locations.items.length) {
+          <div class="table-scroll">
+            <table aria-label="Конфигурирани хранилища">
+              <thead>
+                <tr>
+                  <th scope="col">Име</th>
+                  <th scope="col">Състояние</th>
+                  <th scope="col">Последна проба</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (location of locations.items; track location.id) {
+                  <tr>
+                    <td>
+                      <a [routerLink]="['/admin/storage', location.id]">{{ location.label }}</a>
+                    </td>
+                    <td>{{ statusLabels[location.status] }}</td>
+                    <td>{{ healthLabels[location.connectionStatus] }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p>Няма хранилища с този статус.</p>
+        }
+        @if (locations.nextCursor) {
+          <button
+            nbButton
+            outline
+            type="button"
+            [disabled]="store.busy()"
+            (click)="store.loadLocations(filter(), true)"
+          >
+            Още хранилища
+          </button>
+        }
+      }
+    } @else if (store.detail(); as detail) {
+      @let location = detail.value;
+      <p>
+        {{ statusLabels[location.status] }} · SFTP профил <strong>{{ location.profileId }}</strong>
+      </p>
+      @if (location.status !== 'Archived') {
+        <div class="storage-actions">
+          <button
+            nbButton
+            outline
+            type="button"
+            [disabled]="store.busy() || store.conflict() || form() !== null"
+            (click)="openForm('edit')"
+          >
+            Редактирай
+          </button>
+          <button
+            nbButton
+            status="info"
+            type="button"
+            [disabled]="store.busy() || store.conflict() || form() !== null"
+            (click)="store.probe()"
+          >
+            Тествай връзката
+          </button>
+          @if (location.transitions.includes('ActivateForNewWrites')) {
+            <button
+              nbButton
+              status="primary"
+              type="button"
+              [disabled]="store.busy() || store.conflict() || form() !== null"
+              (click)="openForm('ActivateForNewWrites')"
+            >
+              Използвай за нови качвания
+            </button>
+          }
+          @if (location.transitions.includes('ArchiveDraft')) {
+            <button
+              nbButton
+              outline
+              status="warning"
+              type="button"
+              [disabled]="store.busy() || store.conflict() || form() !== null"
+              (click)="openForm('ArchiveDraft')"
+            >
+              Архивирай черновата
+            </button>
+          }
+        </div>
+      }
+      @if (store.health(); as health) {
+        <h2>Състояние</h2>
+        <dl>
+          <div>
+            <dt>Връзка</dt>
+            <dd>{{ healthLabels[health.status] }}</dd>
+          </div>
+          <div>
+            <dt>Последна проверка</dt>
+            <dd>{{ (health.checkedAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма данни' }}</dd>
+          </div>
+          <div>
+            <dt>Размер на завършените файлове</dt>
+            <dd>
+              {{ health.usedBytes === null ? 'Няма данни' : (health.usedBytes | number) + ' B' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Капацитет</dt>
+            <dd>
+              {{
+                health.capacityBytes === null
+                  ? 'Няма данни'
+                  : (health.capacityBytes | number) + ' B'
+              }}
+            </dd>
+          </div>
+          <div>
+            <dt>Последно резервно копие</dt>
+            <dd>
+              {{ (health.lastSuccessfulBackupAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма данни' }}
+            </dd>
+          </div>
+          <div>
+            <dt>Последно тестово възстановяване</dt>
+            <dd>
+              {{ (health.lastVerifiedRestoreAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма данни' }}
+            </dd>
+          </div>
+        </dl>
+      }
+      @if (store.issues(); as issues) {
+        <h2>Проблемни файлове</h2>
+        @if (issues.items.length) {
+          <ul>
+            @for (issue of issues.items; track issue.uploadId) {
+              <li>
+                {{ issueLabels[issue.kind] }} · {{ issue.detectedAtUtc | date: 'dd.MM.yyyy HH:mm' }}
+                @if (issue.assetId) {
+                  <a [routerLink]="['/admin/media', issue.assetId]">Детайл на файла</a>
+                }
+              </li>
+            }
+          </ul>
+          @if (issues.nextCursor) {
+            <button
+              nbButton
+              outline
+              type="button"
+              [disabled]="store.busy()"
+              (click)="store.moreIssues()"
+            >
+              Още файлове
+            </button>
+          }
+        } @else {
+          <p>Няма записани проблеми.</p>
+        }
+      }
+    }
+
+    @if ((store.conflict() || store.error()) && !store.busy()) {
+      <button nbButton outline type="button" (click)="refresh()">Презареди</button>
+    }
+  </nb-card-body>
+</nb-card>
+
+@if (form(); as action) {
+  <nb-card>
+    <nb-card-header>
+      <h2>
+        @switch (action) {
+          @case ('create') {
+            Ново хранилище
+          }
+          @case ('edit') {
+            Редакция на хранилището
+          }
+          @case ('ActivateForNewWrites') {
+            Потвърди превключването
+          }
+          @case ('ArchiveDraft') {
+            Потвърди архивирането
+          }
+        }
+      </h2>
+    </nb-card-header>
+    <nb-card-body>
+      <form class="storage-form" (submit)="submit($event)">
+        @if (action === 'create' || action === 'edit') {
+          <label>
+            Име на хранилището
+            <input nbInput fullWidth required maxlength="100" [formControl]="label" />
+          </label>
+          @if (action === 'create' || store.detail()?.value?.status === 'Draft') {
+            @if (store.profilesError()) {
+              <nb-alert status="warning" role="alert">{{ store.profilesError() }}</nb-alert>
+              <button nbButton outline type="button" (click)="store.loadProfiles()">
+                Презареди профилите
+              </button>
+            } @else if (store.profiles(); as profiles) {
+              @if (profiles.length) {
+                <label>
+                  SFTP профил
+                  <select [required]="action === 'create'" [formControl]="profileId">
+                    <option value="">
+                      {{ action === 'create' ? 'Избери профил' : 'Запази текущия профил' }}
+                    </option>
+                    @for (profile of profiles; track profile.id) {
+                      <option [value]="profile.id">{{ profile.label }}</option>
+                    }
+                  </select>
+                </label>
+              } @else {
+                <p>Няма конфигурирани SFTP профили.</p>
+              }
+            } @else {
+              <p role="status">Зареждане на SFTP профилите…</p>
+            }
+          }
+        } @else {
+          @if (action === 'ActivateForNewWrites') {
+            <p>
+              Текуща цел за нови качвания <strong>{{ store.active() }}</strong>
+            </p>
+            <p>
+              Нова цел <strong>{{ store.detail()?.value?.label }}</strong>
+            </p>
+            <p>
+              Вече започнатите качвания и съществуващите файлове остават в записаното им хранилище.
+            </p>
+          }
+          <label>
+            Причина
+            <textarea
+              nbInput
+              fullWidth
+              required
+              maxlength="500"
+              rows="3"
+              [formControl]="reason"
+            ></textarea>
+          </label>
+        }
+        <div class="storage-actions">
+          <button
+            nbButton
+            status="primary"
+            type="submit"
+            [disabled]="
+              store.busy() ||
+              store.conflict() ||
+              (action === 'create' && (!label.value.trim() || !profileId.value)) ||
+              (action === 'edit' && !label.value.trim()) ||
+              ((action === 'ActivateForNewWrites' || action === 'ArchiveDraft') &&
+                !reason.value.trim())
+            "
+          >
+            {{ action === 'create' || action === 'edit' ? 'Запази' : 'Потвърди' }}
+          </button>
+          <button nbButton outline type="button" [disabled]="store.busy()" (click)="form.set(null)">
+            Отказ
+          </button>
+        </div>
+      </form>
+    </nb-card-body>
+  </nb-card>
+}

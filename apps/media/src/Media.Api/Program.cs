@@ -65,6 +65,7 @@ if (app.Environment.IsDevelopment()) app.MapOpenApi("/media/openapi/{documentNam
 
 app.MapHealthChecks("/media/health/live");
 app.MapMediaTransfers();
+app.MapGet("/internal/media/v1/storage/profiles", StorageProbeEndpoint.ListProfiles);
 app.MapPost("/internal/media/v1/storage/{locationId}/probe", StorageProbeEndpoint.HandleAsync);
 app.Run();
 

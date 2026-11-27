@@ -40,6 +40,7 @@ import {
   ProcessingStatus,
   UploadStatus,
 } from './persistence/media-upload.schema';
+import { StorageAdminService } from './storage/storage-admin.service';
 
 interface UploadGrantClaims {
   purpose: 'media-upload';
@@ -73,6 +74,7 @@ export class MediaService {
     private readonly auth: AuthService,
     private readonly backOffice: BackOfficeGuard,
     private readonly library: MediaLibraryScope,
+    private readonly storage: StorageAdminService,
     private readonly config: ConfigService<AllConfigType>,
   ) {}
 
@@ -97,15 +99,13 @@ export class MediaService {
     const expiresSeconds = this.value('uploadGrantExpiresSeconds');
     const expiresAt = new Date(now.getTime() + expiresSeconds * 1_000);
     const fileKey = randomBytes(32).toString('hex');
-    const storageLocationId = this.config.getOrThrow(
-      'media.defaultStorageLocationId',
-      { infer: true },
-    );
     await this.ensureQuota(accountId, quotaBytes);
 
     const databaseSession = await this.connection.startSession();
     try {
       await databaseSession.withTransaction(async () => {
+        const storageLocationId =
+          await this.storage.activeProfileId(databaseSession);
         await this.releaseExpiredReservations(accountId, now, databaseSession);
         await this.quotas.updateOne(
           { _id: accountId },

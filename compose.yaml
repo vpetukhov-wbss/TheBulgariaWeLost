@@ -24,6 +24,8 @@ x-api-environment: &api-environment
   MEDIA_UPLOAD_GRANT_SECRET: ${MEDIA_UPLOAD_GRANT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   MEDIA_READ_GRANT_SECRET: ${MEDIA_READ_GRANT_SECRET:?Run ./scripts/dev-up.sh to generate local secrets}
   MEDIA_DEFAULT_STORAGE_LOCATION_ID: archive
+  MEDIA_PROBE_ORIGIN: http://media:8080
+  MEDIA_PROBE_TOKEN: ${MEDIA_PROBE_TOKEN:?Run ./scripts/dev-up.sh to generate local secrets}
   MEDIA_READ_GRANT_EXPIRES_IN_SECONDS: 300
   MEDIA_UPLOAD_LEASE_SECONDS: 2
   MEDIA_INSPECTION_LEASE_SECONDS: 120

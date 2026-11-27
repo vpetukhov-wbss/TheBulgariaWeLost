@@ -9,6 +9,7 @@ export const auditTargets: Record<AuditTargetType, string> = {
   Moderation: 'Модерация',
   Other: 'Друго',
   SiteSettings: 'Настройки на сайта',
+  StorageLocation: 'Хранилище',
 };
 
 export const auditOutcomes: Record<AuditOutcome, string> = {
@@ -18,6 +19,11 @@ export const auditOutcomes: Record<AuditOutcome, string> = {
 };
 
 const auditActions: Record<string, string> = {
+  StorageLocationCreated: 'Добавено хранилище',
+  StorageLocationUpdated: 'Редактирано хранилище',
+  StorageConnectionChecked: 'Проверена SFTP връзка',
+  StorageRoutingChanged: 'Променена цел за нови качвания',
+  StorageDraftArchived: 'Архивирана чернова на хранилище',
   MediaMetadataUpdated: 'Редактирани метаданни на файл',
   MediaAccessRestricted: 'Ограничен достъп до файл',
   MediaRestrictionLifted: 'Отменено ограничение на файл',

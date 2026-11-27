@@ -12,6 +12,9 @@ public static class StorageModule
             .Bind(config.GetSection("MediaStorage"))
             .Validate(options => options.PartialRetentionMinutes is >= 1 and <= 10_080
                 && options.CleanupIntervalSeconds is >= 10 and <= 3_600
+                && options.Profiles.Keys.All(id => id.Length is >= 1 and <= 100
+                    && char.IsAsciiLetterOrDigit(id[0])
+                    && id.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_'))
                 && options.Profiles.Values.All(profile =>
                 !string.IsNullOrWhiteSpace(profile.Host)
                 && profile.Port is >= 1 and <= 65535

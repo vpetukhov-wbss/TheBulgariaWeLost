@@ -271,6 +271,23 @@ public sealed class TransferTests
         Assert.Equal(1, app.Storage.ProbeCount);
     }
 
+    [Fact]
+    public async Task Profile_discovery_returns_only_configured_identifiers()
+    {
+        await using var app = new MediaApp();
+        using var client = app.CreateClient();
+        const string path = "/internal/media/v1/storage/profiles";
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", MediaApp.ServiceToken);
+        using var denied = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.Unauthorized, denied.StatusCode);
+
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", MediaApp.ProbeToken);
+        using var accepted = await client.GetAsync(path);
+        Assert.Equal(HttpStatusCode.OK, accepted.StatusCode);
+        using var document = JsonDocument.Parse(await accepted.Content.ReadAsStringAsync());
+        Assert.Equal("archive", Assert.Single(document.RootElement.EnumerateArray()).GetString());
+    }
+
     private static async Task<HttpResponseMessage> UploadAsync(HttpClient client, byte[] bytes)
     {
         return await UploadAsync(client, new ByteArrayContent(bytes));

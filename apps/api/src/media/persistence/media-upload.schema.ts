@@ -150,6 +150,7 @@ export class MediaUpload {
 export const MediaUploadSchema = SchemaFactory.createForClass(MediaUpload);
 
 MediaUploadSchema.index({ status: 1, _id: -1 });
+MediaUploadSchema.index({ storageLocationId: 1, status: 1, _id: 1 });
 MediaUploadSchema.index({ fileKey: 1 }, { unique: true });
 MediaUploadSchema.index({ accountId: 1, status: 1, expiresAt: 1 });
 MediaUploadSchema.index({ status: 1, leaseExpiresAt: 1 });

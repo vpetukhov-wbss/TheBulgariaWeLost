@@ -33,6 +33,15 @@ import {
   MediaUpload,
   MediaUploadSchema,
 } from './persistence/media-upload.schema';
+import { StorageAdminController } from './storage/storage-admin.controller';
+import { StorageAdminService } from './storage/storage-admin.service';
+import { StorageProfileClient } from './storage/storage-profile-client';
+import {
+  StorageCommand,
+  StorageCommandSchema,
+  StorageRouting,
+  StorageRoutingSchema,
+} from './storage/storage-routing.schema';
 
 @Module({
   imports: [
@@ -44,10 +53,13 @@ import {
       { name: MaterialRevision.name, schema: MaterialRevisionSchema },
       { name: PublishingAuditEvent.name, schema: PublishingAuditEventSchema },
       { name: MediaAccessCommand.name, schema: MediaAccessCommandSchema },
+      { name: StorageRouting.name, schema: StorageRoutingSchema },
+      { name: StorageCommand.name, schema: StorageCommandSchema },
     ]),
   ],
   controllers: [
     AdminMediaController,
+    StorageAdminController,
     MediaUploadController,
     MediaAssetController,
     InternalMediaUploadController,
@@ -58,6 +70,8 @@ import {
     MediaService,
     MediaServiceGuard,
     AdminMediaService,
+    StorageAdminService,
+    StorageProfileClient,
     MediaLibraryScope,
     BackOfficeGuard,
     AdministratorGuard,

@@ -4,6 +4,7 @@ import { AuditStore } from '../audit/audit.store';
 import { ModerationStore } from '../moderation/moderation.store';
 
 const catalogEntry = () => import('./catalog-entry').then((m) => m.CatalogEntry);
+const storage = () => import('../storage/storage-page').then((m) => m.StoragePage);
 
 export const editorialRoutes: Routes = [
   {
@@ -70,6 +71,18 @@ export const editorialRoutes: Routes = [
         loadComponent: () => import('../audit/audit-detail').then((m) => m.AuditDetail),
       },
     ],
+  },
+  {
+    path: 'storage',
+    title: 'Файлови хранилища',
+    data: { requiredPermission: 'Storage.Manage' },
+    loadComponent: storage,
+  },
+  {
+    path: 'storage/:id',
+    title: 'Хранилище',
+    data: { requiredPermission: 'Storage.Manage' },
+    loadComponent: storage,
   },
   {
     path: 'settings',

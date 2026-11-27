@@ -94,7 +94,7 @@
 | `GET /storage-locations/{id}` | Storage.Manage | `StorageLocationDetail` с настройки и версия |
 | `GET /storage-locations/{id}/health` | Storage.Manage | `StorageHealth` с резултат от последната проверка, използван обем, квота когато е налична и последно резервно копие |
 | `PATCH /storage-locations/{id}` | Storage.Manage | `label` и при `Draft` `profileId` → `StorageLocationDetail` |
-| `POST /storage-locations/{id}/connection-checks` | Storage.Manage | `expectedVersion` → `202`. Проверява одобрения профил и нужните права за четене и запис |
+| `POST /storage-locations/{id}/connection-checks` | Storage.Manage | `expectedVersion` → `200 StorageHealth`. Изчаква резултата от пробата за четене и запис с общ лимит 20 секунди |
 | `POST /storage-locations/{id}/transitions` | Storage.Manage | `action = ActivateForNewWrites / ArchiveDraft` и причина. Активирането изисква и `expectedRoutingVersion` → `StorageLocationDetail` |
 | `GET /storage-locations/{id}/asset-issues` | Storage.Manage | `kind = Missing / FailedUpload / IntegrityMismatch` → `Page<StorageAssetIssue>` |
 | `GET /jobs` | Operations.Manage | `type, status, fromUtc, toUtc` → `Page<AdminJobSummary>` |

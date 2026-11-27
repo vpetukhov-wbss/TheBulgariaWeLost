@@ -2,6 +2,7 @@ namespace Media.Storage;
 
 public interface IObjectStorage
 {
+    IReadOnlyList<string> LocationIds { get; }
     bool HasLocation(string locationId);
     Task<StoredFile?> OpenReadAsync(string locationId, string fileKey, CancellationToken cancellationToken);
     Task PublishAsync(string locationId, string fileKey, Stream content, CancellationToken cancellationToken);

@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import assert from 'node:assert/strict';
 import { after, before, describe, it } from 'node:test';
 import { once } from 'node:events';
+import { createServer } from 'node:http';
 import { setTimeout as delay } from 'node:timers/promises';
 import { promisify } from 'node:util';
 import { mongo } from 'mongoose';
@@ -40,12 +41,42 @@ const base32Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
 const mediaServiceToken = `${randomUUID()}${randomUUID()}`;
 const mediaGrantSecret = `${randomUUID()}${randomUUID()}`;
 const mediaReadGrantSecret = `${randomUUID()}${randomUUID()}`;
+const mediaProbeToken = `${randomUUID()}${randomUUID()}`;
+const storageProbes: string[] = [];
+const storageService = createServer((request, response) => {
+  if (request.headers.authorization !== 'Bearer ' + mediaProbeToken) {
+    response.writeHead(401).end();
+  } else if (
+    request.method === 'GET' &&
+    request.url === '/internal/media/v1/storage/profiles'
+  ) {
+    response.setHeader('Content-Type', 'application/json');
+    response.end(
+      JSON.stringify(['archive', 'secondary', 'denied', 'offline', 'spare']),
+    );
+  } else {
+    const profile = request.url?.match(
+      /^\/internal\/media\/v1\/storage\/([a-z]+)\/probe$/,
+    )?.[1];
+    if (request.method !== 'POST' || !profile) {
+      response.writeHead(404).end();
+      return;
+    }
+    storageProbes.push(profile);
+    if (profile === 'denied') {
+      response.writeHead(403, { 'Content-Type': 'application/problem+json' });
+      response.end(JSON.stringify({ code: 'storage_access_denied' }));
+    } else {
+      response.writeHead(profile === 'offline' ? 503 : 204).end();
+    }
+  }
+});
 const authJwtSecret = randomCredential('Jwt');
 const authRefreshSecret = randomCredential('Refresh');
 const authForgotSecret = randomCredential('Forgot');
 const authConfirmSecret = randomCredential('Confirm');
 const authClientIps = new Map<string, string>();
-sensitiveSamples.push(details.password, mediaServiceToken);
+sensitiveSamples.push(details.password, mediaServiceToken, mediaProbeToken);
 
 function authClientIp(email: string): string {
   const existing = authClientIps.get(email);
@@ -378,6 +409,12 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .command({ hello: 1 });
     if (!hello.setName)
       throw new Error('The e2e suite requires a MongoDB replica set.');
+    storageService.listen(0, '127.0.0.1');
+    await once(storageService, 'listening');
+    const probeAddress = storageService.address();
+    if (!probeAddress || typeof probeAddress === 'string') {
+      throw new Error('Unable to start the storage probe fixture.');
+    }
     child = spawn(process.execPath, ['dist/main'], {
       env: {
         ...process.env,
@@ -410,6 +447,8 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         MEDIA_UPLOAD_GRANT_SECRET: mediaGrantSecret,
         MEDIA_READ_GRANT_SECRET: mediaReadGrantSecret,
         MEDIA_DEFAULT_STORAGE_LOCATION_ID: 'archive',
+        MEDIA_PROBE_ORIGIN: `http://127.0.0.1:${probeAddress.port}`,
+        MEDIA_PROBE_TOKEN: mediaProbeToken,
         MEDIA_ACCOUNT_QUOTA_BYTES: '1024',
         MEDIA_MAX_UPLOAD_BYTES: '33554432',
         AUTH_JWT_TOKEN_EXPIRES_IN:
@@ -438,6 +477,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       child.kill();
       await exit;
     }
+    storageService.close();
     try {
       await db.db().dropDatabase();
     } finally {
@@ -2410,6 +2450,157 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .send({ hash, password })
       .expect(422);
     await login(email, password);
+  });
+
+  void it('should switch checked SFTP profiles atomically and preserve already reserved uploads', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const root = '/api/admin/v1/storage-locations';
+    const profiles = '/api/admin/v1/storage-connection-profiles';
+    const get = (path: string, token = admin.token) =>
+      api.get(path).auth(token, { type: 'bearer' });
+    const post = (path: string, body: object, key: string = randomUUID()) =>
+      api
+        .post(path)
+        .auth(admin.token, { type: 'bearer' })
+        .set('Idempotency-Key', key)
+        .send(body);
+    const draft = async (profileId: string) => {
+      const result = await post(root, { label: profileId, profileId }).expect(
+        201,
+      );
+      return result.body as {
+        id: string;
+        version: number;
+        routingVersion: number;
+      };
+    };
+    const detail = async (id: string) => {
+      const response = await get(root + '/' + id).expect(200);
+      return response.body as {
+        id: string;
+        version: number;
+        routingVersion: number;
+        status: string;
+        profileId: string;
+      };
+    };
+    const probe = (id: string, version: number, key?: string) =>
+      post(
+        root + '/' + id + '/connection-checks',
+        { expectedVersion: version },
+        key,
+      );
+    const activate = (
+      location: Awaited<ReturnType<typeof detail>>,
+      key?: string,
+    ) =>
+      post(
+        root + '/' + location.id + '/transitions',
+        {
+          action: 'ActivateForNewWrites',
+          expectedVersion: location.version,
+          expectedRoutingVersion: location.routingVersion,
+          reason: 'Проверка на маршрутизацията',
+        },
+        key,
+      );
+
+    await api.get(root).expect(401);
+    await get(root, editor.token).expect(403);
+    await get(profiles, editor.token).expect(403);
+    const safeProfiles = await get(profiles).expect(200);
+    assert.deepEqual(safeProfiles.body.items[0], {
+      id: 'archive',
+      label: 'archive',
+    });
+    assert.equal(safeProfiles.body.items.length, 5);
+    const before = await get(root)
+      .query({ status: 'ActiveForNewWrites' })
+      .expect(200);
+    assert.equal(before.body.items[0].profileId, 'archive');
+    const legacyId = before.body.items[0].id as string;
+    const originalUpload = await createUpload(editor.token);
+
+    const missing = await post(root, {
+      label: 'Непознато',
+      profileId: 'unknown',
+    }).expect(422);
+    assert.equal(missing.body.code, 'storage_profile_unknown');
+    const draftPayload = { label: 'Второ хранилище', profileId: 'secondary' };
+    const createKey = randomUUID();
+    const created = await post(root, draftPayload, createKey).expect(201);
+    const secondary = await detail(created.body.id as string);
+    assert.equal(created.headers.location, root + '/' + secondary.id);
+    assert.equal(
+      (await post(root, draftPayload, createKey).expect(201)).body.id,
+      secondary.id,
+    );
+    await post(
+      root,
+      { ...draftPayload, label: 'Друг етикет' },
+      createKey,
+    ).expect(409);
+    assert.equal(
+      (await activate(secondary).expect(409)).body.code,
+      'storage_not_ready',
+    );
+
+    const denied = await draft('denied');
+    const deniedHealth = await probe(denied.id, denied.version).expect(200);
+    assert.equal(deniedHealth.body.status, 'Denied');
+    assert.equal(deniedHealth.body.capacityBytes, null);
+    const offline = await draft('offline');
+    assert.equal(
+      (await probe(offline.id, offline.version).expect(200)).body.status,
+      'Unavailable',
+    );
+
+    const checkKey = randomUUID();
+    const result = await probe(
+      secondary.id,
+      secondary.version,
+      checkKey,
+    ).expect(200);
+    assert.equal(result.body.status, 'Healthy');
+    assert.deepEqual(
+      (await probe(secondary.id, secondary.version, checkKey).expect(200)).body,
+      result.body,
+    );
+    assert.equal(storageProbes.filter((id) => id === 'secondary').length, 1);
+
+    const spare = await draft('spare');
+    await probe(spare.id, spare.version).expect(200);
+    const candidates = await Promise.all([
+      detail(secondary.id),
+      detail(spare.id),
+    ]);
+    const switchKeys = [randomUUID(), randomUUID()];
+    const attempts = await Promise.all(
+      candidates.map((candidate, index) =>
+        activate(candidate, switchKeys[index]),
+      ),
+    );
+    assert.deepEqual(attempts.map(({ status }) => status).sort(), [200, 409]);
+    const winIndex = attempts.findIndex(({ status }) => status === 200);
+    const winner = candidates[winIndex];
+    assert.equal(attempts[1 - winIndex].body.code, 'routing_version_conflict');
+    assert.deepEqual(
+      (await activate(winner, switchKeys[winIndex]).expect(200)).body,
+      attempts[winIndex].body,
+    );
+    assert.equal((await detail(legacyId)).status, 'ReadOnly');
+
+    const newUpload = await createUpload(editor.token);
+    const oldClaim = await claimUpload(originalUpload).expect(200);
+    const newClaim = await claimUpload(newUpload).expect(200);
+    assert.equal(oldClaim.body.object.storageLocationId, 'archive');
+    assert.equal(newClaim.body.object.storageLocationId, winner.profileId);
+    const events = await get('/api/admin/v1/audit-events')
+      .query({ targetId: winner.id, action: 'StorageRoutingChanged' })
+      .expect(200);
+    assert.equal(events.body.items.length, 1);
+    assert.equal(events.body.items[0].targetType, 'StorageLocation');
   });
 
   void it('should keep an active administrator under concurrent sanctions and role changes', async () => {
