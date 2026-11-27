@@ -61,7 +61,28 @@ export default registerAs<MediaConfig>('media', () => {
     }
   }
 
+  const backupReportToken =
+    process.env.OPERATIONS_BACKUP_REPORT_TOKEN?.trim() ?? '';
+  if (
+    backupReportToken &&
+    (backupReportToken.length < 32 ||
+      [
+        serviceToken,
+        uploadGrantSecret,
+        readGrantSecret,
+        probeToken,
+        process.env.AUTH_JWT_SECRET,
+        process.env.AUTH_REFRESH_SECRET,
+      ].includes(backupReportToken))
+  ) {
+    throw new Error(
+      'OPERATIONS_BACKUP_REPORT_TOKEN must be independent and at least 32 characters.',
+    );
+  }
+
   return {
+    backupReportToken,
+    backupMaxAgeHours: positiveInteger('OPERATIONS_BACKUP_MAX_AGE_HOURS', 30),
     serviceToken,
     uploadGrantSecret,
     readGrantSecret,

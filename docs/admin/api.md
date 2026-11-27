@@ -100,9 +100,12 @@
 | `GET /jobs` | Operations.Manage | `type, status, fromUtc, toUtc` → `Page<AdminJobSummary>` |
 | `GET /jobs/{id}` | Operations.Manage | `AdminJobDetail` със статус, опити и безопасен код за грешка |
 | `POST /jobs/{id}/retries` | Operations.Manage | `expectedVersion` и причина → `202` само за допустима задача със статус `Failed` |
+| `GET /operations-summary` | Operations.Manage | Последни сигнали от работници, свежест на копията и активни аларми |
 | `GET /backups` | Operations.Manage | `scope, status, fromUtc, toUtc` → `Page<BackupRun>` |
 | `GET /audit-events` | Audit.Read | `actorId, action, targetType, targetId, outcome, fromUtc, toUtc` → `Page<AuditEventSummary>` |
 | `GET /audit-events/{id}` | Audit.Read | `AuditEventDetail` със защитени подробности и корелация |
+
+При справката за задачи интервалът филтрира по начало на задачата. Повторението връща `statusUrl` към същата задача. Частните `PUT /internal/operations/v1/backups/{id}` и `GET /internal/operations/v1/alerts` използват отделен служебен токен. [Експлоатационни инструкции](../operations/runbook.md)
 
 ## Реклама и настройки
 

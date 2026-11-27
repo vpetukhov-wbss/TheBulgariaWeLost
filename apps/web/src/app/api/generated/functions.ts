@@ -99,6 +99,16 @@ export type { RequestAdminPasswordReset$Params as RequestAdminPasswordReset$Para
 export { requestAdminPasswordReset as requestAdminPasswordReset } from './fn/admin-users/request-admin-password-reset';
 export type { GetPasswordResetOperation$Params as GetPasswordResetOperation$Params } from './fn/admin-users/get-password-reset-operation';
 export { getPasswordResetOperation as getPasswordResetOperation } from './fn/admin-users/get-password-reset-operation';
+export type { ListAdminJobs$Params as ListAdminJobs$Params } from './fn/admin-operations/list-admin-jobs';
+export { listAdminJobs as listAdminJobs } from './fn/admin-operations/list-admin-jobs';
+export type { GetAdminJob$Params as GetAdminJob$Params } from './fn/admin-operations/get-admin-job';
+export { getAdminJob as getAdminJob } from './fn/admin-operations/get-admin-job';
+export type { RetryAdminJob$Params as RetryAdminJob$Params } from './fn/admin-operations/retry-admin-job';
+export { retryAdminJob as retryAdminJob } from './fn/admin-operations/retry-admin-job';
+export type { ListBackupRuns$Params as ListBackupRuns$Params } from './fn/admin-operations/list-backup-runs';
+export { listBackupRuns as listBackupRuns } from './fn/admin-operations/list-backup-runs';
+export type { GetOperationsSummary$Params as GetOperationsSummary$Params } from './fn/admin-operations/get-operations-summary';
+export { getOperationsSummary as getOperationsSummary } from './fn/admin-operations/get-operations-summary';
 export type { ListMaterials$Params as ListMaterials$Params } from './fn/publishing/list-materials';
 export { listMaterials as listMaterials } from './fn/publishing/list-materials';
 export type { CreateMaterial$Params as CreateMaterial$Params } from './fn/publishing/create-material';

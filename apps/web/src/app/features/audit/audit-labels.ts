@@ -4,6 +4,7 @@ import type { AuditTargetType } from '../../api/generated/models/audit-target-ty
 export const auditTargets: Record<AuditTargetType, string> = {
   Account: 'Потребител',
   Catalog: 'Каталог',
+  Job: 'Фонова задача',
   Material: 'Материал',
   Media: 'Медия',
   Moderation: 'Модерация',
@@ -19,6 +20,7 @@ export const auditOutcomes: Record<AuditOutcome, string> = {
 };
 
 const auditActions: Record<string, string> = {
+  MediaInspectionRetried: 'Отново поставена проверка на медия в опашката',
   StorageLocationCreated: 'Добавено хранилище',
   StorageLocationUpdated: 'Редактирано хранилище',
   StorageConnectionChecked: 'Проверена SFTP връзка',

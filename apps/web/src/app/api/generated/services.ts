@@ -11,6 +11,7 @@ export { PublicSiteSettingsService } from './services/public-site-settings.servi
 export { AdminStorageService } from './services/admin-storage.service';
 export { AdminMediaService } from './services/admin-media.service';
 export { AdminUsersService } from './services/admin-users.service';
+export { AdminOperationsService } from './services/admin-operations.service';
 export { PublishingService } from './services/publishing.service';
 export { AuthoringService } from './services/authoring.service';
 export { ModerationService } from './services/moderation.service';

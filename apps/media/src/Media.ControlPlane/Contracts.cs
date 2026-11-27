@@ -19,7 +19,8 @@ public sealed record InspectionLease(
     ObjectReference Object,
     ObjectReference PreviewObject,
     long Length,
-    string Sha256);
+    string Sha256,
+    string? TraceId = null);
 
 public sealed record InspectionResult(
     Guid AttemptId,

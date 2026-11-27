@@ -72,6 +72,8 @@ metadata_count=$(compose exec -T mongo mongosh --quiet \
     status: 'Completed',
     schemaVersion: 3,
     completedAttemptId: { \$type: 'string' },
+    inspectionAttemptCount: { \$gte: 1 },
+    inspectionAttempts: { \$elemMatch: { workerId: { \$type: 'string' }, outcome: 'inspected' } },
     \$or: [
       { _id: '$image_id', correlationId: '$image_correlation' },
       { _id: '$pdf_id', correlationId: '$pdf_correlation' }

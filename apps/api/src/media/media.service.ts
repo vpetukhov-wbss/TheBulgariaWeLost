@@ -40,6 +40,7 @@ import {
   ProcessingStatus,
   UploadStatus,
 } from './persistence/media-upload.schema';
+import { MediaWorkerHeartbeat } from './operations/operations.schema';
 import { StorageAdminService } from './storage/storage-admin.service';
 
 interface UploadGrantClaims {
@@ -75,6 +76,8 @@ export class MediaService {
     private readonly backOffice: BackOfficeGuard,
     private readonly library: MediaLibraryScope,
     private readonly storage: StorageAdminService,
+    @InjectModel(MediaWorkerHeartbeat.name)
+    private readonly workerHeartbeats: Model<MediaWorkerHeartbeat>,
     private readonly config: ConfigService<AllConfigType>,
   ) {}
 
@@ -283,6 +286,8 @@ export class MediaService {
           completedAt,
           contentType: receipt.contentType,
           processingStatus: ProcessingStatus.Pending,
+          inspectionUpdatedAt: completedAt,
+          inspectionVersion: 1,
           accessStatus: MediaAccessStatus.Active,
           accessVersion: upload.accessVersion || 1,
           schemaVersion: 3,
@@ -434,8 +439,17 @@ export class MediaService {
         };
   }
 
-  async leaseInspection(): Promise<InspectionLeaseDto | null> {
+  async leaseInspection(workerId?: string): Promise<InspectionLeaseDto | null> {
     const now = new Date();
+    if (workerId) {
+      await this.workerHeartbeats
+        .updateOne(
+          { _id: workerId },
+          { $max: { lastSeenAt: now, expiresAt: now } },
+          { upsert: true },
+        )
+        .exec();
+    }
     const attemptId = uuidv7();
     const previewFileKey = randomBytes(32).toString('hex');
     const leaseExpiresAt = new Date(
@@ -453,21 +467,102 @@ export class MediaService {
             },
           ],
         },
-        {
-          $set: {
-            processingStatus: ProcessingStatus.Claimed,
-            inspectionAttemptId: attemptId,
-            inspectionLeaseExpiresAt: leaseExpiresAt,
-            inspectionPreviewFileKey: previewFileKey,
+        [
+          {
+            $set: {
+              processingStatus: ProcessingStatus.Claimed,
+              inspectionAttemptId: attemptId,
+              inspectionLeaseExpiresAt: leaseExpiresAt,
+              inspectionPreviewFileKey: previewFileKey,
+              inspectionUpdatedAt: now,
+              inspectionVersion: {
+                $add: [{ $ifNull: ['$inspectionVersion', 1] }, 1],
+              },
+              inspectionAttemptCount: {
+                $add: [
+                  {
+                    $ifNull: [
+                      '$inspectionAttemptCount',
+                      {
+                        $cond: [
+                          {
+                            $or: [
+                              {
+                                $ne: [
+                                  { $ifNull: ['$inspectionAttemptId', null] },
+                                  null,
+                                ],
+                              },
+                              {
+                                $ne: [
+                                  {
+                                    $ifNull: [
+                                      '$inspectionCompletedAttemptId',
+                                      null,
+                                    ],
+                                  },
+                                  null,
+                                ],
+                              },
+                            ],
+                          },
+                          1,
+                          0,
+                        ],
+                      },
+                    ],
+                  },
+                  1,
+                ],
+              },
+              inspectionAttempts: {
+                $slice: [
+                  {
+                    $concatArrays: [
+                      {
+                        $map: {
+                          input: { $ifNull: ['$inspectionAttempts', []] },
+                          as: 'attempt',
+                          in: {
+                            $cond: [
+                              { $eq: ['$$attempt.id', '$inspectionAttemptId'] },
+                              {
+                                $mergeObjects: [
+                                  '$$attempt',
+                                  {
+                                    outcome: 'lease_expired',
+                                    finishedAt: '$inspectionLeaseExpiresAt',
+                                  },
+                                ],
+                              },
+                              '$$attempt',
+                            ],
+                          },
+                        },
+                      },
+                      [
+                        {
+                          id: attemptId,
+                          startedAt: now,
+                          ...(workerId ? { workerId } : {}),
+                        },
+                      ],
+                    ],
+                  },
+                  -25,
+                ],
+              },
+            },
           },
-        },
-        { new: true, sort: { completedAt: 1 } },
+        ],
+        { new: true, sort: { completedAt: 1 }, updatePipeline: true },
       )
       .exec();
     if (!claimed) return null;
     return {
       jobId: claimed._id,
       attemptId,
+      traceId: claimed.inspectionRetryTraceId ?? claimed.correlationId,
       object: {
         storageLocationId: claimed.storageLocationId,
         fileKey: claimed.fileKey,
@@ -511,6 +606,26 @@ export class MediaService {
       inspectionCompletedAttemptId: result.attemptId,
       inspectionOutcome: result.outcome,
       inspectedAt: completedAt,
+      inspectionUpdatedAt: completedAt,
+      inspectionVersion: { $add: [{ $ifNull: ['$inspectionVersion', 1] }, 1] },
+      inspectionAttempts: {
+        $map: {
+          input: { $ifNull: ['$inspectionAttempts', []] },
+          as: 'attempt',
+          in: {
+            $cond: [
+              { $eq: ['$$attempt.id', result.attemptId] },
+              {
+                $mergeObjects: [
+                  '$$attempt',
+                  { finishedAt: completedAt, outcome: result.outcome },
+                ],
+              },
+              '$$attempt',
+            ],
+          },
+        },
+      },
     };
     if (inspected) {
       set.previewStorageLocationId = result.previewObject?.storageLocationId;
@@ -524,15 +639,19 @@ export class MediaService {
         _id: jobId,
         processingStatus: ProcessingStatus.Claimed,
         inspectionAttemptId: result.attemptId,
+        inspectionLeaseExpiresAt: { $gt: completedAt },
       },
-      {
-        $set: set,
-        $unset: {
-          inspectionAttemptId: 1,
-          inspectionLeaseExpiresAt: 1,
-          inspectionPreviewFileKey: 1,
+      [
+        { $set: set },
+        {
+          $unset: [
+            'inspectionAttemptId',
+            'inspectionLeaseExpiresAt',
+            'inspectionPreviewFileKey',
+          ],
         },
-      },
+      ],
+      { updatePipeline: true },
     );
     if (completed.modifiedCount) return;
 

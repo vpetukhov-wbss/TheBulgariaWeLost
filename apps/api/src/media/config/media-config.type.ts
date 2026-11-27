@@ -1,4 +1,6 @@
 export type MediaConfig = {
+  backupReportToken: string;
+  backupMaxAgeHours: number;
   serviceToken: string;
   uploadGrantSecret: string;
   readGrantSecret: string;

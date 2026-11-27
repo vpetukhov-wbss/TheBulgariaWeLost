@@ -71,12 +71,18 @@ const storageService = createServer((request, response) => {
     }
   }
 });
+const backupReportToken = `${randomUUID()}${randomUUID()}`;
 const authJwtSecret = randomCredential('Jwt');
 const authRefreshSecret = randomCredential('Refresh');
 const authForgotSecret = randomCredential('Forgot');
 const authConfirmSecret = randomCredential('Confirm');
 const authClientIps = new Map<string, string>();
-sensitiveSamples.push(details.password, mediaServiceToken, mediaProbeToken);
+sensitiveSamples.push(
+  details.password,
+  mediaServiceToken,
+  mediaProbeToken,
+  backupReportToken,
+);
 
 function authClientIp(email: string): string {
   const existing = authClientIps.get(email);
@@ -449,6 +455,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
         MEDIA_DEFAULT_STORAGE_LOCATION_ID: 'archive',
         MEDIA_PROBE_ORIGIN: `http://127.0.0.1:${probeAddress.port}`,
         MEDIA_PROBE_TOKEN: mediaProbeToken,
+        OPERATIONS_BACKUP_REPORT_TOKEN: backupReportToken,
         MEDIA_ACCOUNT_QUOTA_BYTES: '1024',
         MEDIA_MAX_UPLOAD_BYTES: '33554432',
         AUTH_JWT_TOKEN_EXPIRES_IN:
@@ -509,6 +516,7 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     const contractRoutes = Object.keys(contract.paths).filter(
       (path) =>
         path.startsWith('/api/') ||
+        path.startsWith('/internal/operations/v1/') ||
         (path.startsWith('/internal/media/v1/') &&
           !path.startsWith('/internal/media/v1/storage/')),
     );
@@ -2601,6 +2609,215 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .expect(200);
     assert.equal(events.body.items.length, 1);
     assert.equal(events.body.items[0].targetType, 'StorageLocation');
+  });
+
+  void it('should preserve job attempts and accept only one versioned retry', async () => {
+    const admin = await createAdministrator();
+    const editor = await createEditor();
+    const jobRoot = '/api/admin/v1/jobs';
+    const getJob = (id: string, token = admin.token) =>
+      api.get(jobRoot + '/' + id).auth(token, { type: 'bearer' });
+
+    const upload = await createUpload(editor.token, 128, {}, 'ops-test-upload');
+    const claim = await claimUpload(upload).expect(200);
+    await completeUpload(upload, claim.body.attemptId).expect(204);
+    await db
+      .db()
+      .collection<UploadRecord>('mediaUploads')
+      .updateMany(
+        {
+          _id: { $ne: upload.uploadId },
+          status: 'Completed',
+          processingStatus: 'Pending',
+        },
+        { $set: { processingStatus: 'Failed' } },
+      );
+
+    const workerId = randomUUID();
+    const lease = () =>
+      api
+        .post('/internal/media/v1/inspections/lease')
+        .auth(mediaServiceToken, { type: 'bearer' })
+        .send({ workerId });
+    const attempt = (await lease().expect(200)).body;
+    assert.equal(attempt.jobId, upload.uploadId);
+    await completeInspection(upload.uploadId, {
+      attemptId: attempt.attemptId,
+      outcome: 'storage_unavailable',
+    }).expect(204);
+    await getJob(upload.uploadId, editor.token).expect(403);
+    const failed = (await getJob(upload.uploadId).expect(200)).body;
+    assert.equal(failed.canRetry, true);
+    assert.equal(failed.traceId, 'ops-test-upload');
+    assert.equal(failed.attemptCount, 1);
+    assert.equal(failed.attempts[0].workerId, workerId);
+    assert.equal(failed.attempts[0].outcome, 'storage_unavailable');
+
+    const retry = (key: string, reason = 'Хранилището е достъпно') =>
+      api
+        .post(jobRoot + '/' + upload.uploadId + '/retries')
+        .auth(admin.token, { type: 'bearer' })
+        .set('Idempotency-Key', key)
+        .set('X-Correlation-ID', 'ops-test-retry')
+        .send({ expectedVersion: failed.version, reason });
+
+    const key = randomUUID();
+    const results = await Promise.all([
+      retry(key).expect(202),
+      retry(key).expect(202),
+    ]);
+    assert.deepEqual(results[0].body, results[1].body);
+    assert.equal(results[0].headers.location, jobRoot + '/' + upload.uploadId);
+    assert.equal(
+      (await retry(key, 'Променена причина').expect(409)).body.code,
+      'idempotency_key_reused',
+    );
+    assert.equal(
+      (await retry(randomUUID()).expect(409)).body.code,
+      'version_conflict',
+    );
+
+    const second = (await lease().expect(200)).body;
+    assert.equal(second.jobId, upload.uploadId);
+    assert.equal(second.traceId, 'ops-test-retry');
+    assert.notEqual(second.attemptId, attempt.attemptId);
+    await completeInspection(upload.uploadId, {
+      attemptId: attempt.attemptId,
+      outcome: 'storage_unavailable',
+    }).expect(409);
+    await completeInspection(upload.uploadId, {
+      attemptId: second.attemptId,
+      outcome: 'integrity_mismatch',
+    }).expect(204);
+    const finished = (await getJob(upload.uploadId).expect(200)).body;
+    assert.equal(finished.canRetry, false);
+    assert.equal(finished.attemptCount, 2);
+    assert.equal(finished.lastRetryTraceId, 'ops-test-retry');
+    assert.deepEqual(
+      finished.attempts.map(({ outcome }: { outcome: string }) => outcome),
+      ['integrity_mismatch', 'storage_unavailable'],
+    );
+    await api
+      .post(jobRoot + '/' + upload.uploadId + '/retries')
+      .auth(admin.token, { type: 'bearer' })
+      .set('Idempotency-Key', randomUUID())
+      .send({ expectedVersion: finished.version, reason: 'Отказан опит' })
+      .expect(409);
+    const matching = await api
+      .get(jobRoot)
+      .auth(admin.token, { type: 'bearer' })
+      .query({ type: 'MediaInspection', status: 'Failed' })
+      .expect(200);
+    assert(
+      matching.body.items.some(
+        (job: { id: string }) => job.id === upload.uploadId,
+      ),
+    );
+
+    const audit = await api
+      .get('/api/admin/v1/audit-events')
+      .auth(admin.token, { type: 'bearer' })
+      .query({ targetId: upload.uploadId, action: 'MediaInspectionRetried' })
+      .expect(200);
+    assert.equal(audit.body.items.length, 1);
+    const summary = await api
+      .get('/api/admin/v1/operations-summary')
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert(
+      summary.body.workers.some(
+        (worker: { id: string; online: boolean }) =>
+          worker.id === workerId && worker.online,
+      ),
+    );
+    assert(
+      summary.body.alerts.some(
+        (alert: { code: string }) => alert.code === 'job_failed',
+      ),
+    );
+  });
+
+  void it('should authenticate backup reports and preserve verification, restore and alert state', async () => {
+    const admin = await createAdministrator();
+    const backups = '/internal/operations/v1/backups/';
+    const alerts = '/internal/operations/v1/alerts';
+    const scope = 'SftpOriginals';
+    const locations = await api
+      .get('/api/admin/v1/storage-locations')
+      .auth(admin.token, { type: 'bearer' })
+      .query({ status: 'ActiveForNewWrites' })
+      .expect(200);
+    const storageLocationId = locations.body.items[0].id as string;
+    const id = uuidv7();
+    const startedAtUtc = new Date(Date.now() - 48 * 60 * 60_000).toISOString();
+    const finishedAtUtc = new Date(Date.now() - 47 * 60 * 60_000).toISOString();
+    const verifiedAtUtc = new Date(Date.now() - 46 * 60 * 60_000).toISOString();
+    const restoreTestedAtUtc = new Date(
+      Date.now() - 45 * 60 * 60_000,
+    ).toISOString();
+    const running = {
+      scope,
+      storageLocationId,
+      startedAtUtc,
+      status: 'Running',
+    };
+    const report = (runId: string, body: object, token = backupReportToken) =>
+      api
+        .put(backups + runId)
+        .auth(token, { type: 'bearer' })
+        .send(body);
+
+    await report(id, running, mediaServiceToken).expect(401);
+    await api.get(alerts).auth(admin.token, { type: 'bearer' }).expect(401);
+    await report(id, running).expect(200);
+    const complete = {
+      ...running,
+      status: 'Succeeded',
+      finishedAtUtc,
+      verifiedAtUtc,
+      restoreTestedAtUtc,
+    };
+    const recorded = await report(id, complete).expect(200);
+    assert.equal(recorded.body.restoreTestedAtUtc, restoreTestedAtUtc);
+    assert.deepEqual(
+      (await report(id, running).expect(200)).body,
+      recorded.body,
+    );
+    await report(id, {
+      ...complete,
+      status: 'Failed',
+      verifiedAtUtc: undefined,
+      restoreTestedAtUtc: undefined,
+    }).expect(409);
+
+    const alertReport = await api
+      .get(alerts)
+      .auth(backupReportToken, { type: 'bearer' })
+      .expect(200);
+    assert(
+      alertReport.body.alerts.some(
+        (alert: { code: string; target: string }) =>
+          alert.code === 'backup_overdue' && alert.target === storageLocationId,
+      ),
+    );
+    const copy = alertReport.body.backups.find(
+      (item: { storageLocationId?: string }) =>
+        item.storageLocationId === storageLocationId,
+    );
+    assert.equal(copy.lastVerificationAtUtc, verifiedAtUtc);
+    assert.equal(copy.lastVerifiedRestoreAtUtc, restoreTestedAtUtc);
+    const list = await api
+      .get('/api/admin/v1/backups')
+      .auth(admin.token, { type: 'bearer' })
+      .query({ scope, status: 'Succeeded' })
+      .expect(200);
+    assert.equal(list.body.items[0].id, id);
+    const health = await api
+      .get('/api/admin/v1/storage-locations/' + storageLocationId + '/health')
+      .auth(admin.token, { type: 'bearer' })
+      .expect(200);
+    assert.equal(health.body.lastSuccessfulBackupAtUtc, finishedAtUtc);
+    assert.equal(health.body.lastVerifiedRestoreAtUtc, restoreTestedAtUtc);
   });
 
   void it('should keep an active administrator under concurrent sanctions and role changes', async () => {

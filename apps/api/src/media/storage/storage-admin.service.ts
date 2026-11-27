@@ -25,6 +25,8 @@ import { BackOfficeGuard } from '../../back-office/back-office.guard';
 import type { AllConfigType } from '../../config/config.type';
 import { PublishingAuditEvent } from '../../publishing/persistence/publishing-event.schema';
 import { InspectionOutcome } from '../dto/media-upload.dto';
+import { BackupOperationsService } from '../operations/backup-operations.service';
+import { BackupScope } from '../operations/operations.schema';
 import { MediaUpload, UploadStatus } from '../persistence/media-upload.schema';
 import {
   StorageAssetIssueKind,
@@ -74,6 +76,7 @@ export class StorageAdminService {
     @InjectConnection() private readonly connection: Connection,
     private readonly config: ConfigService<AllConfigType>,
     private readonly profilesClient: StorageProfileClient,
+    private readonly backups: BackupOperationsService,
     private readonly auth: AuthService,
     private readonly backOffice: BackOfficeGuard,
   ) {}
@@ -112,6 +115,22 @@ export class StorageAdminService {
     return this.present(this.find(state, id), state);
   }
 
+  async monitoredLocations() {
+    const state = await this.read();
+    return state.locations
+      .filter(
+        (location) =>
+          location.status === StorageLocationStatus.ActiveForNewWrites ||
+          location.status === StorageLocationStatus.ReadOnly,
+      )
+      .map((location) => ({
+        id: location.id,
+        connectionStatus:
+          location.probe?.status ?? StorageConnectionStatus.NotChecked,
+        checkedAt: location.probe?.checkedAt,
+      }));
+  }
+
   async health(id: string): Promise<StorageHealthDto> {
     const location = this.find(await this.read(), id);
     const sizes =
@@ -140,14 +159,15 @@ export class StorageAdminService {
             ])
             .exec();
 
+    const backup = await this.backups.health(BackupScope.SftpOriginals, id);
     return {
       locationId: id,
       status: location.probe?.status ?? StorageConnectionStatus.NotChecked,
       checkedAtUtc: location.probe?.checkedAt.toISOString() ?? null,
       usedBytes: sizes[0]?.total ?? 0,
       capacityBytes: null,
-      lastSuccessfulBackupAtUtc: null,
-      lastVerifiedRestoreAtUtc: null,
+      lastSuccessfulBackupAtUtc: backup.lastSuccessfulBackupAtUtc ?? null,
+      lastVerifiedRestoreAtUtc: backup.lastVerifiedRestoreAtUtc ?? null,
     };
   }
 

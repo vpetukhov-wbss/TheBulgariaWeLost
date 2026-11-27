@@ -29,6 +29,14 @@ export enum MediaAccessStatus {
   Removed = 'Removed',
 }
 
+export interface InspectionAttempt {
+  id: string;
+  workerId?: string;
+  startedAt?: Date;
+  finishedAt?: Date;
+  outcome?: string;
+}
+
 @Schema({ collection: 'mediaUploads', timestamps: true })
 export class MediaUpload {
   @Prop({ type: String, default: uuidv7 })
@@ -101,6 +109,21 @@ export class MediaUpload {
   processingStatus?: ProcessingStatus;
 
   @Prop()
+  inspectionVersion?: number;
+
+  @Prop()
+  inspectionAttemptCount?: number;
+
+  @Prop()
+  inspectionUpdatedAt?: Date;
+
+  @Prop()
+  inspectionRetryTraceId?: string;
+
+  @Prop({ type: [Object], default: undefined })
+  inspectionAttempts?: InspectionAttempt[];
+
+  @Prop()
   inspectionAttemptId?: string;
 
   @Prop()
@@ -160,3 +183,5 @@ MediaUploadSchema.index({
   inspectionLeaseExpiresAt: 1,
   completedAt: 1,
 });
+
+MediaUploadSchema.index({ status: 1, processingStatus: 1, _id: -1 });

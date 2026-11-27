@@ -1,0 +1,38 @@
+.operation-nav,
+.operation-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-block: 0.75rem;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  margin-block: 0.75rem;
+}
+
+table {
+  width: 100%;
+}
+
+td,
+th {
+  text-align: start;
+  padding: 0.5rem;
+}
+
+dd {
+  margin: 0.2rem 0 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.retry-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 35rem;
+}
+
+code {
+  overflow-wrap: anywhere;
+}

@@ -27,20 +27,22 @@ public sealed class MediaControlClient(HttpClient http)
         return await ReadAsync<ReadDecision>(response, cancellationToken);
     }
 
-    public async Task<InspectionLease?> LeaseInspectionAsync(CancellationToken cancellationToken)
+    public async Task<InspectionLease?> LeaseInspectionAsync(Guid workerId, CancellationToken cancellationToken)
     {
-        using var response = await PostAsync($"{Prefix}/inspections/lease", new { }, cancellationToken);
+        using var response = await PostAsync($"{Prefix}/inspections/lease", new { workerId }, cancellationToken);
         return response.StatusCode == HttpStatusCode.NoContent
             ? null
             : await ReadAsync<InspectionLease>(response, cancellationToken);
     }
 
-    public async Task CompleteInspectionAsync(Guid id, InspectionResult result, CancellationToken cancellationToken)
+    public async Task CompleteInspectionAsync(
+        Guid id, InspectionResult result, CancellationToken cancellationToken, string? traceId = null)
     {
-        using var response = await PostAsync($"{Prefix}/inspections/{id:D}/complete", result, cancellationToken);
+        using var response = await PostAsync($"{Prefix}/inspections/{id:D}/complete", result, cancellationToken, traceId);
     }
 
-    private async Task<HttpResponseMessage> PostAsync<T>(string path, T body, CancellationToken cancellationToken)
+    private async Task<HttpResponseMessage> PostAsync<T>(
+        string path, T body, CancellationToken cancellationToken, string? traceId = null)
     {
         // Leave the byte transfers separate from the bounded JSON control requests.
         try
@@ -49,6 +51,10 @@ public sealed class MediaControlClient(HttpClient http)
             {
                 Content = JsonContent.Create(body)
             };
+            if (traceId is { Length: > 0 and <= 128 } &&
+                traceId.All(character => char.IsAsciiLetterOrDigit(character) || character is '.' or '_' or ':' or '-'))
+                request.Headers.Add("X-Correlation-ID", traceId);
+
             var response = await http.SendAsync(request, cancellationToken);
             if (response.IsSuccessStatusCode) return response;
 
