@@ -63,6 +63,7 @@ export class BackOfficeController {
               'Users.Manage',
               'Audit.Read',
               'Storage.Manage',
+              'Operations.Manage',
               'SiteSettings.Manage',
             ]
           : ['BackOffice.Access', 'Editorial.Manage'],

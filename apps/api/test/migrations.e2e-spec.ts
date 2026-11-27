@@ -94,6 +94,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '011-site-settings',
           '012-admin-media-gallery',
           '013-storage-admin',
+          '014-operations',
         ]);
         assert.deepEqual(second.skipped, [
           '001-auth-foundation',
@@ -109,6 +110,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           '011-site-settings',
           '012-admin-media-gallery',
           '013-storage-admin',
+          '014-operations',
         ]);
 
         const client = new mongo.MongoClient(url);
@@ -117,7 +119,7 @@ void describe('versioned MongoDB migrations', { timeout: 30_000 }, () => {
           const database = client.db();
           assert.equal(
             await database.collection('_schemaMigrations').countDocuments(),
-            13,
+            14,
           );
           const initialized = await database
             .collection('siteSettings')

@@ -32,7 +32,13 @@ if (errors.length > 0) {
 function validate(document) {
   const failures = [];
   const operationIds = new Set();
-  const prefixes = ['/api/v1', '/api/admin/v1', '/internal/media/v1', '/media/v1'];
+  const prefixes = [
+    '/api/v1',
+    '/api/admin/v1',
+    '/internal/media/v1',
+    '/internal/operations/v1',
+    '/media/v1',
+  ];
 
   for (const prefix of prefixes) {
     if (!Object.keys(document.paths ?? {}).some((path) => path.startsWith(prefix))) {
@@ -42,7 +48,7 @@ function validate(document) {
 
   for (const [path, pathItem] of Object.entries(document.paths ?? {})) {
     if (!prefixes.some((prefix) => path.startsWith(prefix))) {
-      failures.push(`Route ${path} is outside the four versioned API prefixes.`);
+      failures.push(`Route ${path} is outside the versioned API prefixes.`);
     }
     for (const method of methods) {
       const operation = pathItem?.[method];

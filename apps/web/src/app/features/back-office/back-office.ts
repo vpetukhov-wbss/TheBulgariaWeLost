@@ -58,6 +58,7 @@ function hasBackOfficeAccess(
                 state.principal.permissions.includes('Users.Manage') ||
                 state.principal.permissions.includes('Audit.Read') ||
                 state.principal.permissions.includes('Storage.Manage') ||
+                state.principal.permissions.includes('Operations.Manage') ||
                 state.principal.permissions.includes('SiteSettings.Manage')
               ) {
                 <nav aria-label="Управление">
@@ -69,6 +70,9 @@ function hasBackOfficeAccess(
                   }
                   @if (state.principal.permissions.includes('Storage.Manage')) {
                     <a nbButton outline routerLink="/admin/storage">Файлови хранилища</a>
+                  }
+                  @if (state.principal.permissions.includes('Operations.Manage')) {
+                    <a nbButton outline routerLink="/admin/operations">Задачи и бекъпи</a>
                   }
                   @if (state.principal.permissions.includes('SiteSettings.Manage')) {
                     <a nbButton outline routerLink="/admin/settings">Настройки на сайта</a>

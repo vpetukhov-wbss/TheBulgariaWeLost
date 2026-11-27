@@ -11,6 +11,8 @@ namespace Media.Processing.Inspection;
 internal sealed class InspectionWorker(
     IServiceScopeFactory scopes, ILogger<InspectionWorker> logger) : BackgroundService
 {
+    private readonly Guid workerId = Guid.NewGuid();
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(3));
@@ -40,7 +42,7 @@ internal sealed class InspectionWorker(
         timeout.CancelAfter(TimeSpan.FromSeconds(60));
         var cancellationToken = timeout.Token;
         var control = scope.ServiceProvider.GetRequiredService<MediaControlClient>();
-        var lease = await control.LeaseInspectionAsync(cancellationToken);
+        var lease = await control.LeaseInspectionAsync(workerId, cancellationToken);
         if (lease is null) return;
 
         if (lease.JobId == Guid.Empty || lease.AttemptId == Guid.Empty || lease.Object is null
@@ -49,14 +51,32 @@ internal sealed class InspectionWorker(
             || lease.Length is <= 0 or > 1024L * 1024 * 1024)
             throw new ControlPlaneException(HttpStatusCode.ServiceUnavailable);
 
-        var storage = scope.ServiceProvider.GetRequiredService<IObjectStorage>();
-        var location = lease.Object.StorageLocationId;
-        if (string.IsNullOrEmpty(location) || !storage.HasLocation(location)
-            || string.IsNullOrEmpty(lease.PreviewObject.StorageLocationId)
-            || !storage.HasLocation(lease.PreviewObject.StorageLocationId))
-            throw new StorageFailure();
+        InspectionResult result;
+        try
+        {
+            var storage = scope.ServiceProvider.GetRequiredService<IObjectStorage>();
+            var location = lease.Object.StorageLocationId;
+            if (string.IsNullOrEmpty(location) || !storage.HasLocation(location)
+                || string.IsNullOrEmpty(lease.PreviewObject.StorageLocationId)
+                || !storage.HasLocation(lease.PreviewObject.StorageLocationId))
+                throw new StorageFailure();
 
-        var result = await InspectionProcessor.ProcessAsync(lease, storage, cancellationToken);
-        await control.CompleteInspectionAsync(lease.JobId, result, cancellationToken);
+            result = await InspectionProcessor.ProcessAsync(lease, storage, cancellationToken);
+        }
+        catch (Exception exception) when (exception is StorageFailure or IOException)
+        {
+            result = new InspectionResult(lease.AttemptId, "storage_unavailable");
+        }
+        catch (OperationCanceledException) when (!stoppingToken.IsCancellationRequested)
+        {
+            result = new InspectionResult(lease.AttemptId, "inspection_timeout");
+        }
+
+        using var acknowledgement = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        acknowledgement.CancelAfter(TimeSpan.FromSeconds(8));
+        await control.CompleteInspectionAsync(lease.JobId, result, acknowledgement.Token, lease.TraceId);
+        if (result.Outcome != "inspected")
+            logger.LogWarning("Media inspection {JobId} ended with {Outcome}. Correlation ID {CorrelationId}.",
+                lease.JobId, result.Outcome, lease.TraceId);
     }
 }

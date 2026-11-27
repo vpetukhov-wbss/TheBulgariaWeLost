@@ -36,6 +36,10 @@ async function bootstrap(): Promise<void> {
         path: 'internal/media/v1/{*path}',
         method: RequestMethod.ALL,
       },
+      {
+        path: 'internal/operations/v1/{*path}',
+        method: RequestMethod.ALL,
+      },
     ],
   });
   app.enableVersioning({ type: VersioningType.URI });
@@ -62,6 +66,7 @@ async function bootstrap(): Promise<void> {
         },
         'serviceToken',
       )
+      .addBearerAuth({ type: 'http', scheme: 'bearer' }, 'backupReporterToken')
       .addGlobalParameters({
         name: CORRELATION_ID_HEADER,
         in: 'header',

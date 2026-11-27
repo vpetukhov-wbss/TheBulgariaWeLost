@@ -28,6 +28,7 @@ import {
   CreateUploadDto,
   GrantRequestDto,
   InspectionLeaseDto,
+  InspectionLeaseRequestDto,
   InspectionResultDto,
   MediaAssetDto,
   ReadDecisionDto,
@@ -161,9 +162,10 @@ export class InternalMediaInspectionController {
   @ApiOkResponse({ type: InspectionLeaseDto })
   @ApiNoContentResponse()
   async lease(
+    @Body() body: InspectionLeaseRequestDto,
     @Res({ passthrough: true }) response: Response,
   ): Promise<InspectionLeaseDto | undefined> {
-    const lease = await this.media.leaseInspection();
+    const lease = await this.media.leaseInspection(body?.workerId);
     if (lease) return lease;
     response.status(204);
     return undefined;

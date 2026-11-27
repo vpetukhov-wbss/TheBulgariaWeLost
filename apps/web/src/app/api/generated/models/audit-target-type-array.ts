@@ -9,6 +9,7 @@ import { AuditTargetType } from './audit-target-type';
 export const AUDIT_TARGET_TYPE: AuditTargetType[] = [
   'Account',
   'Catalog',
+  'Job',
   'Material',
   'Media',
   'Moderation',

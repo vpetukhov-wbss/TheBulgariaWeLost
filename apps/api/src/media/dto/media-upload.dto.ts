@@ -28,6 +28,8 @@ export enum InspectionOutcome {
   Missing = 'missing',
   IntegrityMismatch = 'integrity_mismatch',
   UnsupportedFormat = 'unsupported_format',
+  StorageUnavailable = 'storage_unavailable',
+  Timeout = 'inspection_timeout',
 }
 
 export class CreateUploadDto {
@@ -214,7 +216,17 @@ export class ReadDecisionDto {
   contentType: string;
 }
 
+export class InspectionLeaseRequestDto {
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID('4')
+  workerId?: string;
+}
+
 export class InspectionLeaseDto {
+  @ApiPropertyOptional({ maxLength: 128 })
+  traceId?: string;
+
   @ApiProperty({ format: 'uuid' })
   jobId: string;
 

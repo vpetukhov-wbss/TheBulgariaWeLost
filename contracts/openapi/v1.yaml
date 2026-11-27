@@ -16,6 +16,8 @@ tags:
   - name: Admin users
   - name: Admin media
   - name: Admin storage
+  - name: Admin operations
+  - name: Internal operations
   - name: Publishing
   - name: Moderation
   - name: Authoring
@@ -1174,6 +1176,204 @@ paths:
                 $ref: "#/components/schemas/AdminPasswordResetAccepted"
         default:
           $ref: "#/components/responses/Problem"
+  /api/admin/v1/jobs:
+    get:
+      tags:
+        - Admin operations
+      operationId: listAdminJobs
+      security:
+        - bearerAuth: []
+      parameters:
+        - &a2
+          $ref: "#/components/parameters/CorrelationId"
+        - name: type
+          in: query
+          schema:
+            $ref: "#/components/schemas/JobType"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/JobStatus"
+        - &a5
+          name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - &a6
+          name: cursor
+          in: query
+          schema:
+            type: string
+            maxLength: 200
+        - &a7
+          name: fromUtc
+          in: query
+          schema: &a1
+            type: string
+            format: date-time
+        - &a8
+          name: toUtc
+          in: query
+          schema: *a1
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobPage"
+        default: &a3
+          $ref: "#/components/responses/Problem"
+  /api/admin/v1/jobs/{id}:
+    get:
+      tags:
+        - Admin operations
+      operationId: getAdminJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+        - &a4
+          name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobDetail"
+        default: *a3
+  /api/admin/v1/jobs/{id}/retries:
+    post:
+      tags:
+        - Admin operations
+      operationId: retryAdminJob
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+        - *a4
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            minLength: 8
+            maxLength: 128
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetryJobRequest"
+      responses:
+        "202":
+          description: Inspection retry queued.
+          headers:
+            Location:
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/JobRetryReceipt"
+        default: *a3
+  /api/admin/v1/backups:
+    get:
+      tags:
+        - Admin operations
+      operationId: listBackupRuns
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+        - name: scope
+          in: query
+          schema:
+            $ref: "#/components/schemas/BackupScope"
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/BackupStatus"
+        - *a5
+        - *a6
+        - *a7
+        - *a8
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupPage"
+        default: *a3
+  /api/admin/v1/operations-summary:
+    get:
+      tags:
+        - Admin operations
+      operationId: getOperationsSummary
+      security:
+        - bearerAuth: []
+      parameters:
+        - *a2
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsSummary"
+        default: *a3
+  /internal/operations/v1/backups/{id}:
+    put:
+      tags:
+        - Internal operations
+      operationId: reportBackupRun
+      x-internal: true
+      security:
+        - backupReporterToken: []
+      parameters:
+        - *a2
+        - *a4
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BackupReport"
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BackupRun"
+        default: *a3
+  /internal/operations/v1/alerts:
+    get:
+      tags:
+        - Internal operations
+      operationId: getOperationsAlerts
+      x-internal: true
+      security:
+        - backupReporterToken: []
+      parameters:
+        - *a2
+      responses:
+        "200":
+          description: Successful operations request.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OperationsSummary"
+        default: *a3
   /api/admin/v1/operations/{id}:
     get:
       tags: [Admin users]
@@ -2095,6 +2295,14 @@ paths:
         - serviceToken: []
       parameters:
         - $ref: "#/components/parameters/CorrelationId"
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                workerId: { type: string, format: uuid }
       responses:
         "200":
           description: Inspection job lease.
@@ -2181,6 +2389,10 @@ components:
       type: http
       scheme: bearer
       description: Private, rotated service credential.
+    backupReporterToken:
+      type: http
+      scheme: bearer
+      description: Independent internal operations reporting credential.
     mediaProbeToken:
       type: http
       scheme: bearer
@@ -3797,9 +4009,204 @@ components:
           items:
             $ref: "#/components/schemas/StorageAssetIssue"
         nextCursor: { type: string }
+    JobType:
+      type: string
+      enum:
+        - MediaInspection
+        - PasswordResetEmail
+    JobStatus:
+      type: string
+      enum:
+        - Queued
+        - Running
+        - Succeeded
+        - Failed
+    JobSummary:
+      type: object
+      required:
+        - id
+        - type
+        - status
+        - version
+        - attemptCount
+        - updatedAtUtc
+        - traceId
+        - canRetry
+      properties:
+        id: &a2
+          type: string
+          format: uuid
+        type:
+          $ref: "#/components/schemas/JobType"
+        status:
+          $ref: "#/components/schemas/JobStatus"
+        version: &a4
+          type: integer
+          minimum: 1
+        attemptCount:
+          type: integer
+          minimum: 0
+        updatedAtUtc: &a3
+          type: string
+          format: date-time
+        traceId: &a1
+          type: string
+        canRetry: &a5
+          type: boolean
+        lastErrorCode: *a1
+    JobDetail:
+      allOf:
+        - $ref: "#/components/schemas/JobSummary"
+        - type: object
+          required:
+            - targetId
+            - attempts
+          properties:
+            targetId: *a2
+            attempts:
+              type: array
+              items:
+                $ref: "#/components/schemas/JobAttempt"
+            lastRetryTraceId: *a1
+    JobAttempt:
+      type: object
+      required:
+        - id
+      properties:
+        id: *a2
+        workerId: *a2
+        startedAtUtc: *a3
+        finishedAtUtc: *a3
+        outcome: *a1
+    JobPage:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/JobSummary"
+        nextCursor: *a1
+    RetryJobRequest:
+      type: object
+      required:
+        - expectedVersion
+        - reason
+      properties:
+        expectedVersion: *a4
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 500
+    JobRetryReceipt:
+      type: object
+      required:
+        - operationId
+        - statusUrl
+      properties:
+        operationId: *a2
+        statusUrl: *a1
+    BackupScope:
+      type: string
+      enum:
+        - MongoDb
+        - SftpOriginals
+    BackupStatus:
+      type: string
+      enum:
+        - Running
+        - Succeeded
+        - Failed
+    BackupReport:
+      type: object
+      required:
+        - scope
+        - status
+        - startedAtUtc
+      properties:
+        scope:
+          $ref: "#/components/schemas/BackupScope"
+        storageLocationId: *a2
+        status:
+          $ref: "#/components/schemas/BackupStatus"
+        startedAtUtc: *a3
+        finishedAtUtc: *a3
+        verifiedAtUtc: *a3
+        restoreTestedAtUtc: *a3
+    BackupRun:
+      allOf:
+        - $ref: "#/components/schemas/BackupReport"
+        - type: object
+          required:
+            - id
+            - traceId
+          properties:
+            id: *a2
+            traceId: *a1
+    BackupPage:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupRun"
+        nextCursor: *a1
+    BackupHealth:
+      type: object
+      required:
+        - scope
+      properties:
+        scope:
+          $ref: "#/components/schemas/BackupScope"
+        storageLocationId: *a2
+        lastSuccessfulBackupAtUtc: *a3
+        lastVerificationAtUtc: *a3
+        lastVerifiedRestoreAtUtc: *a3
+    WorkerStatus:
+      type: object
+      required:
+        - id
+        - lastSeenAtUtc
+        - online
+      properties:
+        id: *a2
+        lastSeenAtUtc: *a3
+        online: *a5
+    OperationsAlert:
+      type: object
+      required:
+        - code
+        - target
+      properties:
+        code: *a1
+        target: *a1
+    OperationsSummary:
+      type: object
+      required:
+        - measuredAtUtc
+        - workers
+        - backups
+        - alerts
+      properties:
+        measuredAtUtc: *a3
+        workers:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkerStatus"
+        backups:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupHealth"
+        alerts:
+          type: array
+          items:
+            $ref: "#/components/schemas/OperationsAlert"
     AuditTargetType:
       type: string
-      enum: [Account, Catalog, Material, Media, Moderation, Other, SiteSettings, StorageLocation]
+      enum: [Account, Catalog, Job, Material, Media, Moderation, Other, SiteSettings, StorageLocation]
     AuditOutcome:
       type: string
       enum: [Succeeded, Failed, Denied]
@@ -4120,6 +4527,7 @@ components:
       additionalProperties: false
       required: [jobId, attemptId, object, length, sha256]
       properties:
+        traceId: { type: string, maxLength: 128 }
         jobId:
           type: string
           format: uuid
@@ -4145,7 +4553,7 @@ components:
           format: uuid
         outcome:
           type: string
-          enum: [inspected, missing, integrity_mismatch, unsupported_format]
+          enum: [inspected, missing, integrity_mismatch, unsupported_format, storage_unavailable, inspection_timeout]
         length:
           type: integer
           format: int64

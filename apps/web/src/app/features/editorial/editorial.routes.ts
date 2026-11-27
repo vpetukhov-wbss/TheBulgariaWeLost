@@ -6,6 +6,8 @@ import { ModerationStore } from '../moderation/moderation.store';
 const catalogEntry = () => import('./catalog-entry').then((m) => m.CatalogEntry);
 const storage = () => import('../storage/storage-page').then((m) => m.StoragePage);
 
+const operations = () => import('../operations/operations-page').then((m) => m.OperationsPage);
+
 export const editorialRoutes: Routes = [
   {
     path: '',
@@ -83,6 +85,18 @@ export const editorialRoutes: Routes = [
     title: 'Хранилище',
     data: { requiredPermission: 'Storage.Manage' },
     loadComponent: storage,
+  },
+  {
+    path: 'operations',
+    title: 'Задачи и бекъпи',
+    data: { requiredPermission: 'Operations.Manage' },
+    loadComponent: operations,
+  },
+  {
+    path: 'operations/jobs/:id',
+    title: 'Детайл на задача',
+    data: { requiredPermission: 'Operations.Manage' },
+    loadComponent: operations,
   },
   {
     path: 'settings',

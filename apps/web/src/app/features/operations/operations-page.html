@@ -1,0 +1,311 @@
+<nb-card>
+  <nb-card-header>
+    @if (selection().tab === 'detail') {
+      <a routerLink="/admin/operations">Към задачите</a>
+      <h1>Детайл на задача</h1>
+    } @else {
+      <a routerLink="/admin">Към работния панел</a>
+      <h1>Задачи и бекъпи</h1>
+      <nav class="operation-nav" aria-label="Операции">
+        <a
+          nbButton
+          size="small"
+          routerLink="/admin/operations"
+          [attr.aria-current]="selection().tab === 'jobs' ? 'page' : null"
+          >Задачи</a
+        >
+        <a
+          nbButton
+          size="small"
+          routerLink="/admin/operations"
+          [queryParams]="{ tab: 'backups' }"
+          [attr.aria-current]="selection().tab === 'backups' ? 'page' : null"
+          >Бекъпи</a
+        >
+      </nav>
+    }
+  </nb-card-header>
+  <nb-card-body>
+    <button
+      nbButton
+      outline
+      size="small"
+      type="button"
+      [disabled]="store.busy()"
+      (click)="store.select(selection())"
+    >
+      Обнови
+    </button>
+    @if (store.busy()) {
+      <p role="status">Зареждане на оперативни данни…</p>
+    }
+    @if (store.error()) {
+      <nb-alert status="danger" role="alert">{{ store.error() }}</nb-alert>
+    }
+    @if (store.notice()) {
+      <nb-alert status="success" role="status">{{ store.notice() }}</nb-alert>
+    }
+
+    @if (selection().tab !== 'detail' && store.summary(); as summary) {
+      @if (summary.alerts.length) {
+        <h2>Сигнали</h2>
+        <ul>
+          @for (alert of summary.alerts; track alert.code + alert.target) {
+            <li>
+              {{ alertLabels[alert.code] ?? alert.code }} · {{ labelForTarget(alert.target) }}
+            </li>
+          }
+        </ul>
+      }
+    }
+
+    @if (selection().tab === 'jobs') {
+      @if (store.summary(); as summary) {
+        <h2>Работници за медии</h2>
+        @if (summary.workers.length) {
+          <ul>
+            @for (worker of summary.workers; track worker.id) {
+              <li>
+                <strong>{{ worker.online ? 'Активен' : 'Без скорошен сигнал' }}</strong>
+                · {{ worker.lastSeenAtUtc | date: 'dd.MM.yyyy HH:mm:ss' }} ·
+                <code>{{ worker.id }}</code>
+              </li>
+            }
+          </ul>
+        } @else {
+          <p>Няма получени сигнали от работници.</p>
+        }
+      }
+      <h2>История на задачите</h2>
+      <div class="operation-filters">
+        <label for="job-type">Вид</label>
+        <select
+          #typeSelect
+          id="job-type"
+          [value]="type() ?? ''"
+          (change)="filterType(typeSelect.value)"
+        >
+          <option value="">Всички</option>
+          @for (type of jobTypes; track type) {
+            <option [value]="type">{{ types[type] }}</option>
+          }
+        </select>
+        <label for="job-status">Статус</label>
+        <select
+          #statusSelect
+          id="job-status"
+          [value]="status() ?? ''"
+          (change)="filterStatus(statusSelect.value)"
+        >
+          <option value="">Всички</option>
+          @for (status of jobStatuses; track status) {
+            <option [value]="status">{{ statuses[status] }}</option>
+          }
+        </select>
+      </div>
+      @if (store.jobs(); as page) {
+        @if (page.items.length) {
+          <div class="table-scroll">
+            <table aria-label="Фонови задачи">
+              <thead>
+                <tr>
+                  <th scope="col">Задача</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col">Опити</th>
+                  <th scope="col">Последна промяна</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (job of page.items; track job.id) {
+                  <tr>
+                    <td>
+                      <a [routerLink]="['/admin/operations/jobs', job.id]">{{ types[job.type] }}</a>
+                    </td>
+                    <td>{{ statuses[job.status] }}</td>
+                    <td>{{ job.attemptCount }}</td>
+                    <td>{{ job.updatedAtUtc | date: 'dd.MM.yyyy HH:mm' }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p>Няма задачи за избраните филтри.</p>
+        }
+        @if (page.nextCursor) {
+          <button
+            nbButton
+            outline
+            type="button"
+            [disabled]="store.busy()"
+            (click)="store.more(selection())"
+          >
+            Още задачи
+          </button>
+        }
+      }
+    } @else if (selection().tab === 'backups') {
+      @if (store.summary(); as summary) {
+        <h2>Последни успешни копия</h2>
+        <div class="table-scroll">
+          <table aria-label="Състояние на резервните копия">
+            <thead>
+              <tr>
+                <th scope="col">Обхват</th>
+                <th scope="col">Копие</th>
+                <th scope="col">Проверка</th>
+                <th scope="col">Тестово възстановяване</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (backup of summary.backups; track backup.storageLocationId ?? backup.scope) {
+                <tr>
+                  <td>
+                    @if (backup.storageLocationId) {
+                      <a [routerLink]="['/admin/storage', backup.storageLocationId]">{{
+                        scopes[backup.scope]
+                      }}</a>
+                    } @else {
+                      {{ scopes[backup.scope] }}
+                    }
+                  </td>
+                  <td>
+                    {{
+                      (backup.lastSuccessfulBackupAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма отчет'
+                    }}
+                  </td>
+                  <td>
+                    {{ (backup.lastVerificationAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма отчет' }}
+                  </td>
+                  <td>
+                    {{
+                      (backup.lastVerifiedRestoreAtUtc | date: 'dd.MM.yyyy HH:mm') ?? 'Няма отчет'
+                    }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+      <h2>История на бекъпите</h2>
+      <div class="operation-filters">
+        <label for="backup-scope">Обхват</label>
+        <select
+          #scopeSelect
+          id="backup-scope"
+          [value]="scope() ?? ''"
+          (change)="filterScope(scopeSelect.value)"
+        >
+          <option value="">Всички</option>
+          @for (scope of backupScopes; track scope) {
+            <option [value]="scope">{{ scopes[scope] }}</option>
+          }
+        </select>
+      </div>
+      @if (store.backups(); as page) {
+        @if (page.items.length) {
+          <div class="table-scroll">
+            <table aria-label="История на резервните копия">
+              <thead>
+                <tr>
+                  <th scope="col">Обхват</th>
+                  <th scope="col">Статус</th>
+                  <th scope="col">Начало</th>
+                  <th scope="col">Корелационен ID</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (backup of page.items; track backup.id) {
+                  <tr>
+                    <td>{{ scopes[backup.scope] }}</td>
+                    <td>{{ statuses[backup.status] }}</td>
+                    <td>{{ backup.startedAtUtc | date: 'dd.MM.yyyy HH:mm' }}</td>
+                    <td>
+                      <code>{{ backup.traceId }}</code>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        } @else {
+          <p>Няма отчетени изпълнения за този обхват.</p>
+        }
+        @if (page.nextCursor) {
+          <button
+            nbButton
+            outline
+            type="button"
+            [disabled]="store.busy()"
+            (click)="store.more(selection())"
+          >
+            Още бекъпи
+          </button>
+        }
+      }
+    } @else if (store.job(); as job) {
+      <h2>{{ types[job.type] }}</h2>
+      <dl>
+        <dt>Статус</dt>
+        <dd>{{ statuses[job.status] }}</dd>
+        <dt>Опити</dt>
+        <dd>{{ job.attemptCount }}</dd>
+        <dt>Корелационен ID</dt>
+        <dd>
+          <code>{{ job.traceId }}</code>
+        </dd>
+        @if (job.lastRetryTraceId) {
+          <dt>Корелационен ID на повторението</dt>
+          <dd>
+            <code>{{ job.lastRetryTraceId }}</code>
+          </dd>
+        }
+        @if (job.lastErrorCode) {
+          <dt>Последна грешка</dt>
+          <dd>{{ outcome(job.lastErrorCode) }}</dd>
+        }
+      </dl>
+      @if (job.type === 'MediaInspection') {
+        <a [routerLink]="['/admin/media', job.targetId]">Към файла</a>
+      }
+      <h3>Последни опити</h3>
+      @if (job.attempts.length) {
+        <ul>
+          @for (attempt of job.attempts; track attempt.id) {
+            <li>
+              {{ outcome(attempt.outcome) }} ·
+              {{
+                (attempt.finishedAtUtc ?? attempt.startedAtUtc | date: 'dd.MM.yyyy HH:mm') ??
+                  'Няма дата'
+              }}
+            </li>
+          }
+        </ul>
+      } @else {
+        <p>Няма налична история на опитите.</p>
+      }
+      @if (job.canRetry) {
+        <form class="retry-form" (submit)="retry($event)">
+          <label for="retry-reason">Причина за повторението</label>
+          <textarea
+            nbInput
+            fullWidth
+            id="retry-reason"
+            [formControl]="reason"
+            required
+            maxlength="500"
+          ></textarea>
+          <button
+            nbButton
+            status="warning"
+            type="submit"
+            [disabled]="store.busy() || reason.invalid || !reason.value.trim()"
+          >
+            Повтори задачата
+          </button>
+        </form>
+      }
+    }
+  </nb-card-body>
+</nb-card>

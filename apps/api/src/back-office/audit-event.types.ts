@@ -1,6 +1,7 @@
 export enum AuditTargetType {
   Account = 'Account',
   Catalog = 'Catalog',
+  Job = 'Job',
   Material = 'Material',
   Media = 'Media',
   Moderation = 'Moderation',
