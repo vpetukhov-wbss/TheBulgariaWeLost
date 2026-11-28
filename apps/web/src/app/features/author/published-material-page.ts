@@ -17,10 +17,18 @@ import { AuthoringService } from '../../api/generated/services/authoring.service
 import { PublishingService } from '../../api/generated/services/publishing.service';
 import { actionError } from '../../core/auth/auth-errors';
 import { ArchiveSeo } from '../archive/archive-seo';
+import { PublishedEpisode } from './published-episode';
 import { MaterialReportForm } from '../moderation/material-report-form';
 
 @Component({
-  imports: [RouterLink, NbAlertModule, NbButtonModule, NbCardModule, MaterialReportForm],
+  imports: [
+    RouterLink,
+    NbAlertModule,
+    NbButtonModule,
+    NbCardModule,
+    MaterialReportForm,
+    PublishedEpisode,
+  ],
   template: `
     @if (material(); as current) {
       <article>
@@ -45,6 +53,9 @@ import { MaterialReportForm } from '../moderation/material-report-form';
             }
             @if (current.content.summary) {
               <p class="summary">{{ current.content.summary }}</p>
+            }
+            @if (current.type === 'Episode') {
+              <app-published-episode [material]="current" />
             }
             <div class="actions">
               @if (signedIn()) {
@@ -172,16 +183,19 @@ export class PublishedMaterialPage {
     const seo = inject(ArchiveSeo);
     inject(DestroyRef).onDestroy(() => seo.clear());
     effect(() => {
+      if (this.publication.isLoading()) return;
       const material = this.material();
+      const isEpisode = material?.type === 'Episode';
       seo.set(
         material?.content.title ?? 'Материал',
         (
-          material?.content.summary ??
-          material?.content.subtitle ??
-          'Материал от българския архив.'
+          material?.content.summary?.trim() ||
+          material?.content.subtitle?.trim() ||
+          (isEpisode ? 'Епизод от българския архив.' : 'Материал от българския архив.')
         ).slice(0, 160),
         '/materials/' + encodeURIComponent(material?.slug ?? this.params().get('slug') ?? ''),
         Boolean(material),
+        isEpisode ? '/assets/episode-share.png' : undefined,
       );
     });
     effect(() => {

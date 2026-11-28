@@ -1136,6 +1136,164 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     assert.equal(quota?.reservedBytes, 800);
   });
 
+  void it('should publish verified episode revisions and serve safe share metadata', async () => {
+    const author = await createEditor();
+    const reviewer = await createEditor();
+    const sourceId = uuidv7();
+    const sources = db.db().collection('sources');
+    await sources.insertOne({
+      _id: sourceId as unknown as mongo.ObjectId,
+      status: 'Active',
+      verification: { status: 'Unverified' },
+      rights: { publicDisplayAllowed: true },
+      title: 'Архивен опис',
+      url: 'https://example.test/archive',
+      archiveReference: { fund: '18', inventory: '3' },
+    });
+    const title = 'Епизод „Архив“ & <пример>';
+    const created = await api
+      .post('/api/admin/v1/materials')
+      .auth(author.token, { type: 'bearer' })
+      .send({ type: 'Episode', language: 'bg', title })
+      .expect(201);
+    const initial = created.body as MaterialResponse;
+    const adminPath = '/api/admin/v1/materials/' + initial.id;
+    const publicPath = '/api/v1/materials/' + initial.slug;
+    const patch = (
+      token: string,
+      etag: string,
+      body: Record<string, unknown>,
+    ) =>
+      api
+        .patch(adminPath)
+        .auth(token, { type: 'bearer' })
+        .set('If-Match', etag)
+        .send(body);
+    const transition = (
+      token: string,
+      action: string,
+      expectedVersion: number,
+      reason?: string,
+    ) =>
+      api
+        .post(adminPath + '/transitions')
+        .auth(token, { type: 'bearer' })
+        .send({
+          action,
+          expectedVersion,
+          ...(reason ? { reason } : {}),
+        });
+    await api.get(publicPath).expect(404);
+    const unpublishedHead = await api
+      .get(publicPath + '/share-head')
+      .expect(200);
+    assert.match(unpublishedHead.text, /noindex,follow/);
+    assert.doesNotMatch(unpublishedHead.text, /Епизод/);
+    await patch(author.token, created.headers.etag as string, {
+      episode: { chapters: [{ startSeconds: 3, title: ' ' }] },
+    }).expect(422);
+    const episode = {
+      youtubeUrl: 'https://youtu.be/abcDEF123_0?si=ignored',
+      transcript: 'Транскрипция от първата редакция.',
+      chapters: [
+        { startSeconds: 80, title: 'Разказ' },
+        { startSeconds: 0, title: 'Начало' },
+      ],
+    };
+    await patch(author.token, created.headers.etag as string, {
+      summary: 'Резюме "за споделяне"',
+      categoryIds: [uuidv7()],
+      topicIds: [uuidv7()],
+      sourceIds: [sourceId],
+      rights: { publicDisplayAllowed: true, statement: 'Разрешение от автора' },
+      episode,
+    }).expect(200);
+    await transition(author.token, 'SubmitForReview', 2).expect(200);
+    const review = await transition(reviewer.token, 'StartReview', 3).expect(
+      200,
+    );
+    assert.deepEqual(review.body.publicationBlockers, [
+      'episode_provenance_required',
+      'episode_verified_sources_required',
+    ]);
+    await transition(reviewer.token, 'Publish', 4).expect(422);
+    await sources.updateOne(
+      { _id: sourceId as unknown as mongo.ObjectId },
+      { $set: { 'verification.status': 'Verified' } },
+    );
+    await patch(reviewer.token, review.headers.etag as string, {
+      provenance: 'Редакционен запис по архивен опис.',
+    }).expect(200);
+    const published = await transition(reviewer.token, 'Publish', 5).expect(
+      200,
+    );
+    const visible = await api.get(publicPath).expect(200);
+    assert.equal(visible.body.episode.youtubeVideoId, 'abcDEF123_0');
+    assert.equal(visible.body.content.episode.youtubeUrl, undefined);
+    assert.equal(visible.body.content.episode.transcript, episode.transcript);
+    assert.deepEqual(visible.body.episode.sources, [
+      {
+        id: sourceId,
+        title: 'Архивен опис',
+        url: 'https://example.test/archive',
+        reference: 'ф. 18, оп. 3',
+      },
+    ]);
+    const head = await api
+      .get(publicPath + '/share-head')
+      .expect(200)
+      .expect('Content-Type', /text\/html/)
+      .expect('Cache-Control', 'no-store');
+    const frontend = new URL(
+      process.env.FRONTEND_DOMAIN ?? 'http://127.0.0.1:4200',
+    ).origin;
+    assert.match(head.text, /&amp; &lt;пример&gt;/);
+    assert.match(head.text, /Резюме &quot;за споделяне&quot;/);
+    assert.ok(
+      head.text.includes(`content="${frontend}/materials/${initial.slug}"`),
+    );
+    assert.ok(
+      head.text.includes(`content="${frontend}/assets/episode-share.png"`),
+    );
+    const next = await patch(reviewer.token, published.headers.etag as string, {
+      episode: {
+        ...episode,
+        youtubeUrl: 'https://youtube.com.example.test/watch?v=abcDEF123_0',
+      },
+    }).expect(200);
+    assert.equal(
+      (await api.get(publicPath).expect(200)).body.episode.youtubeVideoId,
+      'abcDEF123_0',
+    );
+    await transition(
+      reviewer.token,
+      'Publish',
+      next.body.version as number,
+    ).expect(200);
+    const fallback = await api.get(publicPath).expect(200);
+    assert.equal(fallback.body.episode.youtubeVideoId, undefined);
+    assert.equal(fallback.body.content.episode.transcript, episode.transcript);
+    await sources.updateOne(
+      { _id: sourceId as unknown as mongo.ObjectId },
+      { $set: { 'rights.publicDisplayAllowed': false } },
+    );
+    assert.deepEqual(
+      (await api.get(publicPath).expect(200)).body.episode.sources,
+      [],
+    );
+    await transition(
+      reviewer.token,
+      'Withdraw',
+      8,
+      'Епизодът е свален.',
+    ).expect(200);
+    await api.get(publicPath).expect(404);
+    assert.doesNotMatch(
+      (await api.get(publicPath + '/share-head').expect(200)).text,
+      /og:title/,
+    );
+  });
+
   void it('should version, review, publish and hide materials transactionally', async () => {
     const author = await createEditor();
     const reviewer = await createEditor();

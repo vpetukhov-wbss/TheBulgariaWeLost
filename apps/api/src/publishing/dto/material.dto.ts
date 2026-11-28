@@ -107,7 +107,52 @@ export class MaterialBlockDto {
   text: string;
 }
 
+export class EpisodeChapterDto {
+  @ApiProperty({ minimum: 0, maximum: 86_399 })
+  @IsInt()
+  @Min(0)
+  @Max(86_399)
+  startSeconds: number;
+
+  @ApiProperty({ minLength: 1, maxLength: 160 })
+  @IsString()
+  @Matches(/\S/)
+  @MaxLength(160)
+  title: string;
+}
+
+export class EpisodeDraftDto {
+  @ApiPropertyOptional({ maxLength: 2_000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(2_000)
+  youtubeUrl?: string;
+
+  @ApiPropertyOptional({ maxLength: 30_000 })
+  @IsOptional()
+  @IsString()
+  @MaxLength(30_000)
+  transcript?: string;
+
+  @ApiPropertyOptional({ type: [EpisodeChapterDto], maxItems: 100 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @ArrayUnique((chapter: EpisodeChapterDto | null) => chapter?.startSeconds)
+  @IsObject({ each: true })
+  @ValidateNested({ each: true })
+  @Type(() => EpisodeChapterDto)
+  chapters?: EpisodeChapterDto[];
+}
+
 export class UpdateMaterialDraftDto {
+  @ApiPropertyOptional({ type: EpisodeDraftDto })
+  @IsOptional()
+  @IsObject()
+  @ValidateNested()
+  @Type(() => EpisodeDraftDto)
+  episode?: EpisodeDraftDto;
+
   @ApiPropertyOptional({ minLength: 3, maxLength: 200 })
   @IsOptional()
   @IsString()
@@ -371,7 +416,32 @@ export class MaterialRevisionPageDto {
   nextCursor?: string;
 }
 
+export class EpisodeSourceDto {
+  @ApiProperty({ format: 'uuid' })
+  id: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiPropertyOptional({ format: 'uri' })
+  url?: string;
+
+  @ApiPropertyOptional()
+  reference?: string;
+}
+
+export class PublicEpisodeDto {
+  @ApiPropertyOptional({ pattern: '^[A-Za-z0-9_-]{11}$' })
+  youtubeVideoId?: string;
+
+  @ApiProperty({ type: [EpisodeSourceDto] })
+  sources: EpisodeSourceDto[];
+}
+
 export class PublicMaterialDto {
+  @ApiPropertyOptional({ type: PublicEpisodeDto })
+  episode?: PublicEpisodeDto;
+
   @ApiProperty({ format: 'uuid' })
   id: string;
 

@@ -13,6 +13,7 @@ import type { TransitionMaterialRequest } from '../../api/generated/models/trans
 import { PublishingService } from '../../api/generated/services/publishing.service';
 import { actionError, problemCode } from '../../core/auth/auth-errors';
 import { CatalogPicker } from '../author/catalog-picker';
+import { EpisodeFields } from './episode-fields';
 import { EditorialAccess } from './editorial-access';
 import { isKey, materialTypes, publicStages, workingStages } from './editorial-labels';
 import { RevisionComparison } from './revision-comparison';
@@ -39,6 +40,9 @@ const knownBlockers: Record<string, string> = {
   topic_required: 'Добави тема.',
   source_required: 'Добави източник.',
   material_rights_missing: 'Потвърди правото за публично показване.',
+  episode_provenance_required: 'Опиши произхода на епизода.',
+  episode_rights_statement_required: 'Запиши основанието за правата на епизода.',
+  episode_verified_sources_required: 'Провери източниците и правата им за публично показване.',
 };
 const blockNames = { Heading: 'Заглавие', Paragraph: 'Абзац', Quote: 'Цитат' };
 
@@ -51,6 +55,7 @@ const blockNames = { Heading: 'Заглавие', Paragraph: 'Абзац', Quote
     NbCardModule,
     NbInputModule,
     CatalogPicker,
+    EpisodeFields,
     RevisionComparison,
   ],
   templateUrl: './material-review.html',
@@ -154,6 +159,20 @@ export class MaterialReview implements OnInit {
     if (!draft || !this.dirty() || !tag || !this.editable()) return;
     if (draft.title.trim().length < 3 || draft.rights.statement.trim().length < 3) {
       this.error.set('Заглавието и основанието за правата трябва да съдържат поне 3 знака.');
+      return;
+    }
+    const chapters = draft.episode?.chapters ?? [];
+    if (
+      chapters.some(
+        (chapter) =>
+          !chapter.title.trim() ||
+          !Number.isInteger(chapter.startSeconds) ||
+          chapter.startSeconds < 0 ||
+          chapter.startSeconds > 86_399,
+      ) ||
+      new Set(chapters.map(({ startSeconds }) => startSeconds)).size !== chapters.length
+    ) {
+      this.error.set('Въведи заглавие и различна цяла секунда за всяка времева точка.');
       return;
     }
     const { mediaRefs: _mediaRefs, ...editable } = draft;

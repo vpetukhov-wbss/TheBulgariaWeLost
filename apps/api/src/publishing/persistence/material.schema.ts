@@ -46,6 +46,17 @@ export interface MaterialBlock {
   text: string;
 }
 
+export interface EpisodeChapter {
+  startSeconds: number;
+  title: string;
+}
+
+export interface EpisodeDraft {
+  youtubeUrl?: string;
+  transcript?: string;
+  chapters?: EpisodeChapter[];
+}
+
 export interface MaterialDraft {
   title: string;
   subtitle?: string;
@@ -59,6 +70,7 @@ export interface MaterialDraft {
   historicalYear?: number | null;
   mediaRefs: MaterialMediaReference[];
   provenance?: string;
+  episode?: EpisodeDraft;
   rights: MaterialRights;
 }
 
