@@ -44,6 +44,7 @@ const authorCatalog = {
     isVisible: true,
   },
   topicIds: { kind: CatalogKind.Topics, status: CatalogStatus.Published },
+  placeIds: { kind: CatalogKind.Places, status: CatalogStatus.Published },
   sourceIds: { kind: CatalogKind.Sources, status: CatalogStatus.Active },
 } as const;
 
@@ -474,13 +475,37 @@ export class CatalogService {
     };
   }
 
+  async publicList(kind: CatalogKind, after?: string) {
+    const visibility = this.publicVisibility(kind);
+    const rows = await this.model(kind)
+      .find({ ...visibility, ...(after ? { _id: { $gt: after } } : {}) })
+      .sort({ _id: 1 })
+      .limit(101)
+      .exec();
+    const items = rows.slice(0, 100).map((entry) => ({
+      id: entry._id,
+      kind,
+      name: this.label(entry),
+      slug: entry.slug,
+    }));
+    return { items, ...(rows.length > 100 ? { nextAfter: items[99].id } : {}) };
+  }
+
+  private publicVisibility(kind: CatalogKind) {
+    if (kind === CatalogKind.Topics || kind === CatalogKind.Places) {
+      return { status: CatalogStatus.Published };
+    }
+    if (kind === CatalogKind.Categories) {
+      return { status: CatalogStatus.Approved, isVisible: true };
+    }
+    throw this.notFound();
+  }
+
   async publicBySlug(
     kind: CatalogKind,
     slug: string,
   ): Promise<{ item?: PublicCatalogDto; redirectSlug?: string }> {
-    if (![CatalogKind.Topics, CatalogKind.Categories].includes(kind)) {
-      throw this.notFound();
-    }
+    this.publicVisibility(kind);
     const model = this.model(kind);
     let entry = await model.findOne({ slug }).exec();
     if (!entry) throw this.notFound();
@@ -819,7 +844,10 @@ export class CatalogService {
   }
 
   private isPublic(entry: CatalogEntry): boolean {
-    if (entry.kind === CatalogKind.Topics) {
+    if (
+      entry.kind === CatalogKind.Topics ||
+      entry.kind === CatalogKind.Places
+    ) {
       return entry.status === CatalogStatus.Published;
     }
     if (entry.kind === CatalogKind.Categories) {

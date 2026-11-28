@@ -1,3 +1,4 @@
+import { OmitType } from '@nestjs/swagger';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import {
@@ -387,4 +388,16 @@ export class PublicCatalogDto {
 
   @ApiProperty({ type: Object })
   fields: Record<string, unknown>;
+}
+
+export class PublicCatalogListItemDto extends OmitType(PublicCatalogDto, [
+  'fields',
+] as const) {}
+
+export class PublicCatalogListDto {
+  @ApiProperty({ type: [PublicCatalogListItemDto] })
+  items: PublicCatalogListItemDto[];
+
+  @ApiPropertyOptional({ format: 'uuid' })
+  nextAfter?: string;
 }

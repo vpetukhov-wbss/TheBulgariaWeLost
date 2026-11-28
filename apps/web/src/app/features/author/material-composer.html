@@ -210,6 +210,17 @@
         <nb-card>
           <nb-card-header>Класификация и права</nb-card-header>
           <nb-card-body>
+            <label>
+              Година на събитието
+              <input
+                nbInput
+                fullWidth
+                type="number"
+                formControlName="historicalYear"
+                min="1"
+                max="9999"
+              />
+            </label>
             @for (field of catalogFields; track field) {
               <app-author-catalog-picker
                 [field]="field"

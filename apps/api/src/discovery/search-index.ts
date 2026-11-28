@@ -16,6 +16,8 @@ const mapping = {
       language: keyword,
       categoryIds: keyword,
       topicIds: keyword,
+      placeIds: keyword,
+      historicalYear: { type: 'integer' },
     },
   },
 };
@@ -31,7 +33,7 @@ export type SearchHit = {
 export class SearchIndex {
   private readonly origin = process.env.OPENSEARCH_URL;
   private readonly index =
-    process.env.OPENSEARCH_INDEX ?? 'archive-materials-v1';
+    process.env.OPENSEARCH_INDEX ?? 'archive-materials-v2';
   private readonly username = process.env.OPENSEARCH_USERNAME;
   private readonly password = process.env.OPENSEARCH_PASSWORD;
   private initialized?: Promise<void>;

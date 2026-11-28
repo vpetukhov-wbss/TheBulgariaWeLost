@@ -1175,12 +1175,15 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     const categoryId = randomUUID();
     const topicId = randomUUID();
     const sourceId = randomUUID();
+    const placeId = uuidv7();
     const update = {
       title: 'Завършена редакторска чернова',
       body: 'Историята на мястото, проверена по архивни източници.',
       categoryIds: [categoryId],
       topicIds: [topicId],
       sourceIds: [sourceId],
+      placeIds: [placeId],
+      historicalYear: 1964,
       mediaRefs: [{ mediaId: upload.uploadId, role: 'hero', order: 0 }],
       rights: {
         publicDisplayAllowed: true,
@@ -1342,6 +1345,37 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       .query({ q: update.title, limit: 1 })
       .expect(200);
     assert.equal(found.body.items[0].title, update.title);
+    assert.equal(indexed.get(initial.id)?.document.historicalYear, 1964);
+    assert.deepEqual(indexed.get(initial.id)?.document.placeIds, [placeId]);
+    assert.equal(
+      (
+        await api
+          .get(search)
+          .query({ placeId, fromYear: 1964, toYear: 1964 })
+          .expect(200)
+      ).body.items[0].id,
+      initial.id,
+    );
+    assert.deepEqual(
+      (
+        await api
+          .get(search)
+          .query({ placeId: uuidv7(), fromYear: 1964 })
+          .expect(200)
+      ).body.items,
+      [],
+    );
+    assert.deepEqual(
+      (await api.get(search).query({ fromYear: 1965 }).expect(200)).body.items,
+      [],
+    );
+    await api.get(search).query({ fromYear: 1970, toYear: 1960 }).expect(400);
+    const sitemap = await api
+      .get('/api/v1/archive/sitemap.xml')
+      .expect('Content-Type', /application\/xml/)
+      .expect(200);
+    assert(sitemap.text.includes('/materials/' + published.slug + '</loc>'));
+
     assert.equal(typeof found.body.nextCursor, 'string');
     await api
       .get(search)
@@ -1446,6 +1480,13 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
     const finalMaterial = withdrawn.body as MaterialResponse;
     assert.equal(finalMaterial.status, 'Withdrawn');
     assert.equal(finalMaterial.version, 11);
+    const updatedSitemap = await api
+      .get('/api/v1/archive/sitemap.xml')
+      .expect(200);
+    assert(
+      !updatedSitemap.text.includes('/materials/' + published.slug + '</loc>'),
+    );
+
     await api.get(publicUrl).expect(404);
     assert.deepEqual((await api.get(search).expect(200)).body.items, []);
     staleHits = undefined;
@@ -3518,13 +3559,32 @@ void describe('NestJS archive API', { timeout: 30_000 }, () => {
       }).expect(201);
       assert.equal(archivalSource.body.fields.archiveReference.fund, 'Ф. 214');
 
-      await createCatalog('places', {
+      const location = await createCatalog('places', {
         name: 'Стара Загора',
         slug: 'stara-zagora',
         placeType: 'City',
         location: { latitude: 42.4258, longitude: 25.6345 },
         historicalNames: ['Берое', 'Августа Траяна'],
       }).expect(201);
+      assert.deepEqual(
+        (await api.get('/api/v1/catalog/places').expect(200)).body.items,
+        [],
+      );
+      await transitionCatalog(
+        'places',
+        location.body.id as string,
+        'Publish',
+        1,
+      ).expect(200);
+      const locations = await api.get('/api/v1/catalog/places').expect(200);
+      assert.equal(locations.body.items[0].slug, 'stara-zagora');
+      await api.get('/api/v1/catalog/places/stara-zagora').expect(200);
+      const catalogSitemap = await api
+        .get('/api/v1/archive/sitemap.xml')
+        .expect(200);
+      assert(
+        catalogSitemap.text.includes('/archive/places/stara-zagora</loc>'),
+      );
       await createCatalog('entities', {
         name: 'Завод Берое',
         slug: 'zavod-beroe',

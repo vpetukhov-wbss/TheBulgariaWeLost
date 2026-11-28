@@ -59,6 +59,7 @@ const authorCatalogFields: AuthorCatalogField[] = [
   'categoryIds',
   'topicIds',
   'sourceIds',
+  'placeIds',
 ];
 
 @Injectable()
@@ -830,6 +831,7 @@ export class PublishingService {
       categoryIds: update.categoryIds ?? current.categoryIds,
       topicIds: update.topicIds ?? current.topicIds,
       sourceIds: update.sourceIds ?? current.sourceIds,
+      placeIds: update.placeIds ?? current.placeIds,
     };
   }
 
@@ -870,10 +872,10 @@ export class PublishingService {
     if (session) {
       for (const field of authorCatalogFields) {
         if (
-          draft[field].length &&
+          (draft[field]?.length ?? 0) &&
           !(await this.catalog.authorSelectionValid(
             field,
-            draft[field],
+            draft[field] ?? [],
             session,
           ))
         ) {

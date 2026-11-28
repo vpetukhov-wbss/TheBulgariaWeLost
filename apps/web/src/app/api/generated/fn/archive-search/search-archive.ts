@@ -18,7 +18,10 @@ export interface SearchArchive$Params {
   q?: string;
   type?: 'Story' | 'Document' | 'PhotoEssay' | 'Episode';
   topicId?: string;
-  categoryId?: string;
+  placeId?: string;
+  fromYear?: number;
+  toYear?: number;
+  categoryId?: number;
   language?: string;
   limit?: number;
   cursor?: string;
@@ -31,6 +34,9 @@ export function searchArchive(http: HttpClient, rootUrl: string, params?: Search
     rb.query('q', params.q, {});
     rb.query('type', params.type, {});
     rb.query('topicId', params.topicId, {});
+    rb.query('placeId', params.placeId, {});
+    rb.query('fromYear', params.fromYear, {});
+    rb.query('toYear', params.toYear, {});
     rb.query('categoryId', params.categoryId, {});
     rb.query('language', params.language, {});
     rb.query('limit', params.limit, {});

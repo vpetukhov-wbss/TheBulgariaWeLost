@@ -6,7 +6,7 @@ export interface PublicCatalogEntry {
 [key: string]: any;
 };
   id: string;
-  kind: 'topics' | 'categories';
+  kind: 'topics' | 'categories' | 'places';
   name: string;
   slug: string;
 }

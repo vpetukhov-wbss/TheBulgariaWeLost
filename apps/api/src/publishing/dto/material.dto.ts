@@ -164,6 +164,25 @@ export class UpdateMaterialDraftDto {
   @IsUUID(undefined, { each: true })
   sourceIds?: string[];
 
+  @ApiPropertyOptional({ type: [String], maxItems: 100 })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(100)
+  @IsUUID('7', { each: true })
+  placeIds?: string[];
+
+  @ApiPropertyOptional({
+    type: Number,
+    minimum: 1,
+    maximum: 9999,
+    nullable: true,
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(9999)
+  historicalYear?: number | null;
+
   @ApiPropertyOptional({ type: [MaterialMediaReferenceDto], maxItems: 100 })
   @IsOptional()
   @IsArray()

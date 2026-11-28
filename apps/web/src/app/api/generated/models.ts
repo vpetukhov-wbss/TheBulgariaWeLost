@@ -104,6 +104,8 @@ export type { OperationsSummary } from './models/operations-summary';
 export type { ProblemDetails } from './models/problem-details';
 export type { Profile } from './models/profile';
 export type { PublicCatalogEntry } from './models/public-catalog-entry';
+export type { PublicCatalogList } from './models/public-catalog-list';
+export type { PublicCatalogListItem } from './models/public-catalog-list-item';
 export type { PublicMaterial } from './models/public-material';
 export type { PublicSiteSettings } from './models/public-site-settings';
 export type { RebuildSearchPage } from './models/rebuild-search-page';

@@ -24,6 +24,8 @@ import {
   MaterialStatus,
 } from '../publishing/persistence/material.schema';
 import { PublishingOutboxEvent } from '../publishing/persistence/publishing-event.schema';
+import { CatalogService } from '../catalog/catalog.service';
+import { CatalogKind } from '../catalog/persistence/catalog.schema';
 import { PublishingService } from '../publishing/publishing.service';
 import type {
   ArchiveSearchItem,
@@ -53,7 +55,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
     private readonly events: Model<PublishingOutboxEvent>,
     private readonly publishing: PublishingService,
     private readonly index: SearchIndex,
-    config: ConfigService<AllConfigType>,
+    private readonly config: ConfigService<AllConfigType>,
+    private readonly catalog: CatalogService,
   ) {
     this.cursorKey = createHash('sha256')
       .update('archive-search-cursor-v1\0')
@@ -82,21 +85,36 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
   }
 
   async search(query: ArchiveSearchQuery): Promise<ArchiveSearchPage> {
+    if (query.fromYear && query.toYear && query.fromYear > query.toYear) {
+      throw new BadRequestException({ code: 'invalid_year_range' });
+    }
     const limit = query.limit ?? 20;
     const terms = {
       type: query.type,
       language: query.language,
       topicIds: query.topicId,
       categoryIds: query.categoryId,
+      placeIds: query.placeId,
     };
     const scope = createHash('sha256')
-      .update(JSON.stringify([query.q ?? '', terms]))
+      .update(
+        JSON.stringify([query.q ?? '', terms, query.fromYear, query.toYear]),
+      )
       .digest('base64url');
     let after = this.position(query.cursor, scope);
     const items: ArchiveSearchItem[] = [];
-    const filters = Object.entries(terms)
+    const filters: object[] = Object.entries(terms)
       .filter(([, value]) => Boolean(value))
       .map(([field, value]) => ({ term: { [field]: value } }));
+    if (query.fromYear || query.toYear)
+      filters.push({
+        range: {
+          historicalYear: {
+            ...(query.fromYear ? { gte: query.fromYear } : {}),
+            ...(query.toYear ? { lte: query.toYear } : {}),
+          },
+        },
+      });
     // Cap hydration work on pages containing many obsolete index documents.
     const size = Math.max(20, limit);
     for (let batch = 0; batch < 4; batch++) {
@@ -141,6 +159,63 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
         ? { nextAfter: slice[slice.length - 1]._id }
         : {}),
     };
+  }
+
+  async sitemap(): Promise<string> {
+    const origin = new URL(
+      this.config.getOrThrow('app.frontendDomain', { infer: true }),
+    ).origin;
+    const paths = [
+      '/',
+      '/archive',
+      '/archive/periods',
+      '/archive/topics',
+      '/archive/categories',
+      '/archive/places',
+    ];
+    for (const kind of [
+      CatalogKind.Topics,
+      CatalogKind.Categories,
+      CatalogKind.Places,
+    ]) {
+      let after: string | undefined;
+      do {
+        const page = await this.catalog.publicList(kind, after);
+        for (const item of page.items)
+          paths.push('/archive/' + kind + '/' + encodeURIComponent(item.slug));
+        after = page.nextAfter;
+      } while (after && paths.length < 50_000);
+    }
+
+    const rows = this.materials
+      .find({
+        status: MaterialStatus.Published,
+        publicVisibility: true,
+      })
+      .sort({ _id: 1 })
+      .select('_id')
+      .lean()
+      .cursor();
+    for await (const row of rows) {
+      if (paths.length >= 50_000) break;
+      try {
+        const material = await this.publishing.publicById(row._id);
+        if (material.content.rights.publicDisplayAllowed)
+          paths.push('/materials/' + encodeURIComponent(material.slug));
+      } catch (error: unknown) {
+        if (!(error instanceof NotFoundException)) throw error;
+      }
+    }
+
+    return (
+      '<?xml version="1.0" encoding="UTF-8"?>\n' +
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+      paths
+        .slice(0, 50_000)
+        .map((path) => '<url><loc>' + origin + path + '</loc></url>')
+        .join('') +
+      '</urlset>'
+    );
   }
 
   async metrics(): Promise<SearchMetrics> {
@@ -262,6 +337,8 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
       language: material.language,
       categoryIds: content.categoryIds,
       topicIds: content.topicIds,
+      placeIds: content.placeIds ?? [],
+      historicalYear: content.historicalYear ?? null,
     });
   }
 
@@ -280,7 +357,13 @@ export class DiscoveryService implements OnModuleInit, OnModuleDestroy {
         (query.type && material.type !== query.type) ||
         (query.language && material.language !== query.language) ||
         (query.topicId && !content.topicIds.includes(query.topicId)) ||
-        (query.categoryId && !content.categoryIds.includes(query.categoryId))
+        (query.categoryId && !content.categoryIds.includes(query.categoryId)) ||
+        (query.placeId && !content.placeIds?.includes(query.placeId)) ||
+        (query.fromYear &&
+          (!content.historicalYear ||
+            content.historicalYear < query.fromYear)) ||
+        (query.toYear &&
+          (!content.historicalYear || content.historicalYear > query.toYear))
       )
         return undefined;
       return {

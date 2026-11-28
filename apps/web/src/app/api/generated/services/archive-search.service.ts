@@ -11,6 +11,8 @@ import { ArchiveApiConfiguration } from '../archive-api-configuration';
 import { StrictHttpResponse } from '../strict-http-response';
 
 import { ArchiveSearchPage } from '../models/archive-search-page';
+import { getArchiveSitemap } from '../fn/archive-search/get-archive-sitemap';
+import { GetArchiveSitemap$Params } from '../fn/archive-search/get-archive-sitemap';
 import { searchArchive } from '../fn/archive-search/search-archive';
 import { SearchArchive$Params } from '../fn/archive-search/search-archive';
 
@@ -18,6 +20,33 @@ import { SearchArchive$Params } from '../fn/archive-search/search-archive';
 export class ArchiveSearchService extends BaseService {
   constructor(config: ArchiveApiConfiguration, http: HttpClient) {
     super(config, http);
+  }
+
+  /** Path part for operation `getArchiveSitemap()` */
+  static readonly GetArchiveSitemapPath = '/api/v1/archive/sitemap.xml';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `getArchiveSitemap()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getArchiveSitemap$Response(params?: GetArchiveSitemap$Params, context?: HttpContext): Observable<StrictHttpResponse<string>> {
+    const obs = getArchiveSitemap(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `getArchiveSitemap$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  getArchiveSitemap(params?: GetArchiveSitemap$Params, context?: HttpContext): Observable<string> {
+    const resp = this.getArchiveSitemap$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<string>): string => r.body)
+    );
   }
 
   /** Path part for operation `searchArchive()` */

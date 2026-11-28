@@ -7,8 +7,14 @@ const authorWorkspace = () =>
 const materialComposer = () =>
   import('./features/author/material-composer').then((m) => m.MaterialComposer);
 
+const archivePage = () => import('./features/archive/archive-page').then((m) => m.ArchivePage);
+
 export const routes: Routes = [
   { path: '', pathMatch: 'full', loadComponent: () => import('./home').then((m) => m.Home) },
+  { path: 'archive', pathMatch: 'full', loadComponent: archivePage },
+  { path: 'archive/periods', data: { periods: true }, loadComponent: archivePage },
+  { path: 'archive/:kind/:slug', loadComponent: archivePage },
+  { path: 'archive/:kind', loadComponent: archivePage },
   { path: 'login', data: { action: 'login' }, loadComponent: authPage },
   { path: 'register', data: { action: 'register' }, loadComponent: authPage },
   { path: 'forgot-password', data: { action: 'forgot' }, loadComponent: authPage },

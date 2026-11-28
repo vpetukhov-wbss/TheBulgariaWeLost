@@ -21,9 +21,12 @@ import { getPublicCatalogEntry } from '../fn/catalog/get-public-catalog-entry';
 import { GetPublicCatalogEntry$Params } from '../fn/catalog/get-public-catalog-entry';
 import { listCatalogEntries } from '../fn/catalog/list-catalog-entries';
 import { ListCatalogEntries$Params } from '../fn/catalog/list-catalog-entries';
+import { listPublicCatalog } from '../fn/catalog/list-public-catalog';
+import { ListPublicCatalog$Params } from '../fn/catalog/list-public-catalog';
 import { mergeCatalogEntry } from '../fn/catalog/merge-catalog-entry';
 import { MergeCatalogEntry$Params } from '../fn/catalog/merge-catalog-entry';
 import { PublicCatalogEntry } from '../models/public-catalog-entry';
+import { PublicCatalogList } from '../models/public-catalog-list';
 import { transitionCatalogEntry } from '../fn/catalog/transition-catalog-entry';
 import { TransitionCatalogEntry$Params } from '../fn/catalog/transition-catalog-entry';
 import { updateCatalogEntry } from '../fn/catalog/update-catalog-entry';
@@ -198,6 +201,33 @@ export class CatalogService extends BaseService {
     const resp = this.mergeCatalogEntry$Response(params, context);
     return resp.pipe(
       map((r: StrictHttpResponse<CatalogMergeAccepted>): CatalogMergeAccepted => r.body)
+    );
+  }
+
+  /** Path part for operation `listPublicCatalog()` */
+  static readonly ListPublicCatalogPath = '/api/v1/catalog/{kind}';
+
+  /**
+   * This method provides access to the full `HttpResponse`, allowing access to response headers.
+   * To access only the response body, use `listPublicCatalog()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  listPublicCatalog$Response(params: ListPublicCatalog$Params, context?: HttpContext): Observable<StrictHttpResponse<PublicCatalogList>> {
+    const obs = listPublicCatalog(this.http, this.rootUrl, params, context);
+    return obs;
+  }
+
+  /**
+   * This method provides access only to the response body.
+   * To access the full response (for headers, for example), `listPublicCatalog$Response()` instead.
+   *
+   * This method doesn't expect any request body.
+   */
+  listPublicCatalog(params: ListPublicCatalog$Params, context?: HttpContext): Observable<PublicCatalogList> {
+    const resp = this.listPublicCatalog$Response(params, context);
+    return resp.pipe(
+      map((r: StrictHttpResponse<PublicCatalogList>): PublicCatalogList => r.body)
     );
   }
 

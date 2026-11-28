@@ -55,6 +55,8 @@ export interface MaterialDraft {
   categoryIds: string[];
   topicIds: string[];
   sourceIds: string[];
+  placeIds?: string[];
+  historicalYear?: number | null;
   mediaRefs: MaterialMediaReference[];
   provenance?: string;
   rights: MaterialRights;
