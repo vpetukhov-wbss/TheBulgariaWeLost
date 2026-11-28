@@ -10,6 +10,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, Model, type ClientSession } from 'mongoose';
 import { uuidv7 } from 'uuidv7';
+import { youtubeVideoId } from './youtube-video-id';
 import { AuditTargetType } from '../back-office/audit-event.types';
 import { Role } from '../auth/persistence/account.schema';
 import type { SignedInAccount } from '../auth/strategies/jwt.strategy';
@@ -42,7 +43,7 @@ import {
   type MaterialDraft,
   MaterialRevision,
   MaterialStatus,
-  type MaterialType,
+  MaterialType,
   WorkingStatus,
 } from './persistence/material.schema';
 import {
@@ -243,6 +244,11 @@ export class PublishingService {
         throw new ConflictException({
           code: 'material_archived',
           message: 'Restore the material from the archive before editing.',
+        });
+      }
+      if (dto.episode && material!.type !== MaterialType.Episode) {
+        throw new UnprocessableEntityException({
+          code: 'episode_data_not_allowed',
         });
       }
       const current = await this.currentRevision(material!, session);
@@ -515,6 +521,7 @@ export class PublishingService {
       const blockers = await this.publicationBlockers(
         revision.content,
         session,
+        material.type,
       );
       if (blockers.length)
         throw new UnprocessableEntityException({
@@ -601,13 +608,41 @@ export class PublishingService {
     ) {
       this.publicNotFound();
     }
+    const { episode, ...content } = revision!.content;
+    const isEpisode = material!.type === MaterialType.Episode;
+    const videoId = isEpisode ? youtubeVideoId(episode?.youtubeUrl) : undefined;
     return {
       id: material!._id,
       slug: material!.slug,
       type: material!.type,
       language: material!.language,
       revisionNumber: material!.publishedRevisionNumber!,
-      content: revision!.content,
+      content: {
+        ...content,
+        ...(isEpisode && episode
+          ? {
+              episode: {
+                ...(episode.transcript
+                  ? { transcript: episode.transcript }
+                  : {}),
+                ...(episode.chapters?.length
+                  ? { chapters: episode.chapters }
+                  : {}),
+              },
+            }
+          : {}),
+      },
+      ...(isEpisode
+        ? {
+            episode: {
+              youtubeVideoId: videoId,
+              sources: await this.catalog.verifiedEpisodeSources(
+                content.sourceIds,
+                session,
+              ),
+            },
+          }
+        : {}),
     };
   }
 
@@ -661,6 +696,7 @@ export class PublishingService {
         const blockers = await this.publicationBlockers(
           revision.content,
           session,
+          material.type,
         );
         if (blockers.length) {
           throw new UnprocessableEntityException({
@@ -756,7 +792,11 @@ export class PublishingService {
         : this.allowedActions(material),
       publicationBlockers: author
         ? await this.authorBlockers(revision.content)
-        : await this.publicationBlockers(revision.content),
+        : await this.publicationBlockers(
+            revision.content,
+            undefined,
+            material.type,
+          ),
       ...(material.workingStatus === WorkingStatus.ChangesRequested &&
       material.correctionNote
         ? { correctionNote: material.correctionNote }
@@ -821,6 +861,8 @@ export class PublishingService {
   ): MaterialDraft {
     const changes = { ...update };
     delete changes.changeSummary;
+    delete changes.episode;
+    const episode = update.episode ?? current.episode;
     return {
       ...structuredClone(current),
       ...changes,
@@ -832,12 +874,33 @@ export class PublishingService {
       topicIds: update.topicIds ?? current.topicIds,
       sourceIds: update.sourceIds ?? current.sourceIds,
       placeIds: update.placeIds ?? current.placeIds,
+      ...(episode
+        ? {
+            episode: {
+              ...(episode.youtubeUrl?.trim()
+                ? { youtubeUrl: episode.youtubeUrl.trim() }
+                : {}),
+              ...(episode.transcript?.trim()
+                ? { transcript: episode.transcript.trim() }
+                : {}),
+              ...(episode.chapters?.length
+                ? {
+                    chapters: episode.chapters.map((chapter) => ({
+                      startSeconds: chapter.startSeconds,
+                      title: chapter.title.trim(),
+                    })),
+                  }
+                : {}),
+            },
+          }
+        : {}),
     };
   }
 
   private async publicationBlockers(
     draft: MaterialDraft,
     session?: ClientSession,
+    type?: MaterialType,
   ): Promise<string[]> {
     const blockers: string[] = [];
     if (!draft.categoryIds.length) blockers.push('category_required');
@@ -845,6 +908,25 @@ export class PublishingService {
     if (!draft.sourceIds.length) blockers.push('source_required');
     if (!draft.rights.publicDisplayAllowed)
       blockers.push('material_rights_missing');
+    if (type === MaterialType.Episode) {
+      if (!draft.provenance?.trim())
+        blockers.push('episode_provenance_required');
+      const rights = draft.rights.statement.trim();
+      if (
+        rights.length < 3 ||
+        rights === 'Not reviewed.' ||
+        rights === 'Не са потвърдени.'
+      ) {
+        blockers.push('episode_rights_statement_required');
+      }
+      const citations = await this.catalog.verifiedEpisodeSources(
+        draft.sourceIds,
+        session,
+      );
+      if (citations.length !== new Set(draft.sourceIds).size) {
+        blockers.push('episode_verified_sources_required');
+      }
+    }
     blockers.push(...(await this.mediaBlockers(draft, session)));
     return blockers;
   }

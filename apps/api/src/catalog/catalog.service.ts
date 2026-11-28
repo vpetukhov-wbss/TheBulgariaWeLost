@@ -208,6 +208,48 @@ export class CatalogService {
     return count === unique.length;
   }
 
+  async verifiedEpisodeSources(ids: string[], session?: ClientSession) {
+    if (!ids.length) return [];
+    const entries = await this.sources
+      .find({
+        _id: { $in: ids },
+        status: CatalogStatus.Active,
+        'verification.status': 'Verified',
+        'rights.publicDisplayAllowed': true,
+      })
+      .select('title url archiveReference originalInstitutionName')
+      .session(session ?? null)
+      .exec();
+    const byId = new Map(entries.map((entry) => [entry._id, entry]));
+    return [...new Set(ids)].flatMap((id) => {
+      const source = byId.get(id);
+      if (!source?.title) return [];
+      const archive = source.archiveReference;
+      const reference = [
+        source.originalInstitutionName,
+        archive?.fund && `ф. ${archive.fund}`,
+        archive?.inventory && `оп. ${archive.inventory}`,
+        archive?.archiveUnit && `а.е. ${archive.archiveUnit}`,
+        archive?.pageOrFrame && `л. ${archive.pageOrFrame}`,
+      ]
+        .filter(Boolean)
+        .join(', ');
+      const url = URL.canParse(source.url ?? '')
+        ? new URL(source.url!)
+        : undefined;
+      return [
+        {
+          id,
+          title: source.title,
+          ...(url?.protocol === 'https:' && !url.username && !url.password
+            ? { url: url.href }
+            : {}),
+          ...(reference ? { reference } : {}),
+        },
+      ];
+    });
+  }
+
   async list(
     kind: CatalogKind,
     query?: string,

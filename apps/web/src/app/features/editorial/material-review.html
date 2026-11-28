@@ -211,6 +211,12 @@
                 }
               </ul>
             }
+            @if (material.type === 'Episode') {
+              <app-episode-fields
+                [episode]="editDraft.episode ?? {}"
+                (changed)="edit({ episode: $event })"
+              />
+            }
             <label class="field"
               >Произход
               <textarea

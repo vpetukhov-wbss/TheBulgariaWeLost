@@ -302,3 +302,25 @@ test('denies access to an editorial detail opened directly by a normal user', as
   await expect(page).toHaveURL(/\/forbidden$/);
   await expect(page.getByRole('heading', { name: 'Ограничен достъп' })).toBeVisible();
 });
+
+test('an editor saves episode fields in a revision and publishes it', async ({ page }) => {
+  const state = fixture();
+  state.material.type = 'Episode';
+  state.material.workingStatus = 'InReview';
+  await mockApi(page, 'Editor', state);
+  await page.goto('/admin/materials/' + materialId);
+  await page.getByLabel('Адрес в YouTube').fill('https://youtu.be/abcDEF123_0');
+  await page.getByLabel('Транскрипция').fill('Редакционна транскрипция за архива.');
+  await page.getByRole('button', { name: 'Добави времева точка' }).click();
+  await page.getByLabel('Секунда от началото').fill('80');
+  await page.getByLabel('Заглавие на точката').fill('Архивен разказ');
+  await page.getByRole('button', { name: 'Запази редакцията' }).click();
+  await expect(page.getByText('Записана е нова работна ревизия.')).toBeVisible();
+  expect(state.material.draft.episode).toEqual({
+    youtubeUrl: 'https://youtu.be/abcDEF123_0',
+    transcript: 'Редакционна транскрипция за архива.',
+    chapters: [{ startSeconds: 80, title: 'Архивен разказ' }],
+  });
+  await confirmAction(page, 'Публикувай');
+  await expect(page.getByRole('link', { name: 'Виж публикацията' })).toBeVisible();
+});

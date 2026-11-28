@@ -3,8 +3,10 @@ import {
   Controller,
   Get,
   Headers,
+  Header,
   HttpCode,
   HttpStatus,
+  NotFoundException,
   Param,
   ParseEnumPipe,
   ParseIntPipe,
@@ -17,10 +19,14 @@ import {
   UseGuards,
   VERSION_NEUTRAL,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import type { AllConfigType } from '../config/config.type';
+import { archiveSiteName, materialShareHtml } from './material-share';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
   ApiCreatedResponse,
+  ApiExcludeEndpoint,
   ApiHeader,
   ApiOkResponse,
   ApiQuery,
@@ -190,7 +196,27 @@ export class PublishingController {
 @ApiTags('Publishing')
 @Controller({ path: 'materials', version: '1' })
 export class PublicPublishingController {
-  constructor(private readonly publishing: PublishingService) {}
+  constructor(
+    private readonly publishing: PublishingService,
+    private readonly config: ConfigService<AllConfigType>,
+  ) {}
+
+  @Get(':slug/share-head')
+  @ApiExcludeEndpoint()
+  @Header('Content-Type', 'text/html; charset=utf-8')
+  @Header('Cache-Control', 'no-store')
+  async shareHead(@Param('slug') slug: string): Promise<string> {
+    try {
+      const material = await this.publishing.publicBySlug(slug);
+      return materialShareHtml(
+        material,
+        this.config.getOrThrow('app.frontendDomain', { infer: true }),
+      );
+    } catch (error: unknown) {
+      if (!(error instanceof NotFoundException)) throw error;
+      return `<title>${archiveSiteName}</title><meta name="robots" content="noindex,follow">`;
+    }
+  }
 
   @Get(':slug')
   @ApiOkResponse({ type: PublicMaterialDto })

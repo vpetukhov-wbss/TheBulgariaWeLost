@@ -7,7 +7,13 @@ export class ArchiveSeo {
   private readonly title = inject(Title);
   private readonly meta = inject(Meta);
 
-  set(title: string, description: string, path: string, indexable = true): void {
+  set(
+    title: string,
+    description: string,
+    path: string,
+    indexable = true,
+    imagePath?: string,
+  ): void {
     const url = new URL(path, this.document.location.origin).href;
     const fullTitle = title + ' · България, която изгубихме';
     const canonical =
@@ -21,6 +27,23 @@ export class ArchiveSeo {
     this.meta.updateTag({ property: 'og:title', content: fullTitle });
     this.meta.updateTag({ property: 'og:description', content: description });
     this.meta.updateTag({ property: 'og:url', content: url });
+    this.meta.removeTag('property="og:type"');
+    if (imagePath) {
+      this.meta.updateTag({ property: 'og:type', content: 'article' });
+      this.meta.updateTag({
+        property: 'og:image',
+        content: new URL(imagePath, this.document.location.origin).href,
+      });
+      this.meta.updateTag({ property: 'og:image:width', content: '1200' });
+      this.meta.updateTag({ property: 'og:image:height', content: '630' });
+      this.meta.updateTag({
+        property: 'og:image:alt',
+        content: 'България, която изгубихме · Дигитален архив',
+      });
+      this.meta.updateTag({ name: 'twitter:card', content: 'summary_large_image' });
+    } else {
+      this.clearEpisodeTags();
+    }
     this.meta.updateTag({ name: 'robots', content: indexable ? 'index,follow' : 'noindex,follow' });
   }
 
@@ -35,6 +58,19 @@ export class ArchiveSeo {
     ]) {
       this.meta.removeTag(selector);
     }
+    this.meta.removeTag('property="og:type"');
+    this.clearEpisodeTags();
     this.title.setTitle('България, която изгубихме');
+  }
+  private clearEpisodeTags(): void {
+    for (const selector of [
+      'property="og:image"',
+      'property="og:image:width"',
+      'property="og:image:height"',
+      'property="og:image:alt"',
+      'name="twitter:card"',
+    ]) {
+      this.meta.removeTag(selector);
+    }
   }
 }

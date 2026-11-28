@@ -33,12 +33,9 @@
               "@nebular/theme/styles/prebuilt/default.css",
               "src/styles.scss"
             ],
-            "polyfills": [
-              "zone.js"
-            ],
-            "allowedCommonJsDependencies": [
-              "eva-icons"
-            ]
+            "assets": [{ "glob": "episode-share.png", "input": "src/assets", "output": "assets" }],
+            "polyfills": ["zone.js"],
+            "allowedCommonJsDependencies": ["eva-icons"]
           },
           "configurations": {
             "production": {

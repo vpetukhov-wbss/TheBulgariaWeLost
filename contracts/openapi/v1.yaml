@@ -3334,12 +3334,49 @@ components:
           type: string
           enum: [Heading, Paragraph, Quote]
         text: { type: string, maxLength: 6000 }
+    EpisodeChapter:
+      type: object
+      additionalProperties: false
+      required: [startSeconds, title]
+      properties:
+        startSeconds: { type: integer, minimum: 0, maximum: 86399 }
+        title: { type: string, minLength: 1, maxLength: 160 }
+    EpisodeDraft:
+      type: object
+      additionalProperties: false
+      properties:
+        youtubeUrl: { type: string, maxLength: 2000 }
+        transcript: { type: string, maxLength: 30000 }
+        chapters:
+          type: array
+          maxItems: 100
+          items: { $ref: "#/components/schemas/EpisodeChapter" }
+    EpisodeSource:
+      type: object
+      additionalProperties: false
+      required: [id, title]
+      properties:
+        id: { type: string, format: uuid }
+        title: { type: string }
+        url: { type: string, format: uri }
+        reference: { type: string }
+    PublicEpisode:
+      type: object
+      additionalProperties: false
+      required: [sources]
+      properties:
+        youtubeVideoId: { type: string, pattern: "^[A-Za-z0-9_-]{11}$" }
+        sources:
+          type: array
+          items: { $ref: "#/components/schemas/EpisodeSource" }
     MaterialDraft:
       type: object
       additionalProperties: false
       required:
         [title, categoryIds, topicIds, sourceIds, mediaRefs, rights]
       properties:
+        episode:
+          $ref: "#/components/schemas/EpisodeDraft"
         historicalYear:
           type: integer
           minimum: 1
@@ -3416,6 +3453,8 @@ components:
       type: object
       additionalProperties: false
       properties:
+        episode:
+          $ref: "#/components/schemas/EpisodeDraft"
         historicalYear:
           type: integer
           minimum: 1
@@ -3695,6 +3734,8 @@ components:
       additionalProperties: false
       required: [id, slug, type, language, revisionNumber, content]
       properties:
+        episode:
+          $ref: "#/components/schemas/PublicEpisode"
         id:
           type: string
           format: uuid

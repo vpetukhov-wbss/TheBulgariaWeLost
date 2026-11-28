@@ -56,6 +56,9 @@ export type { DecideModerationCaseRequest } from './models/decide-moderation-cas
 export type { EditAdminMediaRequest } from './models/edit-admin-media-request';
 export type { EditAdminUserRequest } from './models/edit-admin-user-request';
 export type { EditStorageLocationRequest } from './models/edit-storage-location-request';
+export type { EpisodeChapter } from './models/episode-chapter';
+export type { EpisodeDraft } from './models/episode-draft';
+export type { EpisodeSource } from './models/episode-source';
 export type { FeaturedMaterial } from './models/featured-material';
 export type { ForgotPasswordRequest } from './models/forgot-password-request';
 export type { HashRequest } from './models/hash-request';
@@ -106,6 +109,7 @@ export type { Profile } from './models/profile';
 export type { PublicCatalogEntry } from './models/public-catalog-entry';
 export type { PublicCatalogList } from './models/public-catalog-list';
 export type { PublicCatalogListItem } from './models/public-catalog-list-item';
+export type { PublicEpisode } from './models/public-episode';
 export type { PublicMaterial } from './models/public-material';
 export type { PublicSiteSettings } from './models/public-site-settings';
 export type { RebuildSearchPage } from './models/rebuild-search-page';

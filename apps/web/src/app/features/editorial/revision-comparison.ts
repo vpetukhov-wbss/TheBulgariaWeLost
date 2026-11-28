@@ -32,6 +32,15 @@ const fields: { label: string; read: (draft: MaterialDraft) => string }[] = [
   { label: 'Подзаглавие', read: (draft) => draft.subtitle ?? '' },
   { label: 'Резюме', read: (draft) => draft.summary ?? '' },
   { label: 'Съдържание', read: textOf },
+  { label: 'Адрес в YouTube', read: (draft) => draft.episode?.youtubeUrl ?? '' },
+  { label: 'Транскрипция', read: (draft) => draft.episode?.transcript ?? '' },
+  {
+    label: 'Времеви точки',
+    read: (draft) =>
+      (draft.episode?.chapters ?? [])
+        .map(({ startSeconds, title }) => startSeconds + ' с · ' + title)
+        .join('\n'),
+  },
   { label: 'Категории', read: (draft) => draft.categoryIds.join('\n') },
   { label: 'Теми', read: (draft) => draft.topicIds.join('\n') },
   { label: 'Източници', read: (draft) => draft.sourceIds.join('\n') },

@@ -28,6 +28,14 @@ check '.NET Media' 'http://127.0.0.1:5088/media/health/live'
 check 'Mailpit' 'http://127.0.0.1:8025/readyz'
 check 'OpenSearch API' 'http://127.0.0.1:3000/api/v1/archive/search?q=archive'
 
+episode_head=$(curl --fail --silent --show-error 'http://127.0.0.1:4200/materials/smoke-unpublished-episode')
+if ! printf '%s' "$episode_head" | grep -q 'name="robots" content="noindex,follow"' ||
+   printf '%s' "$episode_head" | grep -q '<!--#'; then
+  echo 'Expected Nginx to render a noindex share head for an unpublished material' >&2
+  exit 1
+fi
+check 'Episode image' 'http://127.0.0.1:4200/assets/episode-share.png'
+
 status=$(curl --silent --output /dev/null --write-out '%{http_code}' \
   --request POST \
   --header "Authorization: Bearer $MEDIA_PROBE_TOKEN" \
