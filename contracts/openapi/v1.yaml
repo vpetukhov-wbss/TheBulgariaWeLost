@@ -28,6 +28,22 @@ tags:
   - name: Internal media
     description: Private service-to-service operations. Never call these from a browser.
 paths:
+  /api/v1/archive/sitemap.xml:
+    get:
+      tags:
+        - Archive search
+      operationId: getArchiveSitemap
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+      responses:
+        "200":
+          description: Sitemap XML.
+          content:
+            application/xml:
+              schema:
+                type: string
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/archive/search:
     get:
       tags:
@@ -55,6 +71,20 @@ paths:
           schema: &a1
             type: string
             format: uuid
+        - name: placeId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: fromYear
+          in: query
+          schema: &a1
+            type: integer
+            minimum: 1
+            maximum: 9999
+        - name: toYear
+          in: query
+          schema: *a1
         - name: categoryId
           in: query
           schema: *a1
@@ -2164,6 +2194,36 @@ paths:
                 $ref: "#/components/schemas/CatalogMergeAccepted"
         default:
           $ref: "#/components/responses/Problem"
+  /api/v1/catalog/{kind}:
+    get:
+      tags:
+        - Catalog
+      operationId: listPublicCatalog
+      parameters:
+        - $ref: "#/components/parameters/CorrelationId"
+        - name: kind
+          in: path
+          required: true
+          schema:
+            type: string
+            enum:
+              - topics
+              - categories
+              - places
+        - name: after
+          in: query
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Public catalog entries.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PublicCatalogList"
+        default:
+          $ref: "#/components/responses/Problem"
   /api/v1/catalog/{kind}/{slug}:
     get:
       tags: [Catalog]
@@ -2530,7 +2590,7 @@ components:
       required: true
       schema:
         type: string
-        enum: [categoryIds, topicIds, sourceIds]
+        enum: [categoryIds, topicIds, sourceIds, placeIds]
     CorrelationId:
       name: X-Correlation-ID
       in: header
@@ -3186,6 +3246,36 @@ components:
         targetId:
           type: string
           format: uuid
+    PublicCatalogListItem:
+      type: object
+      required:
+        - id
+        - name
+        - slug
+        - kind
+      properties:
+        id: &a2
+          type: string
+          format: uuid
+        name: &a1
+          type: string
+        slug: *a1
+        kind:
+          type: string
+          enum:
+            - topics
+            - categories
+            - places
+    PublicCatalogList:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PublicCatalogListItem"
+        nextAfter: *a2
     PublicCatalogEntry:
       type: object
       additionalProperties: false
@@ -3196,7 +3286,7 @@ components:
           format: uuid
         kind:
           type: string
-          enum: [topics, categories]
+          enum: [topics, categories, places]
         name:
           type: string
         slug:
@@ -3250,6 +3340,17 @@ components:
       required:
         [title, categoryIds, topicIds, sourceIds, mediaRefs, rights]
       properties:
+        historicalYear:
+          type: integer
+          minimum: 1
+          maximum: 9999
+          nullable: true
+        placeIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
         title:
           type: string
           minLength: 3
@@ -3315,6 +3416,17 @@ components:
       type: object
       additionalProperties: false
       properties:
+        historicalYear:
+          type: integer
+          minimum: 1
+          maximum: 9999
+          nullable: true
+        placeIds:
+          type: array
+          maxItems: 100
+          items:
+            type: string
+            format: uuid
         title:
           type: string
           minLength: 3

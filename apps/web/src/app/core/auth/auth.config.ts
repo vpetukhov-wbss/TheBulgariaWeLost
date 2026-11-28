@@ -36,6 +36,9 @@ export function skipBearer(request: HttpRequest<unknown>): boolean {
     !/^\/api\/(?:v1|admin\/v1)\//.test(pathname) ||
     anonymousAuthPaths.has(pathname) ||
     pathname === '/api/v1/site-settings' ||
+    pathname === '/api/v1/archive/search' ||
+    pathname.startsWith('/api/v1/catalog/') ||
+    /^\/api\/v1\/materials\/[^/]+$/.test(pathname) ||
     /^\/api\/v1\/materials\/[^/]+\/reports$/.test(pathname)
   );
 }

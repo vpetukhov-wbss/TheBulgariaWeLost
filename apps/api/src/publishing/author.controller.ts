@@ -40,6 +40,7 @@ enum CatalogField {
   Category = 'categoryIds',
   Topic = 'topicIds',
   Source = 'sourceIds',
+  Place = 'placeIds',
 }
 
 @ApiTags('Authoring')

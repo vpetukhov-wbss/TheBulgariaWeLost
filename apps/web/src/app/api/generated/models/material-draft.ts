@@ -8,7 +8,9 @@ export interface MaterialDraft {
   blocks?: Array<MaterialBlock>;
   body?: string;
   categoryIds: Array<string>;
+  historicalYear?: number | null;
   mediaRefs: Array<MaterialMediaReference>;
+  placeIds?: Array<string>;
   provenance?: string;
   rights: MaterialRights;
   sourceIds: Array<string>;

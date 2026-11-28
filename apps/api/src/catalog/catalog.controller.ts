@@ -39,6 +39,7 @@ import {
   CatalogPageDto,
   CatalogTransitionDto,
   PublicCatalogDto,
+  PublicCatalogListDto,
 } from './dto/catalog.dto';
 import { CatalogKind, CatalogStatus } from './persistence/catalog.schema';
 
@@ -159,6 +160,16 @@ export class CatalogController {
 @Controller({ path: 'catalog', version: '1' })
 export class PublicCatalogController {
   constructor(private readonly catalog: CatalogService) {}
+
+  @Get(':kind')
+  @ApiOkResponse({ type: PublicCatalogListDto })
+  listPublic(
+    @Param('kind', new ParseEnumPipe(CatalogKind)) kind: CatalogKind,
+    @Query('after', new ParseUUIDPipe({ version: '7', optional: true }))
+    after?: string,
+  ): Promise<PublicCatalogListDto> {
+    return this.catalog.publicList(kind, after);
+  }
 
   @Get(':kind/:slug')
   @ApiOkResponse({ type: PublicCatalogDto })

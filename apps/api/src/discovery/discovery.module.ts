@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   Module,
   Post,
@@ -13,6 +14,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOkResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
+import { CatalogModule } from '../catalog/catalog.module';
 import { AuthModule } from '../auth/auth.module';
 import { AdministratorGuard } from '../back-office/administrator.guard';
 import { BackOfficeGuard } from '../back-office/back-office.guard';
@@ -50,6 +52,23 @@ class ArchiveSearchController {
   }
 }
 
+@ApiTags('Archive search')
+@Controller({ path: 'archive', version: '1' })
+@UseGuards(ThrottlerGuard)
+class ArchiveSitemapController {
+  constructor(private readonly discovery: DiscoveryService) {}
+
+  @Get('sitemap.xml')
+  @Header('Content-Type', 'application/xml; charset=utf-8')
+  @Throttle({ default: { limit: 12, ttl: 60_000 } })
+  @ApiOkResponse({
+    content: { 'application/xml': { schema: { type: 'string' } } },
+  })
+  sitemap(): Promise<string> {
+    return this.discovery.sitemap();
+  }
+}
+
 @ApiTags('Admin search')
 @ApiBearerAuth()
 @Controller({ path: 'admin/v1/search', version: VERSION_NEUTRAL })
@@ -80,6 +99,7 @@ class AdminSearchController {
 @Module({
   imports: [
     AuthModule,
+    CatalogModule,
     PublishingModule,
     MongooseModule.forFeature([
       { name: Material.name, schema: MaterialSchema },
@@ -87,7 +107,11 @@ class AdminSearchController {
       { name: PublishingOutboxEvent.name, schema: PublishingOutboxEventSchema },
     ]),
   ],
-  controllers: [ArchiveSearchController, AdminSearchController],
+  controllers: [
+    ArchiveSearchController,
+    ArchiveSitemapController,
+    AdminSearchController,
+  ],
   providers: [
     DiscoveryService,
     SearchIndex,

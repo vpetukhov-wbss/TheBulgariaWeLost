@@ -38,6 +38,27 @@ export class ArchiveSearchQuery {
   @IsUUID('7')
   categoryId?: string;
 
+  @ApiPropertyOptional({ format: 'uuid' })
+  @IsOptional()
+  @IsUUID('7')
+  placeId?: string;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 9999 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(9999)
+  fromYear?: number;
+
+  @ApiPropertyOptional({ minimum: 1, maximum: 9999 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(9999)
+  toYear?: number;
+
   @ApiPropertyOptional({ maxLength: 12 })
   @IsOptional()
   @Matches(/^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})?$/)

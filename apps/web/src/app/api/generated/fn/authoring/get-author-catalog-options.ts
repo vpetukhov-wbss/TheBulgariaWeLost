@@ -15,7 +15,7 @@ export interface GetAuthorCatalogOptions$Params {
  * Optional caller correlation ID. The server echoes it or creates a safe value.
  */
   'X-Correlation-ID'?: string;
-  field: 'categoryIds' | 'topicIds' | 'sourceIds';
+  field: 'categoryIds' | 'topicIds' | 'sourceIds' | 'placeIds';
   q?: string;
 
 /**

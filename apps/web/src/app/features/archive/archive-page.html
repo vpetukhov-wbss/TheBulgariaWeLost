@@ -1,0 +1,128 @@
+<nb-card>
+  <nb-card-body>
+    <h1>{{ heading() }}</h1>
+    <nav class="archive-nav" aria-label="Раздели на архива">
+      <a routerLink="/archive">Всички материали</a>
+      @for (group of groupKinds; track group) {
+        <a [routerLink]="['/archive', group]">{{ groups[group] }}</a>
+      }
+      <a routerLink="/archive/periods">Периоди</a>
+    </nav>
+    @if (description()) {
+      <p>{{ description() }}</p>
+    }
+    @if (!directory() && !unavailable() && (!slug() || entry.hasValue())) {
+      <form #filterForm class="filters" (submit)="submit($event, filterForm)">
+        <label>
+          Търси в архива
+          <input
+            nbInput
+            fullWidth
+            type="search"
+            name="q"
+            maxlength="150"
+            [value]="filters().q ?? ''"
+          />
+        </label>
+        <label>
+          Вид
+          <select name="type" [value]="filters().type ?? ''">
+            <option value="">Всички</option>
+            @for (type of materialTypes; track type) {
+              <option [value]="type">{{ types[type] }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          От година
+          <input
+            nbInput
+            fullWidth
+            name="fromYear"
+            type="number"
+            min="1"
+            max="9999"
+            [value]="filters().fromYear ?? ''"
+          />
+        </label>
+        <label>
+          До година
+          <input
+            nbInput
+            fullWidth
+            name="toYear"
+            type="number"
+            min="1"
+            max="9999"
+            [value]="filters().toYear ?? ''"
+          />
+        </label>
+        <button nbButton status="primary" type="submit">Търси</button>
+        <a [routerLink]="[]">Изчисти филтрите</a>
+      </form>
+    }
+  </nb-card-body>
+</nb-card>
+@if (loading()) {
+  <p role="status">Зарежда се архивът…</p>
+} @else if (unavailable()) {
+  <nb-alert status="warning">Този раздел вече е недостъпен.</nb-alert>
+} @else if (error()) {
+  <nb-alert status="danger" role="alert">
+    @if (filters().fromYear && filters().toYear && filters().fromYear! > filters().toYear!) {
+      Началната година трябва да е преди или равна на крайната.
+    } @else {
+      Архивът временно не може да се зареди.
+      <button nbButton outline size="small" type="button" (click)="retry()">Опитай отново</button>
+    }
+  </nb-alert>
+} @else if (directory()) {
+  @if (entries.hasValue()) {
+    @let page = entries.value();
+    @if (page.items.length) {
+      <ul class="directory">
+        @for (item of page.items; track item.id) {
+          <li>
+            <a [routerLink]="['/archive', item.kind, item.slug]">{{ item.name }}</a>
+          </li>
+        }
+      </ul>
+    } @else {
+      <p>Няма публикувани записи в този раздел.</p>
+    }
+    @if (page.nextAfter) {
+      <a nbButton outline [routerLink]="[]" [queryParams]="{ after: page.nextAfter }"
+        >Следваща страница</a
+      >
+    }
+  }
+} @else if (results.hasValue()) {
+  @let page = results.value();
+  <section aria-label="Резултати от архива">
+    @for (item of page.items; track item.id) {
+      <nb-card>
+        <nb-card-body>
+          <span>{{ types[item.type] }}</span>
+          <h2>
+            <a [routerLink]="['/materials', item.slug]">{{ item.title }}</a>
+          </h2>
+          @if (item.summary) {
+            <p>{{ item.summary }}</p>
+          }
+        </nb-card-body>
+      </nb-card>
+    } @empty {
+      <p role="status">Няма материали по тези филтри.</p>
+    }
+    @if (page.nextCursor) {
+      <a
+        nbButton
+        outline
+        [routerLink]="[]"
+        queryParamsHandling="merge"
+        [queryParams]="{ cursor: page.nextCursor }"
+        >Следваща страница</a
+      >
+    }
+  </section>
+}

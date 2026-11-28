@@ -1,15 +1,22 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
-import type { OnInit } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  computed,
+  DestroyRef,
+  effect,
+  inject,
+  signal,
+} from '@angular/core';
+import { rxResource, toSignal } from '@angular/core/rxjs-interop';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NbAuthService } from '@nebular/auth';
 import { NbAlertModule, NbButtonModule, NbCardModule } from '@nebular/theme';
 import { firstValueFrom } from 'rxjs';
-import type { PublicMaterial } from '../../api/generated/models/public-material';
 import { AuthoringService } from '../../api/generated/services/authoring.service';
 import { PublishingService } from '../../api/generated/services/publishing.service';
 import { actionError } from '../../core/auth/auth-errors';
+import { ArchiveSeo } from '../archive/archive-seo';
 import { MaterialReportForm } from '../moderation/material-report-form';
 
 @Component({
@@ -19,7 +26,20 @@ import { MaterialReportForm } from '../moderation/material-report-form';
       <article>
         <nb-card>
           <nb-card-body>
+            <a routerLink="/archive">Към архива</a>
             <h1>{{ current.content.title }}</h1>
+            @if (current.content.historicalYear) {
+              <p>
+                <a
+                  routerLink="/archive/periods"
+                  [queryParams]="{
+                    fromYear: current.content.historicalYear,
+                    toYear: current.content.historicalYear,
+                  }"
+                  >{{ current.content.historicalYear }} г.</a
+                >
+              </p>
+            }
             @if (current.content.subtitle) {
               <p>{{ current.content.subtitle }}</p>
             }
@@ -70,9 +90,12 @@ import { MaterialReportForm } from '../moderation/material-report-form';
           </nb-card-body>
         </nb-card>
       </article>
-    } @else if (error()) {
-      <nb-alert status="warning" role="alert">{{ error() }}</nb-alert>
-      <a nbButton outline routerLink="/">Начало</a>
+    } @else if (loadError()) {
+      <nb-alert status="warning" role="alert">{{ loadError() }}</nb-alert>
+      @if (!withdrawn()) {
+        <button nbButton outline type="button" (click)="publication.reload()">Опитай отново</button>
+      }
+      <a nbButton outline routerLink="/archive">Към архива</a>
     } @else {
       <p role="status">Зарежда се материалът…</p>
     }
@@ -115,25 +138,57 @@ import { MaterialReportForm } from '../moderation/material-report-form';
   ],
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class PublishedMaterialPage implements OnInit {
+export class PublishedMaterialPage {
   private readonly publishing = inject(PublishingService);
   private readonly authoring = inject(AuthoringService);
-  private readonly slug = inject(ActivatedRoute).snapshot.paramMap.get('slug') ?? '';
-  protected readonly returnTo = inject(Router).url;
+  private readonly router = inject(Router);
+  private readonly params = toSignal(inject(ActivatedRoute).paramMap, { requireSync: true });
+  protected get returnTo(): string {
+    return this.router.url;
+  }
   protected readonly signedIn = toSignal(inject(NbAuthService).isAuthenticated());
-  protected readonly material = signal<PublicMaterial | null>(null);
+  protected readonly publication = rxResource({
+    params: () => ({ slug: this.params().get('slug') ?? '' }),
+    stream: ({ params }) => this.publishing.getPublishedMaterial(params),
+  });
+  protected readonly material = computed(() =>
+    this.publication.hasValue() ? this.publication.value() : undefined,
+  );
+  protected readonly withdrawn = computed(() => {
+    const error = this.publication.error();
+    return error instanceof HttpErrorResponse && error.status === 404;
+  });
+  protected readonly loadError = computed(() => {
+    if (!this.publication.error()) return '';
+    return this.withdrawn()
+      ? 'Материалът е свален или вече е недостъпен.'
+      : 'Материалът временно не може да се зареди.';
+  });
   protected readonly error = signal('');
   protected readonly saving = signal(false);
   protected readonly saved = signal(false);
 
-  async ngOnInit(): Promise<void> {
-    try {
-      this.material.set(
-        await firstValueFrom(this.publishing.getPublishedMaterial({ slug: this.slug })),
+  constructor() {
+    const seo = inject(ArchiveSeo);
+    inject(DestroyRef).onDestroy(() => seo.clear());
+    effect(() => {
+      const material = this.material();
+      seo.set(
+        material?.content.title ?? 'Материал',
+        (
+          material?.content.summary ??
+          material?.content.subtitle ??
+          'Материал от българския архив.'
+        ).slice(0, 160),
+        '/materials/' + encodeURIComponent(material?.slug ?? this.params().get('slug') ?? ''),
+        Boolean(material),
       );
-    } catch (error: unknown) {
-      this.error.set(actionError(error, 'Материалът не е достъпен.'));
-    }
+    });
+    effect(() => {
+      this.params();
+      this.saved.set(false);
+      this.error.set('');
+    });
   }
 
   protected async save(id: string): Promise<void> {

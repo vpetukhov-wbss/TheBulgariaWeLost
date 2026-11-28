@@ -1,7 +1,7 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import type { OnInit } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { NbAlertModule, NbButtonModule, NbCardModule, NbInputModule } from '@nebular/theme';
 import { firstValueFrom } from 'rxjs';
@@ -14,13 +14,14 @@ import { actionError, problemCode } from '../../core/auth/auth-errors';
 import { authorStatus } from './author-status';
 import { CatalogPicker } from './catalog-picker';
 
-type CatalogField = 'categoryIds' | 'topicIds' | 'sourceIds';
+type CatalogField = 'categoryIds' | 'topicIds' | 'sourceIds' | 'placeIds';
 
 const blockLabels = { Heading: 'Заглавие', Paragraph: 'Абзац', Quote: 'Цитат' };
 const catalogLabels: Record<CatalogField, string> = {
   categoryIds: 'Категории',
   topicIds: 'Теми',
   sourceIds: 'Източници',
+  placeIds: 'Локации',
 };
 const blockerLabels: Record<string, string> = {
   content_required: 'Добави съдържание.',
@@ -89,6 +90,8 @@ export class MaterialComposer implements OnInit {
     categoryIds: this.builder.control<string[]>([]),
     topicIds: this.builder.control<string[]>([]),
     sourceIds: this.builder.control<string[]>([]),
+    placeIds: this.builder.control<string[]>([]),
+    historicalYear: new FormControl<number | null>(null, [Validators.min(1), Validators.max(9999)]),
     provenance: ['', Validators.maxLength(2_000)],
     publicDisplayAllowed: [false],
     rightsStatement: ['', Validators.maxLength(2_000)],
@@ -260,6 +263,8 @@ export class MaterialComposer implements OnInit {
       categoryIds: draft.categoryIds,
       topicIds: draft.topicIds,
       sourceIds: draft.sourceIds,
+      placeIds: draft.placeIds ?? [],
+      historicalYear: draft.historicalYear ?? null,
       publicDisplayAllowed: draft.rights.publicDisplayAllowed,
       rightsStatement:
         draft.rights.statement === 'Not reviewed.' || draft.rights.statement === 'Не са потвърдени.'

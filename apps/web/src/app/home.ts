@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, DestroyRef, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { NbSecurityModule } from '@nebular/security';
 import { NbButtonModule, NbCardModule } from '@nebular/theme';
+import { ArchiveSeo } from './features/archive/archive-seo';
 import { SitePresentationResource } from './core/site-presentation/site-presentation.resource';
 
 @Component({
@@ -11,6 +12,7 @@ import { SitePresentationResource } from './core/site-presentation/site-presenta
       <nb-card-body>
         <h1>{{ presentation().siteName }}</h1>
         <p>Дигитален архив на снимки, документи и лични истории.</p>
+        <p><a nbButton status="primary" routerLink="/archive">Разгледай архива</a></p>
         <a *nbIsGranted="['sign-in', 'session']" nbButton status="primary" routerLink="/register">
           Създай профил
         </a>
@@ -38,4 +40,10 @@ import { SitePresentationResource } from './core/site-presentation/site-presenta
 })
 export class Home {
   protected readonly presentation = inject(SitePresentationResource).settings;
+
+  constructor() {
+    const seo = inject(ArchiveSeo);
+    inject(DestroyRef).onDestroy(() => seo.clear());
+    seo.set('Начало', 'Дигитален архив на снимки, документи и лични истории.', '/');
+  }
 }
